@@ -206,6 +206,9 @@ describe("filing a call that ended on its own", () => {
     });
     expect(filed.outcome).toBe("call_back_later");
     expect(wrapup.wrapUpPrompt(lines, meta)).toContain("Them: She's out. Try after three tomorrow.");
+    const transferred = wrapup.wrapUpPrompt([...lines, { role: "system", text: "Connected to Adil Khan." }], meta);
+    expect(transferred).toContain("(Call note): Connected to Adil Khan.");
+    expect(transferred).toContain("if one says they were connected to Adil Khan, the summary says so");
   });
 
   it("files nothing when they never spoke, or when the model fails", async () => {

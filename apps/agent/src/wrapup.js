@@ -7,14 +7,15 @@ const { AGENT_OUTCOMES } = require("./outcomes");
 // returns is checked field by field; anything that does not fit is dropped.
 
 function wrapUpPrompt(lines, meta) {
-  const transcript = lines.map((l) => `${l.role === "agent" ? meta.agentName : "Them"}: ${l.text}`).join("\n");
+  const speaker = (role) => (role === "agent" ? meta.agentName : role === "system" ? "(Call note)" : "Them");
+  const transcript = lines.map((l) => `${speaker(l.role)}: ${l.text}`).join("\n");
   return `Below is the transcript of a phone call. ${meta.agentName} is an AI assistant that called a restaurant for ${meta.repName} at ${meta.company}, asking for the owner. The call ended before it was filed.
 
 ${transcript}
 
 Reply with one JSON object and nothing else:
 {"outcome": one of ${JSON.stringify(AGENT_OUTCOMES)}, "summary": two short factual sentences, "ownerReached": true or false, "contactName": string or null, "callbackTime": string or null, "bookingSystem": string or null, "interested": true, false or null}
-Use only what was said. If they hung up before anything was agreed, the outcome is "other".`;
+Use only what was said. Lines marked (Call note) are facts about the call: if one says they were connected to ${meta.repName}, the summary says so. If they hung up before anything was agreed, the outcome is "other".`;
 }
 
 const text = (value, max) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null);

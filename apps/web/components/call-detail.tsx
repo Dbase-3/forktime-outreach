@@ -118,8 +118,10 @@ export function CallDetail({
   const failure = cancel.error || again.error || block.error;
 
   return (
-    <article className="card flex max-h-[calc(100vh-190px)] min-h-[320px] flex-col">
-      <header className="border-b border-gray-100 p-4">
+    // One scroll for the whole panel: the summary and recording scroll away and the
+    // transcript keeps its full height. The header (name, status, actions) stays put.
+    <article className="card max-h-[calc(100vh-190px)] min-h-[320px] overflow-y-auto">
+      <header className="sticky top-0 z-10 rounded-t-lg border-b border-gray-100 bg-white p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-gray-900">{call.label || formatPhone(call.phone)}</h2>
@@ -192,7 +194,8 @@ export function CallDetail({
         </section>
       )}
 
-      <section className="flex-1 overflow-y-auto p-4">
+      <section className="p-4">
+        <h3 className="mb-3 text-xs font-medium text-gray-700">Conversation</h3>
         <Transcript lines={transcript} live={open} agentName={agentName} />
       </section>
     </article>

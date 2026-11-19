@@ -344,7 +344,7 @@ class OutreachCall {
     if (this.ended) return;
     const { meta, rep } = this;
     this.emitter.emit("stage", { stage: "transferring" });
-    if (note) this.emitter.line("system", `For ${rep}: ${note}`);
+    if (note) this.noteLine(`For ${rep}: ${note}`);
     await this.session.say(`One moment, I'll put ${rep} on now.`, { allowInterruptions: false }).waitForPlayout().catch(() => undefined);
     this.session.input.setAudioEnabled(false);
 
@@ -356,7 +356,7 @@ class OutreachCall {
       this.pending = null;
       this.session.input.setAudioEnabled(true);
       this.emitter.emit("stage", { stage: "talking" });
-      this.emitter.line("system", `${rep} did not pick up.`);
+      this.noteLine(`${rep} did not pick up.`);
       this.session.generateReply({
         instructions:
           `${rep} did not pick up just now. Tell them so in one short sentence, say ${rep} will call them back, and ask what time suits. ` +
@@ -368,9 +368,15 @@ class OutreachCall {
     if (this.ended) return;
     this.transferred = true;
     this.emitter.emit("stage", { stage: "with_rep" });
-    this.emitter.line("system", `Connected to ${meta.repName}.`);
+    this.noteLine(`Connected to ${meta.repName}. They talked directly from here.`);
     // The agent goes quiet and stays in the room; the call ends when either of them hangs up.
     await this.session.close().catch(() => undefined);
+  }
+
+  /** A note about the call itself, for the screen and for the summary written afterwards. */
+  noteLine(text) {
+    this.lines.push({ role: "system", text });
+    this.emitter.line("system", text);
   }
 
   onParticipantLeft(participant) {

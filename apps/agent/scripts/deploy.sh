@@ -29,10 +29,13 @@ if [ "$(value_of OUTREACH_AGENT_NAME)" != "outreach-agent" ]; then
   exit 1
 fi
 
+# The same region as the Forktime phone agents.
+REGION="${OUTREACH_AGENT_REGION:-us-east}"
+
 echo "Deploying the outreach agent. Reports go to: $WEB_URL"
 if grep -q '^\[agent\]' livekit.toml 2>/dev/null; then
   lk agent deploy --secrets-file "$ENV_FILE"
 else
-  echo "First deploy: creating the agent on LiveKit Cloud."
-  lk agent create --secrets-file "$ENV_FILE"
+  echo "First deploy: creating the agent on LiveKit Cloud ($REGION)."
+  lk agent create --region "$REGION" --secrets-file "$ENV_FILE" --silent
 fi

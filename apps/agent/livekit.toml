@@ -1,5 +1,5 @@
-# The LiveKit Cloud project this agent deploys into (the same project as the
-# Forktime phone agent; this one has its own agent name and its own id).
-# `lk agent create` adds the [agent] id here the first time it is deployed.
 [project]
   subdomain = "ground-labs-qizx17qt"
+
+[agent]
+  id = "CA_9A5PQfcpoAfH"

@@ -44,6 +44,13 @@ scripts/setup-env.mjs   writes both env files; copies provider keys BY NAME from
 - Recording: LiveKit Egress, audio only, to `outreach/<callId>-<attempt>.ogg` in the bucket from `EGRESS_S3_*` (same mechanism as the phone agent).
 - A call the model never filed is filed once from its transcript (`src/wrapup.js`).
 
+## Deploy
+
+- `pnpm setup:prod` writes `apps/web/.env.vercel` (paste into Vercel; root directory `apps/web`) and `apps/agent/.env.prod`. Production has its own login password, session secret and agent key, `DIAL_MODE=live`, and `MONGODB_URI` = the Forktime database server with the database name `forktime_outreach` (`outreachMongoUri` in `scripts/setup-env.mjs`; it keeps the original database as `authSource`, or the sign-in fails on a non-SRV address). That login is the Forktime cluster's admin user: a dedicated user scoped to `forktime_outreach` is owed.
+- The agent in production: `pnpm deploy:agent` (`apps/agent/scripts/deploy.sh`: `lk agent create` the first time, `lk agent deploy` after, secrets from `.env.prod`; refuses a local `OUTREACH_WEB_URL`). `apps/agent/livekit.toml` names the LiveKit project (the same one as the Forktime phone agent). `pnpm dev:agent:prod` runs the worker locally on `.env.prod` (`OUTREACH_ENV_FILE`).
+- Every `.env*` file is git-ignored. Branches follow the Forktime flow: `staging` first, then `main`.
+- The web tests use `mongodb-memory-server-core` on purpose: the full package downloads a MongoDB binary at install time, which a Vercel build would do too.
+
 ## Tests and checks
 
 - `pnpm test`: web (vitest, real throwaway MongoDB via mongodb-memory-server; the dial is the one thing mocked) and agent (vitest, no network).

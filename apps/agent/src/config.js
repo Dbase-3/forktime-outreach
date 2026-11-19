@@ -1,7 +1,8 @@
 "use strict";
 
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "../.env") });
+// OUTREACH_ENV_FILE picks another file in apps/agent (".env.prod": the deployed app's keys).
+require("dotenv").config({ path: path.join(__dirname, "..", process.env.OUTREACH_ENV_FILE || ".env") });
 
 // The voice stack, with the same settings the Forktime phone agent runs on
 // (packages/agent in forktime-core): Soniox for listening, ElevenLabs for the

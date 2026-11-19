@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryServer } from "mongodb-memory-server-core";
 
 // The queue and the agent's reports, end to end against a real (throwaway)
 // database. The one thing faked is the dial itself: no phone rings here.

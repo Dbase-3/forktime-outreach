@@ -1,6 +1,15 @@
-// Writes the two local env files this project needs:
-//   apps/web/.env.local   the app (login, database, dialling)
-//   apps/agent/.env       the voice agent (speech, voice, model, recording)
+// Writes the env files this project needs.
+//
+//   pnpm setup         for your machine:
+//     apps/web/.env.local   the app (login, database, dialling)
+//     apps/agent/.env       the voice agent (speech, voice, model, recording)
+//
+//   pnpm setup:prod    for the deployed app:
+//     apps/web/.env.vercel  paste into Vercel (Settings, Environment Variables)
+//     apps/agent/.env.prod  the agent's secrets (`pnpm deploy:agent`, or `pnpm dev:agent:prod`)
+//   Production gets its own login password, session secret and agent key,
+//   places real calls (DIAL_MODE=live), and keeps its data in a database of its
+//   own (forktime_outreach) on the Forktime database server.
 //
 // Provider keys are copied BY NAME from the Forktime phone agent's env files
 // (../forktime-core/packages/{agent,backend}/.env) when they are there, so the
@@ -48,15 +57,34 @@ function writeEnv(file, title, entries) {
   console.log(report.join("\n"));
 }
 
-const eventsKey = readEnv(join(root, "apps", "web", ".env.local")).AGENT_EVENTS_KEY || readEnv(join(root, "apps", "agent", ".env")).AGENT_EVENTS_KEY || secret(32);
+/**
+ * The Forktime database server, with this project's own database name. A
+ * plain (non-SRV) address signs in against the database named in it unless it
+ * says otherwise, so the original name is kept as the sign-in database.
+ */
+function outreachMongoUri(coreUri) {
+  const match = /^(mongodb(?:\+srv)?:\/\/[^/]+)\/([^?]*)(\?.*)?$/.exec(coreUri || "");
+  if (!match) return "";
+  const [, server, database, query = ""] = match;
+  const needsAuthSource = !server.startsWith("mongodb+srv") && !/[?&]authSource=/i.test(query);
+  const withAuth = needsAuthSource ? `${query ? `${query}&` : "?"}authSource=${database || "admin"}` : query;
+  return `${server}/forktime_outreach${withAuth}`;
+}
 
-writeEnv(join(root, "apps", "web", ".env.local"), "Forktime Outreach: the app", [
+const prod = process.argv.includes("--prod");
+const webFile = join(root, "apps", "web", prod ? ".env.vercel" : ".env.local");
+const agentFile = join(root, "apps", "agent", prod ? ".env.prod" : ".env");
+const eventsKey = readEnv(webFile).AGENT_EVENTS_KEY || readEnv(agentFile).AGENT_EVENTS_KEY || secret(32);
+
+writeEnv(webFile, prod ? "Forktime Outreach: the app, in production (for Vercel)" : "Forktime Outreach: the app", [
   ["ADMIN_EMAIL", () => "ops@outreach.local", "The one operator login."],
-  ["ADMIN_PASSWORD", () => secret(15)],
+  ["ADMIN_PASSWORD", () => secret(prod ? 21 : 15)],
   ["SESSION_SECRET", () => secret(48)],
   ["AGENT_EVENTS_KEY", () => eventsKey, "Shared with apps/agent/.env: the agent signs its reports with it."],
-  ["MONGODB_URI", () => "mongodb://127.0.0.1:27027/forktime_outreach", "`pnpm db` runs a local database here. Production: a real MongoDB."],
-  ["DIAL_MODE", () => "dry", '"dry": no phone rings, calls are acted out on screen. "live": real calls.'],
+  prod
+    ? ["MONGODB_URI", () => outreachMongoUri(sources.backend.MONGO_URI), "This project's own database (forktime_outreach) on the Forktime database server."]
+    : ["MONGODB_URI", () => "mongodb://127.0.0.1:27027/forktime_outreach", "`pnpm db` runs a local database here. Production: a real MongoDB."],
+  ["DIAL_MODE", () => (prod ? "live" : "dry"), '"dry": no phone rings, calls are acted out on screen. "live": real calls.'],
   ["OUTREACH_AGENT_NAME", () => "outreach-agent"],
   ["LIVEKIT_URL", () => from("LIVEKIT_URL", "agent", "backend")],
   ["LIVEKIT_API_KEY", () => from("LIVEKIT_API_KEY", "agent", "backend")],
@@ -67,9 +95,9 @@ writeEnv(join(root, "apps", "web", ".env.local"), "Forktime Outreach: the app", 
   ["ELEVENLABS_API_KEY", () => from("ELEVENLABS_API_KEY", "agent"), "Only to list voices and their samples in Settings."],
 ]);
 
-writeEnv(join(root, "apps", "agent", ".env"), "Forktime Outreach: the voice agent", [
+writeEnv(agentFile, prod ? "Forktime Outreach: the voice agent, in production" : "Forktime Outreach: the voice agent", [
   ["OUTREACH_AGENT_NAME", () => "outreach-agent"],
-  ["OUTREACH_WEB_URL", () => "http://localhost:3100", "Where the app runs; the agent posts its reports here."],
+  ["OUTREACH_WEB_URL", () => (prod ? "" : "http://localhost:3100"), prod ? "The deployed app's address (https://...). FILL THIS IN after the first Vercel deploy." : "Where the app runs; the agent posts its reports here."],
   ["AGENT_EVENTS_KEY", () => eventsKey],
   ["LIVEKIT_URL", () => from("LIVEKIT_URL", "agent", "backend")],
   ["LIVEKIT_API_KEY", () => from("LIVEKIT_API_KEY", "agent", "backend")],
@@ -90,4 +118,8 @@ writeEnv(join(root, "apps", "agent", ".env"), "Forktime Outreach: the voice agen
   ["EGRESS_S3_PUBLIC_URL", () => from("EGRESS_S3_PUBLIC_URL", "agent")],
 ]);
 
-console.log("\nDone. The login email and password are ADMIN_EMAIL and ADMIN_PASSWORD in apps/web/.env.local.");
+console.log(
+  prod
+    ? "\nDone. Paste apps/web/.env.vercel into Vercel. The login is ADMIN_EMAIL and ADMIN_PASSWORD in that file.\nThen put the deployed address in OUTREACH_WEB_URL in apps/agent/.env.prod."
+    : "\nDone. The login email and password are ADMIN_EMAIL and ADMIN_PASSWORD in apps/web/.env.local.",
+);

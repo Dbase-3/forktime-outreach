@@ -61,8 +61,29 @@ pnpm typecheck
 pnpm lint
 ```
 
+## Putting it online
+
+```bash
+pnpm setup:prod   # writes apps/web/.env.vercel and apps/agent/.env.prod
+```
+
+**The app, on Vercel**
+
+1. New Project, import this repository, and set **Root Directory** to `apps/web`.
+2. Paste the contents of `apps/web/.env.vercel` into Environment Variables (Vercel reads a pasted .env file).
+3. Deploy. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from that file.
+
+Production places real calls (`DIAL_MODE=live`) and keeps its data in its own database, `forktime_outreach`, on the Forktime database server. If the app shows a database error, the database's network access list does not allow Vercel yet.
+
+**The voice agent**
+
+Put the deployed app's address in `OUTREACH_WEB_URL` in `apps/agent/.env.prod`. Then either:
+
+- `pnpm dev:agent:prod` runs the agent on your machine against the deployed app. Quickest way to make a first test call.
+- `pnpm deploy:agent` deploys it to LiveKit Cloud (the first run creates the agent there). Calls then work with no machine of yours running.
+
 ## Before calling real restaurants
 
 - **Use separate phone numbers, ideally a separate carrier account.** `pnpm setup` points this project at the same LiveKit project and Telnyx trunk as the Forktime phone agent, which is fine for calling your own phone. Complaints about outbound calls land on the account that carries every live restaurant's line.
 - **Ask your lawyer** about calling businesses with an AI voice, and about recording, in each country you call. The opening line says it is an AI, who it calls for, why, and that the call is recorded. Leave those on.
-- **Deploying**: the app runs anywhere Next.js does and needs a real MongoDB (`MONGODB_URI`). The agent deploys like the Forktime agent (LiveKit Cloud or a server) and needs `OUTREACH_WEB_URL` set to the app's public address.
+- **Give the app its own database login.** `pnpm setup:prod` reuses the Forktime database login, which can read and write every Forktime database. Create a user that can only use `forktime_outreach` and put it in `MONGODB_URI` on Vercel.

@@ -5,6 +5,9 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "setup": "node scripts/setup-env.mjs",
+    "setup:prod": "node scripts/setup-env.mjs --prod",
+    "dev:agent:prod": "pnpm --filter @outreach/agent dev:prod",
+    "deploy:agent": "pnpm --filter @outreach/agent run deploy",
     "db": "pnpm --filter @outreach/web db",
     "dev:web": "pnpm --filter @outreach/web dev",
     "dev:agent": "pnpm --filter @outreach/agent dev",

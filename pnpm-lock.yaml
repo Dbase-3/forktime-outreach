@@ -102,7 +102,7 @@ importers:
       eslint-config-next:
         specifier: ^14.2.30
         version: 14.2.35(eslint@8.57.1)(typescript@5.9.3)
-      mongodb-memory-server:
+      mongodb-memory-server-core:
         specifier: ^10.1.2
         version: 10.4.3(bare-buffer@3.7.3)
       postcss:
@@ -2648,10 +2648,6 @@ packages:
 
   mongodb-memory-server-core@10.4.3:
     resolution: {integrity: sha512-IPjlw73IoSYopnqBibQKxmAXMbOEPf5uGAOsBcaUiNH/TOI7V19WO+K7n5KYtnQ9FqzLGLpvwCGuPOTBSg4s5Q==}
-    engines: {node: '>=16.20.1'}
-
-  mongodb-memory-server@10.4.3:
-    resolution: {integrity: sha512-CDZvFisXvGIigsIw5gqH6r9NI/zxGa/uRdutgUL/isuJh+inj0YXb7Ykw6oFMFzqgTJWb7x0I5DpzrqCstBWpg==}
     engines: {node: '>=16.20.1'}
 
   mongodb@6.22.0:
@@ -6169,23 +6165,6 @@ snapshots:
       tar-stream: 3.2.2(bare-buffer@3.7.3)
       tslib: 2.9.1
       yauzl: 3.4.0
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-providers'
-      - '@mongodb-js/zstd'
-      - bare-abort-controller
-      - bare-buffer
-      - gcp-metadata
-      - kerberos
-      - mongodb-client-encryption
-      - react-native-b4a
-      - snappy
-      - socks
-      - supports-color
-
-  mongodb-memory-server@10.4.3(bare-buffer@3.7.3):
-    dependencies:
-      mongodb-memory-server-core: 10.4.3(bare-buffer@3.7.3)
-      tslib: 2.9.1
     transitivePeerDependencies:
       - '@aws-sdk/credential-providers'
       - '@mongodb-js/zstd'

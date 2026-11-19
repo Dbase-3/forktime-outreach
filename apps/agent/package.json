@@ -5,6 +5,8 @@
   "main": "src/agent.js",
   "scripts": {
     "dev": "node src/agent.js dev",
+    "dev:prod": "OUTREACH_ENV_FILE=.env.prod node src/agent.js dev",
+    "deploy": "bash scripts/deploy.sh",
     "start": "node src/agent.js start",
     "download-files": "node src/agent.js download-files",
     "sim": "node scripts/sim.js",

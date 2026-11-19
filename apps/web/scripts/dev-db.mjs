@@ -3,7 +3,7 @@
 // Production uses a real MongoDB through MONGODB_URI instead.
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryServer } from "mongodb-memory-server-core";
 
 const dbPath = fileURLToPath(new URL("../.data/mongo", import.meta.url));
 mkdirSync(dbPath, { recursive: true });

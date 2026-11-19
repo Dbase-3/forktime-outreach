@@ -253,6 +253,30 @@ describe("the queue, as a dry run, outside calling hours", () => {
   });
 });
 
+describe("settings", () => {
+  it("the voice speed stays between normal and 1.2, and rides to the agent with the call", async () => {
+    const { DEFAULT_SETTINGS, validateSettings } = await import("@/lib/settings");
+    const { callMetadata } = await import("@/lib/dialer");
+    expect("settings" in validateSettings({ ...DEFAULT_SETTINGS, voiceSpeed: 1.2 })).toBe(true);
+    for (const voiceSpeed of [0.9, 1.5]) {
+      const result = validateSettings({ ...DEFAULT_SETTINGS, voiceSpeed });
+      expect("errors" in result && result.errors[0].field).toBe("voiceSpeed");
+    }
+    const [call] = await add("+61889410001");
+    expect(callMetadata(call, { ...DEFAULT_SETTINGS, voiceSpeed: 1.2 }).voiceSpeed).toBe(1.2);
+  });
+
+  it("settings saved before a field existed read back with that field's default", async () => {
+    const { collections } = await import("@/lib/db");
+    const { DEFAULT_SETTINGS, getSettings } = await import("@/lib/settings");
+    const { voiceSpeed: _dropped, ...older } = DEFAULT_SETTINGS;
+    await (await collections()).settings.updateOne({ _id: "app" }, { $set: { ...older, agentName: "Mia" } }, { upsert: true });
+    const read = await getSettings();
+    expect(read.agentName).toBe("Mia");
+    expect(read.voiceSpeed).toBe(1);
+  });
+});
+
 describe("outcomeOfEnding", () => {
   it("files a call under what happened", async () => {
     const { outcomeOfEnding } = await import("@/lib/agent-events");

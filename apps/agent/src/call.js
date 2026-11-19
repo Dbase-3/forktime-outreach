@@ -7,7 +7,7 @@ const soniox = require("@livekit/agents-plugin-soniox");
 const { TelephonyBackgroundVoiceCancellation } = require("@livekit/noise-cancellation-node");
 const { z } = require("zod");
 
-const { VOICE, TIMING, BOOKING_TERMS, env } = require("./config");
+const { VOICE, TIMING, BOOKING_TERMS, env, ttsOptions } = require("./config");
 const { waitForCallAnswer } = require("./callAnswer");
 const { createEmitter } = require("./events");
 const { classifyLine } = require("./lineCheck");
@@ -39,9 +39,14 @@ class OutreachAgent extends voice.Agent {
     this.call = call;
   }
 
+  /**
+   * Whatever they say before the opening line has finished ("hello? hello?")
+   * is answered by that line, not by the model. The SDK drops such a turn, so
+   * the call keeps the words itself.
+   */
   async onUserTurnCompleted(_chatCtx, newMessage) {
-    if (this.call.openingSaid) return;
-    this.call.onFirstWords(newMessage && newMessage.textContent);
+    if (this.call.openingDone) return;
+    this.call.onEarlyWords(newMessage && newMessage.textContent);
     throw new voice.StopResponse();
   }
 }
@@ -74,6 +79,9 @@ class OutreachCall {
     const { ctx, meta } = this;
     const room = ctx.room;
     this.emitter = createEmitter({ baseUrl: env.webUrl(), key: env.eventsKey(), callId: meta.callId, attempt: meta.attempt, log: this.log });
+
+    this.tts = new elevenlabs.TTS({ ...ttsOptions(meta.voiceSpeed), voiceId: meta.voiceId, apiKey: process.env.ELEVENLABS_API_KEY });
+    this.prepareOpening();
 
     const answer = await waitForCallAnswer(room, (meta.ringTimeoutSec + 8) * 1000);
     if (answer !== "answered") {
@@ -165,7 +173,7 @@ class OutreachCall {
           terms: [...BOOKING_TERMS, meta.company, meta.repName, meta.label].filter(Boolean),
         },
       }),
-      tts: new elevenlabs.TTS({ ...VOICE.tts, voiceId: meta.voiceId, apiKey: process.env.ELEVENLABS_API_KEY }),
+      tts: this.tts,
       llm: this.llm,
       turnHandling: { turnDetection, endpointing: VOICE.endpointing, interruption: VOICE.interruption },
       maxToolSteps: VOICE.session.maxToolSteps,
@@ -178,6 +186,8 @@ class OutreachCall {
     this.session.on(Events.ConversationItemAdded, (event) => this.onItem(event.item));
     this.session.on(Events.UserStateChanged, (event) => {
       this.userState = event.newState;
+      // They stopped talking ("Hello?"): answer at once, without waiting for the words to be transcribed.
+      if (event.oldState === "speaking" && event.newState === "listening") this.sayOpening();
       if (event.newState === "away") this.onSilence();
     });
     this.session.on(Events.AgentStateChanged, (event) => {
@@ -189,8 +199,9 @@ class OutreachCall {
       if (!this.transferred) this.finalize(event.error ? "error" : "agent_ended");
     });
 
+    this.agent = new OutreachAgent(this, { instructions: buildInstructions(meta, this.openingLine), tools: this.buildTools() });
     await this.session.start({
-      agent: new OutreachAgent(this, { instructions: buildInstructions(meta, this.openingLine), tools: this.buildTools() }),
+      agent: this.agent,
       room: this.ctx.room,
       inputOptions: {
         audioSampleRate: 16000,
@@ -223,21 +234,60 @@ class OutreachCall {
     });
   }
 
-  /** Their first words: the opening line answers them, and the model judges who (or what) answered. */
-  onFirstWords(text) {
-    this.firstHeard = String(text || "").trim() || null;
-    this.lineCheck = classifyLine({ llmModel: this.llm, firstHeard: this.firstHeard, ChatContext: llm.ChatContext, log: this.log }).then((kind) => {
-      this.lineKind = kind;
-      return kind;
-    });
+  /**
+   * The opening line's audio is made while the phone is still ringing, so it
+   * starts the moment they have said hello and not a second later.
+   */
+  prepareOpening() {
+    this.openingFrames = null;
+    (async () => {
+      const frames = [];
+      for await (const audio of this.tts.synthesize(this.openingLine)) if (audio && audio.frame) frames.push(audio.frame);
+      if (frames.length) this.openingFrames = frames;
+    })().catch((err) => this.log.warn(`[Call] the opening line was not made ahead: ${err.message}`));
+  }
+
+  /**
+   * What they said before the opening line finished. The first of it tells the
+   * model who answered (and is judged: person, voicemail or menu); all of it
+   * goes in the transcript. If the opening has not started yet, it starts now.
+   */
+  onEarlyWords(text) {
+    const heard = String(text || "").trim();
+    if (heard) {
+      this.lines.push({ role: "callee", text: heard });
+      this.emitter.line("callee", heard);
+    }
+    if (heard && !this.firstHeard) {
+      this.firstHeard = heard;
+      this.lineCheck = classifyLine({ llmModel: this.llm, firstHeard: heard, ChatContext: llm.ChatContext, log: this.log }).then((kind) => {
+        this.lineKind = kind;
+        return kind;
+      });
+      if (this.agent) {
+        Promise.resolve(this.agent.updateInstructions(buildInstructions(this.meta, this.openingLine, { firstHeard: heard }))).catch((err) =>
+          this.log.warn(`[Call] could not add their first words to the instructions: ${err.message}`),
+        );
+      }
+    }
     this.sayOpening();
   }
 
   sayOpening() {
-    if (this.openingSaid || this.ended) return;
+    if (this.openingSaid || this.ended || !this.session) return;
     this.openingSaid = true;
     // Not interruptible: the person must hear that this is an AI, who it calls for and why.
-    const handle = this.session.say(this.openingLine, { allowInterruptions: false, addToChatCtx: true });
+    const options = { allowInterruptions: false, addToChatCtx: true };
+    const frames = this.openingFrames;
+    if (frames) {
+      options.audio = new ReadableStream({
+        start(controller) {
+          for (const frame of frames) controller.enqueue(frame);
+          controller.close();
+        },
+      });
+    }
+    const handle = this.session.say(this.openingLine, options);
     handle
       .waitForPlayout()
       .catch(() => undefined)

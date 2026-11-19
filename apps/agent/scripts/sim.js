@@ -197,8 +197,9 @@ const words = (text) => (text.replace(META.callbackNumberSpoken, "").match(/[\p{
 async function play(scenario) {
   const meta = { ...META, label: scenario.label || META.label };
   const call = new OutreachCall({ ctx: { room: { name: "sim" } }, meta, vad: null });
+  // As on a real call: their first words are not a turn the model answered (the opening line
+  // answered them); they reach the model through its instructions.
   const chatCtx = llm.ChatContext.empty();
-  chatCtx.addMessage({ role: "user", content: scenario.greeting });
   chatCtx.addMessage({ role: "assistant", content: call.openingLine });
 
   const model = new anthropic.LLM({ ...VOICE.llm, apiKey: process.env.ANTHROPIC_API_KEY_EVAL || process.env.ANTHROPIC_API_KEY });
@@ -212,7 +213,8 @@ async function play(scenario) {
     for (const fn of event.functionCalls || []) toolCalls.push(fn.name);
   });
 
-  await session.start({ agent: new voice.Agent({ instructions: buildInstructions(meta, call.openingLine), tools: call.buildTools(), chatCtx }) });
+  const instructions = buildInstructions(meta, call.openingLine, { firstHeard: scenario.greeting });
+  await session.start({ agent: new voice.Agent({ instructions, tools: call.buildTools(), chatCtx }) });
   // Who answered, judged from their first words exactly as on a real call.
   call.llm = model;
   call.lineKind = await classifyLine({ llmModel: model, firstHeard: scenario.greeting, ChatContext: llm.ChatContext });

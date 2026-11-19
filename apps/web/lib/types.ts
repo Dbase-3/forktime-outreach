@@ -20,6 +20,12 @@ export interface Settings {
   callbackNumber: string;
   /** ElevenLabs voice id. */
   voiceId: string;
+  /**
+   * How fast the voice speaks: 1 is normal, up to 1.2. Normal uses the most
+   * natural voice model, which has one fixed speed; anything faster uses the
+   * model that takes a speed (the agent picks, apps/agent/src/config.js).
+   */
+  voiceSpeed: number;
   /** Caller ID for new calls: one of the carrier account's numbers. E.164. */
   fromNumber: string;
   /** Calls go out only inside this window, on this clock. */

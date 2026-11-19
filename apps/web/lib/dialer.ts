@@ -39,6 +39,7 @@ export function callMetadata(call: Call, settings: Settings) {
     /** The call-back number as words, so the voice reads it digit by digit. */
     callbackNumberSpoken: settings.callbackNumber ? spokenPhone(settings.callbackNumber) : "",
     voiceId: settings.voiceId,
+    voiceSpeed: settings.voiceSpeed,
     ringTimeoutSec: settings.ringTimeoutSec,
     maxCallMinutes: settings.maxCallMinutes,
     recordCalls: settings.recordCalls,

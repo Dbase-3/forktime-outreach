@@ -6,11 +6,19 @@ const { firstName } = require("./opening");
 // calling for a named person at a named company, about a named topic. It is
 // never a customer and never has a booking to make.
 
-function buildInstructions(meta, openingLine) {
+/**
+ * @param {object} meta        the call's details from the app
+ * @param {string} openingLine the line already spoken
+ * @param {{firstHeard?: string|null}} [heard] what they said when they picked up, before the opening line
+ */
+function buildInstructions(meta, openingLine, heard = {}) {
   const rep = firstName(meta.repName);
   const company = meta.company;
   const callbackNumber = meta.callbackNumberSpoken || "the number this call came from";
   const place = meta.label ? `You are calling: ${meta.label}.` : "";
+  const pickedUpWith = heard.firstHeard
+    ? `\nWhen they picked up, before you spoke, they said: "${String(heard.firstHeard).slice(0, 400)}"`
+    : "";
 
   return `You are ${meta.agentName}, an AI voice assistant on a phone call. You are calling a restaurant for ${meta.repName} at ${company}. ${company} sets restaurants up with an AI phone assistant that answers their calls and takes bookings. You are one of those assistants, so this call is a live example of how one sounds. ${place}
 
@@ -19,7 +27,7 @@ ${rep} would like a short word with the owner, or the manager who makes decision
 
 THE CALL HAS STARTED
 You have already said, word for word: "${openingLine}"
-Never say it again.
+Never say it again.${pickedUpWith}
 
 ALWAYS TRUE
 - You are an AI. Say so plainly whenever it comes up. Never claim or hint that you are a person.

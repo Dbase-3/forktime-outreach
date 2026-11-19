@@ -43,10 +43,17 @@ const VOICE = {
     enableLanguageIdentification: true,
   },
   tts: {
-    model: "eleven_v4_turbo",
     encoding: "pcm_16000",
-    // v4 is a dialogue model: it takes stability and nothing else.
-    voiceSettings: { stability: 0.6 },
+    // The most natural model. It is a dialogue model: it takes stability and
+    // nothing else, so it has one speaking speed.
+    natural: { model: "eleven_v4_turbo", voiceSettings: { stability: 0.6 } },
+    // The model that takes a speed (up to 1.2). Measured on the same line and
+    // voice: 9.4 s on v4 Turbo, 6.8 s here at 1.2.
+    paced: {
+      model: "eleven_flash_v2_5",
+      voiceSettings: { stability: 0.6, similarity_boost: 0.75, style: 0.0, use_speaker_boost: false },
+    },
+    maxSpeed: 1.2,
   },
   llm: {
     model: process.env.OUTREACH_LLM_MODEL || "claude-haiku-4-5",
@@ -74,10 +81,13 @@ const VOICE = {
 };
 
 const TIMING = {
-  /** After the pickup, how long to wait for their "hello" before speaking first. */
-  openingWaitMs: 2500,
+  /**
+   * After the pickup, how long to wait for their "hello" before speaking first.
+   * Any longer and the person hears a dead line and starts saying "hello? hello?".
+   */
+  openingWaitMs: 900,
   /** If they are still talking then, the longest the opening line waits for them to finish. */
-  openingHardCapMs: 9000,
+  openingHardCapMs: 6000,
   /** After the opening line, how long a recording is given to stay silent before the call is ended. */
   recordingSilenceMs: 4000,
   /** How long the rep's phone rings on a transfer. */
@@ -85,6 +95,21 @@ const TIMING = {
   /** After the agent is told to wrap up at the time limit, how long before the line is cut. */
   timeLimitGraceMs: 20000,
 };
+
+/**
+ * The voice model and its settings for a speaking speed. Normal speed (1, or
+ * anything that is not a number) is the natural model; faster is the paced
+ * model at that speed, capped at its limit. Pure.
+ */
+function ttsOptions(voiceSpeed) {
+  const speed = Math.min(Number(voiceSpeed) || 1, VOICE.tts.maxSpeed);
+  if (!(speed > 1)) return { encoding: VOICE.tts.encoding, ...VOICE.tts.natural };
+  return {
+    encoding: VOICE.tts.encoding,
+    model: VOICE.tts.paced.model,
+    voiceSettings: { ...VOICE.tts.paced.voiceSettings, speed },
+  };
+}
 
 function required(name) {
   const value = process.env[name];
@@ -115,4 +140,4 @@ const env = {
   }),
 };
 
-module.exports = { VOICE, TIMING, BOOKING_TERMS, env };
+module.exports = { VOICE, TIMING, BOOKING_TERMS, env, ttsOptions };

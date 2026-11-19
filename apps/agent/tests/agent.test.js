@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import callAnswer from "../src/callAnswer.js";
+import config from "../src/config.js";
 import events from "../src/events.js";
 import lineCheck from "../src/lineCheck.js";
 import opening from "../src/opening.js";
@@ -65,6 +66,13 @@ describe("the agent's instructions", () => {
   it("take a no, and a busy owner, at their word", () => {
     expect(text).toContain("Never ask for the owner again after a no.");
     expect(text).toContain("never offer to connect Adil now");
+  });
+
+  it("carry what they said at pickup, when it is known", () => {
+    expect(text).not.toContain("When they picked up");
+    expect(prompt.buildInstructions(meta, meta.openingLine, { firstHeard: "Luigi's, owner speaking." })).toContain(
+      'When they picked up, before you spoke, they said: "Luigi\'s, owner speaking."',
+    );
   });
 
   it("give staff the call-back number as words, and fall back when none is set", () => {
@@ -235,6 +243,24 @@ describe("who answered: a person or a recording", () => {
   });
 });
 
+describe("the voice for a speaking speed", () => {
+  it("normal speed is the natural model, which only takes stability", () => {
+    for (const speed of [1, undefined, null, "fast", 0.8]) {
+      expect(config.ttsOptions(speed)).toEqual({ encoding: "pcm_16000", model: "eleven_v4_turbo", voiceSettings: { stability: 0.6 } });
+    }
+  });
+
+  it("faster is the model that takes a speed, never past its limit", () => {
+    expect(config.ttsOptions(1.2)).toEqual({
+      encoding: "pcm_16000",
+      model: "eleven_flash_v2_5",
+      voiceSettings: { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: false, speed: 1.2 },
+    });
+    expect(config.ttsOptions(1.1).voiceSettings.speed).toBe(1.1);
+    expect(config.ttsOptions(3).voiceSettings.speed).toBe(1.2);
+  });
+});
+
 describe("small helpers", () => {
   it("Australian numbers go out on the Australian trunk when there is one", () => {
     expect(transfer.trunkFor("+61400000001", { standard: "T1", au: "T2" })).toBe("T2");
@@ -275,6 +301,42 @@ describe("the agent's tools and call details", () => {
     expect(await tools.end_call.execute({ goodbye: "No worries, thanks for your time.", ...filed }, {})).toBeUndefined();
     expect(call.filed).toEqual(filed);
     expect(call.pending).toEqual({ type: "end", goodbye: "No worries, thanks for your time." });
+  });
+
+  it("what they say before the opening line is kept, judged once and never answered by the model", async () => {
+    const said = [];
+    const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+    call.emitter = { line: (role, text) => said.push(`${role}: ${text}`) };
+    call.llm = { chat: () => (async function* () { yield { delta: { content: "person" } }; })() };
+    const updated = [];
+    call.agent = { updateInstructions: async (text) => updated.push(text) };
+    call.session = { say: vi.fn(() => ({ waitForPlayout: () => new Promise(() => {}) })) };
+
+    call.onEarlyWords("Hello?");
+    call.onEarlyWords("  Hello, who is this? ");
+    call.onEarlyWords("");
+
+    expect(said).toEqual(["callee: Hello?", "callee: Hello, who is this?"]);
+    expect(call.firstHeard).toBe("Hello?");
+    expect(await call.lineCheck).toBe("person");
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toContain('they said: "Hello?"');
+    // The opening line is said once, however many times they say hello.
+    expect(call.session.say).toHaveBeenCalledTimes(1);
+    expect(call.session.say.mock.calls[0][0]).toBe(meta.openingLine);
+    expect(call.session.say.mock.calls[0][1]).toMatchObject({ allowInterruptions: false, addToChatCtx: true });
+  });
+
+  it("the opening line uses the audio made while it rang, when there is some", async () => {
+    const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+    call.session = { say: vi.fn(() => ({ waitForPlayout: () => new Promise(() => {}) })) };
+    call.openingFrames = [{ frame: 1 }, { frame: 2 }];
+    call.sayOpening();
+    const { audio } = call.session.say.mock.calls[0][1];
+    const reader = audio.getReader();
+    expect((await reader.read()).value).toEqual({ frame: 1 });
+    expect((await reader.read()).value).toEqual({ frame: 2 });
+    expect((await reader.read()).done).toBe(true);
   });
 
   it("a no from staff is filed as staff turning the call away, not as the owner's answer", async () => {

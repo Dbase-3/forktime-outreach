@@ -176,6 +176,18 @@ export function SettingsForm() {
             ))}
           </select>
         </Field>
+        <Field
+          label="Speaking speed"
+          hint="Normal uses the most natural voice model, which has one fixed speed. Faster uses the voice model that can be sped up, so it sounds slightly different."
+          error={fieldErrors.voiceSpeed}
+          wide
+        >
+          <select className="field" value={String(form.voiceSpeed)} onChange={(e) => set("voiceSpeed", Number(e.target.value))}>
+            <option value="1">Normal</option>
+            <option value="1.1">Fast (1.1)</option>
+            <option value="1.2">Faster (1.2)</option>
+          </select>
+        </Field>
         {voice?.previewUrl && (
           <div className="sm:col-span-2">
             <span className="label">Sample of this voice</span>

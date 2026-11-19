@@ -1,0 +1,266 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { MongoMemoryServer } from "mongodb-memory-server";
+
+// The queue and the agent's reports, end to end against a real (throwaway)
+// database. The one thing faked is the dial itself: no phone rings here.
+
+const placeCall = vi.fn(async () => undefined);
+const closeRoom = vi.fn(async () => undefined);
+vi.mock("@/lib/dialer", async (original) => ({
+  ...(await original<typeof import("@/lib/dialer")>()),
+  placeCall,
+  closeRoom,
+}));
+
+let server: MongoMemoryServer;
+
+beforeAll(async () => {
+  server = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = `${server.getUri()}outreach_test`;
+});
+
+afterAll(async () => {
+  const { closeDb } = await import("@/lib/db");
+  await closeDb();
+  await server.stop();
+});
+
+beforeEach(async () => {
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  await Promise.all(["calls", "transcripts", "settings", "dnc"].map((name) => db.collection(name).deleteMany({})));
+  placeCall.mockClear();
+  closeRoom.mockClear();
+  placeCall.mockImplementation(async () => undefined);
+  process.env.DIAL_MODE = "live";
+});
+
+async function setup(overrides: Record<string, unknown> = {}) {
+  const { DEFAULT_SETTINGS, saveSettings, setQueueRunning } = await import("@/lib/settings");
+  await saveSettings({
+    ...DEFAULT_SETTINGS,
+    enforceWindow: false,
+    transferNumber: "+61400000001",
+    callbackNumber: "+61400000002",
+    fromNumber: "+61400000003",
+    ...overrides,
+  });
+  await setQueueRunning(true);
+}
+
+async function add(...phones: string[]) {
+  const { addCalls } = await import("@/lib/calls-repo");
+  return addCalls(phones.map((phone, i) => ({ phone, label: `Place ${i + 1}` })), "+61400000003");
+}
+
+const statuses = async () => {
+  const { listCalls } = await import("@/lib/calls-repo");
+  const calls = await listCalls();
+  return Object.fromEntries(calls.map((c) => [c.label, c.outcome ? `${c.status}:${c.outcome}` : c.status]));
+};
+
+describe("the queue, with real calls", () => {
+  it("dials one number at a time, and the agent's ending starts the next", async () => {
+    await setup();
+    const [first, second] = await add("+61889410001", "+61889410002");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+
+    await advanceQueue();
+    await advanceQueue();
+    expect(placeCall).toHaveBeenCalledTimes(1);
+    expect(await statuses()).toEqual({ "Place 1": "dialing", "Place 2": "queued" });
+
+    await applyAgentEvent({ type: "answered", callId: first._id, attempt: 1 });
+    await applyAgentEvent({ type: "transcript", callId: first._id, attempt: 1, seq: 1, role: "callee", text: "Rosie's, hello?" });
+    await applyAgentEvent({ type: "transcript", callId: first._id, attempt: 1, seq: 1, role: "callee", text: "Rosie's, hello?" });
+    expect(await statuses()).toEqual({ "Place 1": "live", "Place 2": "queued" });
+
+    await applyAgentEvent({
+      type: "ended",
+      callId: first._id,
+      attempt: 1,
+      outcome: "message_left",
+      endReason: "agent_ended",
+      summary: "Staff will pass the number on.",
+      ownerReached: false,
+    });
+    expect(await statuses()).toEqual({ "Place 1": "ended:message_left", "Place 2": "dialing" });
+    expect(placeCall).toHaveBeenCalledTimes(2);
+
+    const { getTranscript, getCall } = await import("@/lib/calls-repo");
+    expect((await getTranscript(first._id)).map((l) => l.text)).toEqual(["Rosie's, hello?"]);
+    expect((await getCall(first._id))?.summary).toBe("Staff will pass the number on.");
+    expect((await getCall(second._id))?.roomName).toBe(`outreach-${second._id}-1`);
+  });
+
+  it("two ticks at the same moment still start one call", async () => {
+    await setup();
+    await add("+61889410001", "+61889410002");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    await Promise.all([advanceQueue(), advanceQueue(), advanceQueue()]);
+    expect(Object.values(await statuses()).filter((s) => s === "dialing")).toHaveLength(1);
+    expect(placeCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("an unanswered call goes back in the queue for later, up to the limit", async () => {
+    await setup({ maxAttempts: 2, retryAfterMinutes: 60 });
+    const [call] = await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    const { getCall } = await import("@/lib/calls-repo");
+    const t0 = new Date("2026-11-18T04:00:00Z");
+
+    await advanceQueue(t0);
+    await applyAgentEvent({ type: "not_answered", callId: call._id, attempt: 1 }, t0);
+    const requeued = await getCall(call._id);
+    expect(requeued?.status).toBe("queued");
+    expect(requeued?.attempt).toBe(2);
+    expect(requeued?.notBefore?.toISOString()).toBe("2026-11-18T05:00:00.000Z");
+
+    // Not yet due: nothing is dialled.
+    await advanceQueue(new Date("2026-11-18T04:30:00Z"));
+    expect(placeCall).toHaveBeenCalledTimes(1);
+
+    const t1 = new Date("2026-11-18T05:01:00Z");
+    await advanceQueue(t1);
+    expect(placeCall).toHaveBeenCalledTimes(2);
+    await applyAgentEvent({ type: "not_answered", callId: call._id, attempt: 2 }, t1);
+    expect(await statuses()).toEqual({ "Place 1": "ended:no_answer" });
+  });
+
+  it("a report from an earlier try of the same number is ignored", async () => {
+    await setup();
+    const [call] = await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    await advanceQueue();
+    await applyAgentEvent({ type: "not_answered", callId: call._id, attempt: 1 });
+    await applyAgentEvent({ type: "ended", callId: call._id, attempt: 1, endReason: "callee_hung_up" });
+    expect(await statuses()).toEqual({ "Place 1": "queued" });
+  });
+
+  it("someone who asks not to be called goes on the list and is never dialled again", async () => {
+    await setup();
+    const [call] = await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    const { dncPhones } = await import("@/lib/dnc");
+
+    await advanceQueue();
+    await applyAgentEvent({ type: "answered", callId: call._id, attempt: 1 });
+    await applyAgentEvent({ type: "ended", callId: call._id, attempt: 1, outcome: "do_not_call", endReason: "agent_ended" });
+    expect([...(await dncPhones())]).toEqual(["+61889410001"]);
+
+    const { setQueueRunning } = await import("@/lib/settings");
+    await add("+61889410001");
+    await setQueueRunning(true);
+    await advanceQueue();
+    expect(placeCall).toHaveBeenCalledTimes(1);
+    const { listCalls } = await import("@/lib/calls-repo");
+    expect((await listCalls()).map((c) => c.outcome).sort()).toEqual(["do_not_call", "skipped_do_not_call"]);
+  });
+
+  it("a call the agent never reported on is closed, so the queue is not stuck", async () => {
+    await setup({ ringTimeoutSec: 30 });
+    await add("+61889410001", "+61889410002");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const t0 = new Date("2026-11-18T04:00:00Z");
+    await advanceQueue(t0);
+    await advanceQueue(new Date(t0.getTime() + 60_000));
+    expect(await statuses()).toEqual({ "Place 1": "dialing", "Place 2": "queued" });
+
+    await advanceQueue(new Date(t0.getTime() + 80_000));
+    expect(await statuses()).toEqual({ "Place 2": "dialing", "Place 1": "ended:failed" });
+    expect(closeRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dial the carrier refuses is filed as failed and the next number goes out", async () => {
+    await setup();
+    await add("+61889410001", "+61889410002");
+    placeCall.mockImplementationOnce(async () => {
+      throw new Error("trunk refused");
+    });
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    await advanceQueue();
+    expect(await statuses()).toEqual({ "Place 2": "dialing", "Place 1": "ended:failed" });
+  });
+
+  it("nothing is dialled outside the calling window, or while paused", async () => {
+    await setup({ enforceWindow: true, timezone: "UTC", windowStart: "09:00", windowEnd: "17:00", windowDays: [1, 2, 3, 4, 5, 6, 7] });
+    await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { setQueueRunning } = await import("@/lib/settings");
+
+    expect((await advanceQueue(new Date("2026-11-18T20:00:00Z"))).waiting).toBe("outside_window");
+    await setQueueRunning(false);
+    expect((await advanceQueue(new Date("2026-11-18T10:00:00Z"))).waiting).toBe("paused");
+    expect(placeCall).not.toHaveBeenCalled();
+
+    await setQueueRunning(true);
+    expect((await advanceQueue(new Date("2026-11-18T10:00:00Z"))).activeCallId).toBeTruthy();
+    expect(placeCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("the queue stops itself when it runs dry", async () => {
+    await setup();
+    const [call] = await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    await advanceQueue();
+    await applyAgentEvent({ type: "answered", callId: call._id, attempt: 1 });
+    await applyAgentEvent({ type: "ended", callId: call._id, attempt: 1, endReason: "transferred", transferred: true });
+    const snapshot = await advanceQueue();
+    expect(snapshot).toMatchObject({ running: false, waiting: "paused", activeCallId: null, queued: 0 });
+    expect(await statuses()).toEqual({ "Place 1": "ended:transferred" });
+  });
+});
+
+describe("the queue, as a dry run", () => {
+  it("acts each call out on screen and never dials", async () => {
+    delete process.env.DIAL_MODE;
+    await setup();
+    await add("+61889410001", "+61889410002");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { getTranscript, listCalls } = await import("@/lib/calls-repo");
+
+    const t0 = new Date("2026-11-18T04:00:00Z");
+    const at = (seconds: number) => new Date(t0.getTime() + seconds * 1000);
+    expect((await advanceQueue(t0)).mode).toBe("dry");
+    await advanceQueue(at(6));
+    const [live] = await listCalls();
+    expect(live.status).toBe("live");
+    expect(live.simulated).toBe(true);
+    expect((await getTranscript(live._id)).length).toBeGreaterThan(0);
+
+    for (let s = 10; s <= 120; s += 5) await advanceQueue(at(s));
+    const done = await listCalls();
+    expect(done.every((c) => c.status === "ended")).toBe(true);
+    expect(done.map((c) => c.outcome).sort()).toEqual(["transferred", "voicemail"]);
+    expect(placeCall).not.toHaveBeenCalled();
+  });
+});
+
+describe("the queue, as a dry run, outside calling hours", () => {
+  it("still runs: no phone rings, so the hours do not apply", async () => {
+    delete process.env.DIAL_MODE;
+    await setup({ enforceWindow: true, timezone: "UTC", windowStart: "09:00", windowEnd: "17:00", windowDays: [1, 2, 3, 4, 5, 6, 7] });
+    await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const snapshot = await advanceQueue(new Date("2026-11-18T22:00:00Z"));
+    expect(snapshot.activeCallId).toBeTruthy();
+    expect(snapshot.waiting).toBe("line_busy");
+  });
+});
+
+describe("outcomeOfEnding", () => {
+  it("files a call under what happened", async () => {
+    const { outcomeOfEnding } = await import("@/lib/agent-events");
+    const ended = (extra: object) => ({ type: "ended" as const, callId: "c", endReason: "agent_ended" as const, ...extra });
+    expect(outcomeOfEnding(ended({ outcome: "not_interested" }))).toBe("not_interested");
+    expect(outcomeOfEnding(ended({ outcome: "owner_callback", transferred: true }))).toBe("transferred");
+    expect(outcomeOfEnding(ended({ endReason: "callee_hung_up" }))).toBe("hung_up");
+    expect(outcomeOfEnding(ended({ endReason: "error" }))).toBe("failed");
+    expect(outcomeOfEnding(ended({}))).toBe("other");
+  });
+});

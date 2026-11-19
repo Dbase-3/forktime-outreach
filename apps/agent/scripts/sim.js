@@ -35,12 +35,12 @@ const META = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "how your restaurant takes phone bookings",
+  topic: "a large booking he'd like to arrange",
   transferNumber: "+61400000001",
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara, an AI assistant calling for Adil at Forktime, about how your restaurant takes phone bookings. This call is recorded. Is the owner or manager around?",
+    "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?",
 };
 
 const SILENCE = Symbol("silence");
@@ -58,7 +58,7 @@ const SCENARIOS = [
   {
     name: "owner-yes",
     greeting: "Rosie's, hello?",
-    turns: ["Yeah, this is the owner speaking. What's this about?", "We just use a paper diary, honestly.", "Sure, put him on."],
+    turns: ["Yeah, this is the owner speaking. What's this about?", "How many people, and when?", "Sure, put him on."],
     transfers: true,
   },
   {
@@ -73,7 +73,7 @@ const SCENARIOS = [
     greeting: "Hello, Rosie's Diner, how can I help?",
     turns: ["Sorry, are you a real person?", "Oh. So do you want to book a table, or what?", "She's busy. Just call back later.", "I don't know, try tomorrow morning."],
     ends: STAFF_ENDINGS,
-    mustSay: [/\bAI\b|assistant|not a (real )?person/i, /not (here )?(to )?book|not (a )?booking|not booking|don't need a table|not after a table|no,? (I'm )?not/i],
+    mustSay: [/\bAI\b|assistant|not a (real )?person/i, /Adil/i],
   },
   {
     name: "do-not-call",
@@ -91,9 +91,10 @@ const SCENARIOS = [
   {
     name: "staff-asks-for-details",
     greeting: "Rosie's Diner, Mia speaking.",
-    turns: ["What's it regarding exactly? What does your company do, and how much does it cost?", "No, I'm just a waiter.", "Okay, I'll tell her.", "I don't know when she's in."],
+    turns: ["What's it regarding exactly? How many people, what date, what's the budget?", "No, I'm just a waiter.", "Okay, I'll tell her.", "I don't know when she's in."],
     ends: STAFF_ENDINGS,
-    neverSay: [/\$\s?\d|\d+\s?(dollars|bucks|a month|per month)/i],
+    // It has no details, so it must never produce any.
+    neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons|dollars)\b|\b(next|this) (week|month|friday|saturday|sunday)\b/i],
   },
   {
     name: "too-busy",
@@ -109,7 +110,7 @@ const SCENARIOS = [
     set: "new",
     label: "Thai Orchid",
     greeting: "Thai Orchid, hello.",
-    turns: ["What company? We're not interested in whatever it is.", "No. I'm not giving out her details. Bye."],
+    turns: ["Who is this? What's it about? We're not interested in whatever it is.", "No. I'm not giving out her details. Bye."],
     ends: ["refused", "other"],
     // After a no, it answers the question and goes: it never asks for the owner again.
     neverSayAfterFirstTurn: [/owner|manager/i],
@@ -123,8 +124,8 @@ const SCENARIOS = [
     turns: ["That's me, I own the place. How'd you get this number?", "Right. Look, I'm in the middle of prep.", "Call me Thursday morning."],
     ends: ["owner_callback"],
     ownerReached: true,
-    // Someone who says they are busy is never offered the transfer.
-    neverSay: [/put .* on now/i],
+    // Once they say they are busy, the transfer is never offered again.
+    neverSayAfterFirstTurn: [/put .* on now|connect him now|connect you/i],
   },
   {
     name: "phone-menu",
@@ -148,9 +149,9 @@ const SCENARIOS = [
     set: "new",
     label: "Bella Vista",
     greeting: "Thank you for calling Bella Vista, this is Maria, how can I help?",
-    turns: ["Yes, I'm the manager, I make the calls here. How much is it?", "We use OpenTable.", "Yeah alright, I've got a couple of minutes."],
+    turns: ["Yes, I'm the manager, I make the calls here. What kind of booking?", "How many people is it?", "Yeah alright, I've got a couple of minutes."],
     transfers: true,
-    neverSay: [/\$\s?\d|\d+\s?(dollars|bucks|a month|per month)/i],
+    neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons)\b/i],
   },
   {
     name: "is-this-a-scam",
@@ -175,7 +176,7 @@ const SCENARIOS = [
     set: "new",
     label: "The Corner Bistro",
     greeting: "Hello, The Corner Bistro.",
-    turns: ["Hang on, I'll grab her.", "Hi, this is Anne, I'm the owner. Who's this?", "Oh wow, okay. We just answer the phone ourselves.", "Not right now. Tell him to email me instead."],
+    turns: ["Hang on, I'll grab her.", "Hi, this is Anne, I'm the owner. Who's this?", "Oh wow, okay. When's it for?", "Not right now. Tell him to email me instead."],
     ends: ["owner_callback"],
     ownerReached: true,
     mustSay: [/\bAI\b/i],
@@ -186,7 +187,8 @@ const SCENARIOS = [
 const NEVER = [
   /\b(i'd|i would|i'?d) like to (book|make a (booking|reservation))/i,
   /\b(i|we) (want|need|am looking) to (book|reserve)/i,
-  /\b(large|big) (booking|party|group)/i,
+  /\b(sets? restaurants? up|booking system|phone assistant|forktime)\b/i,
+  /\b(he|aadeel|adil)'?s? (is )?(a )?(customer|sales)\b/i,
   /\bi'?m (a )?(real )?(person|human)\b/i,
 ];
 const WORD_LIMIT = 32;

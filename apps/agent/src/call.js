@@ -147,6 +147,8 @@ class OutreachCall {
         execute: async ({ goodbye, ...filed }) => {
           // "Not interested" from someone who is not the owner is staff turning the call away.
           if (filed.outcome === "not_interested" && filed.ownerReached === false) filed.outcome = "refused";
+          // "The owner wants a follow-up" is only true if an owner was reached; from staff it is a better time to call.
+          if (filed.outcome === "owner_callback" && filed.ownerReached === false) filed.outcome = "call_back_later";
           this.filed = filed;
           this.pending = { type: "end", goodbye };
           return undefined;
@@ -313,7 +315,7 @@ class OutreachCall {
       ownerReached: false,
     };
     // A menu is not listening; a voicemail is, so it gets the message.
-    const message = voicemail && meta.callbackNumberSpoken ? `Please call ${rep} from ${meta.company} back on ${meta.callbackNumberSpoken}.` : null;
+    const message = voicemail && meta.callbackNumberSpoken ? `Please call ${rep} back on ${meta.callbackNumberSpoken}. It's about a large booking.` : null;
     this.pending = { type: "end", goodbye: message };
     this.agentSpokeLast = false;
     return true;

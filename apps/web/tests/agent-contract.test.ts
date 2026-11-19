@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS } from "@/lib/settings";
 const require = createRequire(import.meta.url);
 const agentOutcomes = require("../../agent/src/outcomes.js") as { AGENT_OUTCOMES: string[] };
 const agentOpening = require("../../agent/src/opening.js") as {
-  hasDisclosure: (line: string, company: string) => boolean;
+  hasDisclosure: (line: string, repFirstName: string) => boolean;
   resolveOpeningLine: (meta: Record<string, unknown>) => string;
 };
 
@@ -23,11 +23,11 @@ describe("the app and the agent agree", () => {
     const lines = [
       buildOpeningLine(DEFAULT_SETTINGS),
       "Hi, I'd like to make a large booking. Is the owner around?",
-      "Hi, this is Sara from Forktime.",
+      "Hi, this is Sara calling for Adil.",
       "Hi, this is an AI assistant.",
       "",
     ];
-    for (const line of lines) expect(agentOpening.hasDisclosure(line, "Forktime")).toBe(hasDisclosure(line, "Forktime"));
+    for (const line of lines) expect(agentOpening.hasDisclosure(line, "Adil")).toBe(hasDisclosure(line, "Adil"));
   });
 
   it("the agent speaks the app's opening line as written", () => {

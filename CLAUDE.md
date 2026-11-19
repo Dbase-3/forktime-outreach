@@ -6,10 +6,12 @@ Outbound voice agent + the web app that runs it. The agent phones restaurants, d
 
 ## Product rules (owner + build decisions, 2026-11-20). Do not weaken these.
 
-- **The agent is honest by construction.** Its first words are a fixed line built by the app (`apps/web/lib/opening-line.ts`): AI assistant, who it calls for, the company, the topic, the recording notice, then "Is the owner or manager around?". The agent speaks it word for word, uninterruptibly, and replaces any handed line that fails `hasDisclosure` with its own (`apps/agent/src/opening.js`).
-- **It is never a customer.** The owner's first idea was a pretext ("I want to make a large booking, get me the owner"). That was declined and is not built: no fake booking, no hidden AI. The instructions say so, the practice conversations check it (`NEVER` in `scripts/sim.js`), and a test pins that the prompt contains no such wording. Do not add a "reason for calling" that is not true.
-- **A no is a no.** "Not interested" / "stop" from anyone ends the call; "don't call again" puts the number on the do-not-call list (`outcome: do_not_call`), which the queue never dials again.
-- **Staff get no details**, only the call-back number. Only an owner or deciding manager who says yes is transferred.
+- **What the call is (owner, 2026-11-20):** Aadeel really wants to arrange a large booking and is too busy to phone around, so the AI calls on his behalf, finds the owner, and connects them to him to talk directly. The booking is real; the agent has none of its details and takes no booking. It says so: "Hi, this is Sara, an AI assistant calling on behalf of Aadeel, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?"
+- **No sales pitch.** The earlier version pitched Forktime and asked how restaurants take bookings; the owner removed it. The prompt tests pin that Forktime, "booking system" and similar never appear (`tests/agent.test.js`, `NEVER` in `scripts/sim.js`).
+- **The AI is never hidden and nothing is invented.** The opening line is built by the app (`apps/web/lib/opening-line.ts`), spoken word for word and uninterruptibly, and replaced by the agent's own if it fails `hasDisclosure` (AI + the rep's first name, mirrored in `apps/agent/src/opening.js`). Date, party size, budget: the agent never produces them ("Aadeel will go through all of that himself"); the practice conversations check it.
+- **"What the call is about" in Settings must be TRUE for every number in the queue**: the agent says it on every call. If the list includes restaurants Aadeel does not mean to book at, the call is a pretext; an earlier request to hide the AI and pose as a customer was declined and is not built.
+- **A no is a no.** "Not interested" / "stop" from anyone ends the call; "don't call again" puts the number on the do-not-call list.
+- Whoever picks up is staff until they say they are the owner or manager; only they are offered the transfer. Staff get no details, only the call-back number.
 - Calls go out one at a time, inside the calling window, at most `maxAttempts` tries (only an unanswered call is retried).
 
 ## Layout

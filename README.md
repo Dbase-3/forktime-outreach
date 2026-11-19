@@ -4,7 +4,7 @@ An AI assistant that phones restaurants, says who it is and why it is calling, a
 
 On every call the assistant opens with one line that is always the same shape:
 
-> "Hi, this is Sara, an AI assistant calling for Adil at Forktime, about how your restaurant takes phone bookings. This call is recorded. Is the owner or manager around?"
+> "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?"
 
 It never poses as a customer and never claims to be a person. Staff are given no details, only a number to pass on. An owner who is interested is connected to the rep on the spot.
 

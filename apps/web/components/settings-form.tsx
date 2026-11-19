@@ -119,7 +119,7 @@ export function SettingsForm() {
         <Field label="Company" error={fieldErrors.company}>
           <input className="field" value={form.company} onChange={(e) => set("company", e.target.value)} />
         </Field>
-        <Field label="What the call is about" hint='Reads after "about", so start in lower case.' error={fieldErrors.topic}>
+        <Field label="What the call is about" hint='Reads after "about", so start in lower case. It must be true: the agent says it on every call.' error={fieldErrors.topic}>
           <input className="field" value={form.topic} onChange={(e) => set("topic", e.target.value)} />
         </Field>
         <div className="sm:col-span-2">

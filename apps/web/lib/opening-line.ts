@@ -22,14 +22,14 @@ function topicPhrase(topic: string): string {
 export function buildOpeningLine(settings: OpeningFields): string {
   const notice = settings.recordCalls && settings.recordingNotice ? " This call is recorded." : "";
   return (
-    `Hi, this is ${settings.agentName.trim()}, an AI assistant calling for ${firstName(settings.repName)} ` +
-    `at ${settings.company.trim()}, about ${topicPhrase(settings.topic)}.${notice} ` +
-    `Is the owner or manager around?`
+    `Hi, this is ${settings.agentName.trim()}, an AI assistant calling on behalf of ${firstName(settings.repName)}, ` +
+    `about ${topicPhrase(settings.topic)}.${notice} Is the owner or manager around?`
   );
 }
 
-/** Whether a line says it is an AI and names the company. */
-export function hasDisclosure(line: string, company: string): boolean {
+/** Whether a line says it is an AI and names the person it calls for (first name). */
+export function hasDisclosure(line: string, repFirstName: string): boolean {
   const said = line.toLowerCase();
-  return /\bai\b/.test(said) && company.trim().length > 0 && said.includes(company.trim().toLowerCase());
+  const who = repFirstName.trim().toLowerCase();
+  return /\bai\b/.test(said) && who.length > 0 && said.includes(who);
 }

@@ -19,12 +19,12 @@ const meta = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "how your restaurant takes phone bookings",
+  topic: "a large booking he'd like to arrange",
   transferNumber: "+61400000001",
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara, an AI assistant calling for Adil at Forktime, about how your restaurant takes phone bookings. This call is recorded. Is the owner or manager around?",
+    "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?",
 };
 
 describe("the opening line", () => {
@@ -33,10 +33,10 @@ describe("the opening line", () => {
   });
 
   it("is replaced by the agent's own line when the one handed over hides either", () => {
-    for (const line of ["Hi, I'd like to make a large booking. Is the owner around?", "Hi, this is Sara from Forktime.", "", undefined]) {
+    for (const line of ["Hi, I'd like to make a large booking. Is the owner around?", "Hi, this is Sara calling for Adil.", "", undefined]) {
       const spoken = opening.resolveOpeningLine({ ...meta, openingLine: line });
-      expect(spoken).toBe("Hi, this is Sara, an AI assistant calling for Adil at Forktime. This call is recorded. Is the owner or manager around?");
-      expect(opening.hasDisclosure(spoken, "Forktime")).toBe(true);
+      expect(spoken).toBe("Hi, this is Sara, an AI assistant calling on behalf of Adil. This call is recorded. Is the owner or manager around?");
+      expect(opening.hasDisclosure(spoken, "Adil")).toBe(true);
     }
   });
 });
@@ -46,15 +46,15 @@ describe("the agent's instructions", () => {
 
   it("say who it is, who it calls for, and that the opening line is already said", () => {
     expect(text).toContain("You are Sara, an AI voice assistant");
-    expect(text).toContain("for Adil Khan at Forktime");
+    expect(text).toContain("on behalf of Adil Khan");
     expect(text).toContain(`You have already said, word for word: "${meta.openingLine}"`);
     expect(text).toContain("You are calling: Rosie's Diner.");
   });
 
   it("never let it pose as a customer or deny being an AI", () => {
-    expect(text).toContain("You are not a customer.");
+    expect(text).toContain("you have no details");
     expect(text).toContain("Never claim or hint that you are a person.");
-    expect(text).not.toMatch(/large booking|party of|pretend/i);
+    expect(text).not.toMatch(/party of|pretend|Forktime|booking system/i);
   });
 
   it("teach it to say goodbye through the tool, and what to do with a machine that talks back", () => {
@@ -350,6 +350,16 @@ describe("the agent's tools and call details", () => {
     expect(call.filed.outcome).toBe("refused");
   });
 
+  it("an owner callback is only filed when an owner was reached", async () => {
+    const file = async (ownerReached) => {
+      const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+      await call.buildTools().end_call.execute({ goodbye: "Thanks.", outcome: "owner_callback", summary: "x", ownerReached }, {});
+      return call.filed.outcome;
+    };
+    expect(await file(false)).toBe("call_back_later");
+    expect(await file(true)).toBe("owner_callback");
+  });
+
   it("a quiet line is ended when a recording answered, with the message for a voicemail only", async () => {
     const quiet = async (kind) => {
       const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
@@ -359,7 +369,7 @@ describe("the agent's tools and call details", () => {
     const voicemail = await quiet("voicemail");
     expect(voicemail.handled).toBe(true);
     expect(voicemail.call.filed.outcome).toBe("voicemail");
-    expect(voicemail.call.pending.goodbye).toBe("Please call Adil from Forktime back on oh four one two, three four five, six seven eight.");
+    expect(voicemail.call.pending.goodbye).toBe("Please call Adil back on oh four one two, three four five, six seven eight. It's about a large booking.");
 
     const menu = await quiet("menu");
     expect(menu.call.filed.outcome).toBe("phone_menu");

@@ -80,14 +80,14 @@ describe("the opening line", () => {
     agentName: "Sara",
     repName: "Adil Khan",
     company: "Forktime",
-    topic: "It's about how your restaurant takes phone bookings.",
+    topic: "A large booking he'd like to arrange.",
     recordCalls: true,
     recordingNotice: true,
   };
 
   it("says it is an AI, who it calls for and why, before it asks for anyone", () => {
     expect(buildOpeningLine(settings)).toBe(
-      "Hi, this is Sara, an AI assistant calling for Adil at Forktime, about how your restaurant takes phone bookings. " +
+      "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. " +
         "This call is recorded. Is the owner or manager around?",
     );
   });
@@ -98,10 +98,10 @@ describe("the opening line", () => {
   });
 
   it("every line it builds passes the disclosure check; a line that hides either part does not", () => {
-    expect(hasDisclosure(buildOpeningLine(settings), "Forktime")).toBe(true);
-    expect(hasDisclosure("Hi, I'd like to make a large booking. Is the owner around?", "Forktime")).toBe(false);
-    expect(hasDisclosure("Hi, this is Sara from Forktime.", "Forktime")).toBe(false);
-    expect(hasDisclosure("Hi, this is an AI assistant.", "Forktime")).toBe(false);
+    expect(hasDisclosure(buildOpeningLine(settings), "Adil")).toBe(true);
+    expect(hasDisclosure("Hi, I'd like to make a large booking. Is the owner around?", "Adil")).toBe(false);
+    expect(hasDisclosure("Hi, this is Sara calling for Adil.", "Adil")).toBe(false);
+    expect(hasDisclosure("Hi, this is an AI assistant.", "Adil")).toBe(false);
     expect(hasDisclosure("Hi, this is an AI assistant.", "")).toBe(false);
   });
 

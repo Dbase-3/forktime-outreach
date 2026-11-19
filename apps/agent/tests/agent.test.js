@@ -268,8 +268,10 @@ describe("small helpers", () => {
     expect(transfer.trunkFor("+14165550199", { standard: "T1", au: "T2" })).toBe("T1");
   });
 
-  it("each try of a call gets its own recording file", () => {
+  it("each try of a call gets its own recording file, with a known address", () => {
     expect(recording.recordingPath({ callId: "call-1", attempt: 2 })).toBe("outreach/call-1-2.ogg");
+    expect(recording.recordingUrl({ callId: "call-1", attempt: 2 }, "https://files.example")).toBe("https://files.example/outreach/call-1-2.ogg");
+    expect(recording.recordingUrl({ callId: "call-1", attempt: 2 }, "")).toBeNull();
   });
 });
 

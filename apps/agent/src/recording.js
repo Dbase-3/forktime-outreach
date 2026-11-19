@@ -52,6 +52,11 @@ async function startRecording(roomName, meta, log = console) {
   }
 }
 
+/** Where a call's recording is served from, or null when the bucket has no public address. Pure. */
+function recordingUrl(meta, publicUrl) {
+  return publicUrl ? `${publicUrl}/${recordingPath(meta)}` : null;
+}
+
 /** Stop a recording. Returns where the file is and how long it runs, or null. */
 async function stopRecording(egressId, meta, log = console) {
   if (!egressId) return null;
@@ -70,9 +75,12 @@ async function stopRecording(egressId, meta, log = console) {
       durationSec: durationNs ? Math.round(durationNs / 1e9) : null,
     };
   } catch (err) {
-    log.warn(`[Recording] could not stop: ${err.message}`);
-    return null;
+    // A room closed from the app (Hang up) ends its recording by itself, so there
+    // is nothing left to stop. The file is still written to its usual place.
+    log.warn(`[Recording] could not stop (${err.message}); reporting the file where it is saved`);
+    const fileUrl = recordingUrl(meta, storage.publicUrl);
+    return fileUrl ? { url: fileUrl, durationSec: null } : null;
   }
 }
 
-module.exports = { startRecording, stopRecording, recordingPath, recordingConfigured };
+module.exports = { startRecording, stopRecording, recordingPath, recordingUrl, recordingConfigured };

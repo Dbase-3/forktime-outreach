@@ -133,7 +133,7 @@ class OutreachCall {
           goodbye: z.string().describe("Your last words before hanging up: one short, warm sentence. For voicemail or a phone menu, the call-back message."),
           outcome: z.enum(AGENT_OUTCOMES).describe(
             "owner_callback: the owner wants a follow-up later (a call back at a time, or an email). not_interested: the owner said no. " +
-              "message_left: staff will pass the message on. call_back_later: staff gave a better time to call. " +
+              "message_left: the owner was not there and staff could not say when they will be. call_back_later: staff gave a time (or the owner's usual hours) to call back. " +
               "refused: staff would not help, or said the restaurant is not interested. voicemail, phone_menu, wrong_number: no person to talk to. " +
               "do_not_call: they asked not to be called again. other: anything else.",
           ),
@@ -314,8 +314,8 @@ class OutreachCall {
       summary: voicemail ? "Voicemail answered. The call-back message was left." : "A phone menu answered. There was nobody to talk to.",
       ownerReached: false,
     };
-    // A menu is not listening; a voicemail is, so it gets the message.
-    const message = voicemail && meta.callbackNumberSpoken ? `Please call ${rep} back on ${meta.callbackNumberSpoken}. It's about a large booking.` : null;
+    // A menu is not listening; a voicemail is, so it hears who called and why (no number: the team calls again).
+    const message = voicemail ? `This is ${meta.agentName}, an AI assistant calling for ${rep} about a large booking. He'll try again later. Thank you.` : null;
     this.pending = { type: "end", goodbye: message };
     this.agentSpokeLast = false;
     return true;
@@ -339,6 +339,8 @@ class OutreachCall {
     if (action.goodbye && !this.agentSpokeLast) {
       await this.session.say(action.goodbye, { allowInterruptions: false }).waitForPlayout().catch(() => undefined);
     }
+    // Let the last words finish on the phone before the line is closed: the audio is still in transit.
+    await sleep(TIMING.hangupDelayMs);
     return this.finalize("agent_ended");
   }
 

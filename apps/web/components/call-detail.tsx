@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, PhoneOff, RotateCcw, X } from "lucide-react";
+import { Ban, CalendarClock, PhoneOff, RotateCcw, X } from "lucide-react";
 import clsx from "clsx";
 import { client } from "@/lib/api";
 import { clockTime, dayAndTime, duration } from "@/lib/format";
@@ -96,8 +96,9 @@ export function CallDetail({
     queryClient.invalidateQueries({ queryKey: ["call", callId] });
   };
   const cancel = useMutation({ mutationFn: () => client.cancelCall(callId as string), onSuccess: refresh });
+  const [recallAt, setRecallAt] = useState("");
   const again = useMutation({
-    mutationFn: () => client.callAgain(callId as string),
+    mutationFn: (at?: string) => client.callAgain(callId as string, at),
     onSuccess: (result) => {
       refresh();
       onSelect(result.callId);
@@ -153,10 +154,30 @@ export function CallDetail({
             </button>
           )}
           {(call.status === "ended" || call.status === "cancelled") && (
-            <button type="button" className="btn-secondary" disabled={again.isPending} onClick={() => again.mutate()}>
+            <button type="button" className="btn-secondary" disabled={again.isPending} onClick={() => again.mutate(undefined)}>
               <RotateCcw className="h-4 w-4" />
               Call again
             </button>
+          )}
+          {(call.status === "ended" || call.status === "cancelled") && (
+            <span className="flex items-center gap-1.5">
+              <input
+                type="datetime-local"
+                aria-label="Call again at"
+                value={recallAt}
+                onChange={(e) => setRecallAt(e.target.value)}
+                className="field w-auto py-1.5 text-xs"
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={again.isPending || !recallAt}
+                onClick={() => again.mutate(new Date(recallAt).toISOString())}
+              >
+                <CalendarClock className="h-4 w-4" />
+                Schedule
+              </button>
+            </span>
           )}
           {call.outcome !== "do_not_call" && (
             <button type="button" className="btn-secondary" disabled={block.isPending || block.isSuccess} onClick={() => block.mutate(call.phone)}>
@@ -180,7 +201,7 @@ export function CallDetail({
             <Fact label="Spoke to the owner" value={yesNo(call.ownerReached)} />
             <Fact label="Interested" value={yesNo(call.interested)} />
             <Fact label="Name" value={call.contactName} />
-            <Fact label="Best time to call" value={call.callbackTime} />
+            <Fact label="Owner is free" value={call.callbackTime} />
             <Fact label="Booking system" value={call.bookingSystem} />
           </dl>
         </section>

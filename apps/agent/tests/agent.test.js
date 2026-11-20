@@ -60,7 +60,7 @@ describe("the agent's instructions", () => {
   it("teach it to say goodbye through the tool, and what to do with a machine that talks back", () => {
     expect(text).toContain("Another AI assistant or a phone system that answers for the restaurant");
     expect(text).toContain("Your last words go in its goodbye field");
-    expect(text).toContain("Never ask staff which number to call");
+    expect(text).toContain("Never give a phone number");
   });
 
   it("take a no, and a busy owner, at their word", () => {
@@ -75,10 +75,11 @@ describe("the agent's instructions", () => {
     );
   });
 
-  it("give staff the call-back number as words, and fall back when none is set", () => {
-    expect(text).toContain("on oh four one two, three four five, six seven eight");
-    expect(prompt.buildInstructions({ ...meta, callbackNumberSpoken: "" }, meta.openingLine)).toContain("on the number this call came from");
+  it("never carries a phone number for the agent to read out", () => {
+    expect(text).not.toMatch(/call-back number|four one two|oh four/i);
+    expect(prompt.buildInstructions({ ...meta, callbackNumberSpoken: "oh four one two" }, meta.openingLine)).not.toContain("oh four one two");
   });
+
 });
 
 describe("the event reporter", () => {
@@ -369,7 +370,7 @@ describe("the agent's tools and call details", () => {
     const voicemail = await quiet("voicemail");
     expect(voicemail.handled).toBe(true);
     expect(voicemail.call.filed.outcome).toBe("voicemail");
-    expect(voicemail.call.pending.goodbye).toBe("Please call Adil back on oh four one two, three four five, six seven eight. It's about a large booking.");
+    expect(voicemail.call.pending.goodbye).toBe("This is Sara, an AI assistant calling for Adil about a large booking. He'll try again later. Thank you.");
 
     const menu = await quiet("menu");
     expect(menu.call.filed.outcome).toBe("phone_menu");

@@ -26,7 +26,7 @@ export function toLineJson(line: TranscriptLine): TranscriptLineJson {
 }
 
 /** Add numbers to the end of the queue as one batch. */
-export async function addCalls(entries: NumberEntry[], fromNumber: string, now = new Date()): Promise<Call[]> {
+export async function addCalls(entries: NumberEntry[], fromNumber: string, now = new Date(), notBefore: Date | null = null): Promise<Call[]> {
   if (!entries.length) return [];
   const { calls } = await collections();
   const last = await calls.find({}, { projection: { order: 1 } }).sort({ order: -1 }).limit(1).next();
@@ -44,7 +44,7 @@ export async function addCalls(entries: NumberEntry[], fromNumber: string, now =
     order: firstOrder + index,
     fromNumber,
     roomName: null,
-    notBefore: null,
+    notBefore,
     queuedAt: now,
     startedAt: null,
     answeredAt: null,

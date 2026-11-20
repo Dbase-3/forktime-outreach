@@ -192,6 +192,9 @@ const NEVER = [
   /\bi'?m (a )?(real )?(person|human)\b/i,
 ];
 const WORD_LIMIT = 32;
+// It never reads a phone number out, and never asks staff to pass a message on or call back.
+NEVER.push(/\b(oh|zero|four|one|two|three|five|six|seven|eight|nine)[ ,]+(oh|zero|four|one|two|three|five|six|seven|eight|nine)[ ,]+(oh|zero|four|one|two|three|five|six|seven|eight|nine)\b/i);
+NEVER.push(/\b(ask|tell) (them|him|her) to (call|ring|phone)\b|\bcould you (ask|pass)\b|\bcall (him|aadeel|adil) back\b|\bpass (that|it|this|the message) on\b/i);
 
 /** Words in a reply, not counting the phone number read out digit by digit. */
 const words = (text) => (text.replace(META.callbackNumberSpoken, "").match(/[\p{L}\p{N}']+/gu) || []).length;

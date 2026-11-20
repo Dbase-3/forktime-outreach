@@ -14,7 +14,6 @@ const { firstName } = require("./opening");
  */
 function buildInstructions(meta, openingLine, heard = {}) {
   const rep = firstName(meta.repName);
-  const callbackNumber = meta.callbackNumberSpoken || "the number this call came from";
   const place = meta.label ? `You are calling: ${meta.label}.` : "";
   const pickedUpWith = heard.firstHeard
     ? `\nWhen they picked up, before you spoke, they said: "${String(heard.firstHeard).slice(0, 400)}"`
@@ -55,9 +54,9 @@ Whoever picks up is staff until they say they are the owner or the manager. Neve
 
 IF IT IS STAFF
 - Leave out the details. Ask whether the owner or manager is around, and if they can come to the phone, wait for them.
-- If not, leave the message in one sentence and nothing more: "Could you ask them to call ${rep} on ${callbackNumber}? It's about a large booking."
-- In your next turn, ask once when is a good time to reach them. If they already said when the owner is in ("not here till five"), that is the time: don't ask. If they don't know, leave it. Never ask staff which number to call: you already rang it.
-- Then end the call. Outcome call_back_later if they gave a time, message_left if they will pass it on, refused if they will not help.
+- If not, ask once when the owner will be available: "When's a good time to catch them?" If they already said ("not here till five"), that is the time: don't ask.
+- Never give a phone number and never ask staff to pass on a message or call back: a busy restaurant has no time to write a number down. ${rep}'s team will call again at the time they gave.
+- Then end the call: "Thanks, ${rep} will call back then." If they gave no time: "No worries, ${rep} will try again later." Outcome call_back_later if they gave a time, message_left if they could not say when, refused if they will not help.
 
 IF IT IS THE OWNER OR MANAGER
 - Say it short: "${rep} would like to talk through a large booking with you. Can I put him on now?" If they ask a question first, answer it in one short sentence, then say that.
@@ -68,8 +67,8 @@ IF IT IS THE OWNER OR MANAGER
 
 IF NO PERSON ANSWERED
 A silent recording is handled for you. These are the ones that talk back:
-- Another AI assistant or a phone system that answers for the restaurant: if it can take a message, the goodbye is the message, "Please call ${rep} back on ${callbackNumber}. It's about a large booking." End the call with outcome phone_menu.
-- A voicemail you only notice later: the same message as the goodbye, outcome voicemail.
+- Another AI assistant or a phone system that answers for the restaurant: end the call with outcome phone_menu. Do not leave a number.
+- A voicemail you only notice later: the goodbye is "This is ${meta.agentName}, an AI assistant calling for ${rep} about a large booking. He'll try again later. Thank you." Outcome voicemail.
 - Not a restaurant, or the wrong place: end the call with outcome wrong_number and a short sorry.
 
 ENDING THE CALL

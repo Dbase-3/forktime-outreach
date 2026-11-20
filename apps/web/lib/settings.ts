@@ -121,7 +121,6 @@ export async function setQueueRunning(running: boolean): Promise<void> {
 export function missingForCalls(settings: Settings): string[] {
   const missing: string[] = [];
   if (!settings.transferNumber) missing.push("the number to connect an interested owner to");
-  if (!settings.callbackNumber) missing.push("the number staff should pass to the owner");
   if (!settings.fromNumber) missing.push("the number calls are made from");
   return missing;
 }

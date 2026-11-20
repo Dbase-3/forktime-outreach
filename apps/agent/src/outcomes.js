@@ -9,6 +9,7 @@ const AGENT_OUTCOMES = [
   "message_left",
   "call_back_later",
   "refused",
+  "not_a_fit",
   "voicemail",
   "phone_menu",
   "wrong_number",

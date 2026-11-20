@@ -49,6 +49,7 @@ export function CallList({
               <span className="block truncate text-sm font-medium text-gray-900">{call.label || formatPhone(call.phone)}</span>
               <span className="block truncate text-xs text-gray-500">
                 {call.label ? formatPhone(call.phone) : ""}
+                {call.direction === "inbound" ? `${call.label ? " · " : ""}called us back` : ""}
                 {call.simulated ? `${call.label ? " · " : ""}acted out` : ""}
               </span>
             </span>

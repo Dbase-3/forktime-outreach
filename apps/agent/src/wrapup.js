@@ -14,7 +14,7 @@ function wrapUpPrompt(lines, meta) {
 ${transcript}
 
 Reply with one JSON object and nothing else:
-{"outcome": one of ${JSON.stringify(AGENT_OUTCOMES)}, "summary": two short factual sentences, "ownerReached": true or false, "contactName": string or null, "callbackTime": string or null, "bookingSystem": string or null, "interested": true, false or null}
+{"outcome": one of ${JSON.stringify(AGENT_OUTCOMES)}, "summary": two short factual sentences, "ownerReached": true or false, "contactName": string or null, "callbackTime": string or null, "takesLargeBookings": true, false or null, "seats": whole number or null, "vegetarianVegan": string or null, "interestedInSystem": true, false or null, "interested": true, false or null}
 Use only what was said. Lines marked (Call note) are facts about the call: if one says they were connected to ${meta.repName}, the summary says so. If they hung up before anything was agreed, the outcome is "other".`;
 }
 
@@ -39,7 +39,10 @@ function parseWrapUp(reply) {
     ownerReached: flag(data.ownerReached),
     contactName: text(data.contactName, 120),
     callbackTime: text(data.callbackTime, 160),
-    bookingSystem: text(data.bookingSystem, 120),
+    takesLargeBookings: flag(data.takesLargeBookings),
+    seats: Number.isInteger(data.seats) && data.seats >= 0 ? data.seats : null,
+    vegetarianVegan: text(data.vegetarianVegan, 200),
+    interestedInSystem: flag(data.interestedInSystem),
     interested: flag(data.interested),
   };
 }

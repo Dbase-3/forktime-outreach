@@ -36,11 +36,23 @@ const agent = defineAgent({
     // Required here, not at the top: the plugins open clients when loaded.
     const { OutreachCall } = require("./call");
     await ctx.connect();
-    const meta = parseMetadata(ctx.job.metadata) || parseMetadata(ctx.room.metadata);
+    let meta = parseMetadata(ctx.job.metadata) || parseMetadata(ctx.room.metadata);
+    let inboundParticipant = null;
     if (!meta) {
-      console.error(`[Outreach] room ${ctx.room.name} has no outreach call details; leaving`);
-      ctx.shutdown("not an outreach call");
-      return;
+      // No call details: someone rang the call-back number and a dispatch rule sent them here.
+      const { inboundNumbers, fetchInbound } = require("./inbound");
+      const participant = await ctx.waitForParticipant();
+      const numbers = inboundNumbers(participant);
+      const found = numbers
+        ? await fetchInbound({ baseUrl: env.webUrl(), key: env.eventsKey(), ...numbers, roomName: ctx.room.name })
+        : null;
+      if (!found) {
+        console.error(`[Outreach] room ${ctx.room.name} is neither a call we placed nor one the app knows; leaving`);
+        ctx.shutdown("unknown call");
+        return;
+      }
+      meta = found.meta;
+      inboundParticipant = participant;
     }
 
     const call = new OutreachCall({ ctx, meta, vad: ctx.proc.userData.vad });
@@ -48,7 +60,8 @@ const agent = defineAgent({
       await call.finalize("error").catch(() => undefined);
     });
     try {
-      await call.run();
+      if (inboundParticipant) await call.runInbound(inboundParticipant);
+      else await call.run();
     } catch (err) {
       console.error("[Outreach] call failed:", (err && err.stack) || err);
       await call.finalize("error").catch(() => undefined);

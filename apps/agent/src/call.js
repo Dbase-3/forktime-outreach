@@ -71,9 +71,35 @@ class OutreachCall {
     this.silences = 0;
     this.agentSpokeLast = false;
     this.firstHeard = null;
+    this.previousNote = meta.previousNote || null;
+    this.calleeIdentity = CALLEE_IDENTITY;
     this.lineKind = null;
     this.calleeSpokeAfterOpening = false;
     this.timers = new Set();
+  }
+
+  makeTts() {
+    const { meta } = this;
+    const setup = voiceSetup({ provider: meta.voiceProvider, voiceId: meta.voiceId, voiceSpeed: meta.voiceSpeed });
+    return setup.provider === "fishaudio" ? new fishaudio.TTS(setup.options) : new elevenlabs.TTS(setup.options);
+  }
+
+  /**
+   * An inbound call: someone rang the call-back number and is already on the
+   * line, so there is no ringing to wait out. The agent speaks first, at once.
+   */
+  async runInbound(participant) {
+    const { ctx, meta } = this;
+    this.calleeIdentity = participant.identity;
+    this.emitter = createEmitter({ baseUrl: env.webUrl(), key: env.eventsKey(), callId: meta.callId, attempt: meta.attempt, log: this.log });
+    this.tts = this.makeTts();
+    ctx.room.on("participantDisconnected", (left) => this.onParticipantLeft(left));
+    this.recording = startRecording(ctx.room.name, meta, this.log);
+
+    await this.startSession();
+    // A short beat so the line is settled, then the welcome: nobody should wait for it.
+    this.after(TIMING.inboundWelcomeMs, () => this.sayOpening());
+    this.after(meta.maxCallMinutes * 60_000, () => this.onTimeLimit());
   }
 
   async run() {
@@ -81,8 +107,7 @@ class OutreachCall {
     const room = ctx.room;
     this.emitter = createEmitter({ baseUrl: env.webUrl(), key: env.eventsKey(), callId: meta.callId, attempt: meta.attempt, log: this.log });
 
-    const setup = voiceSetup({ provider: meta.voiceProvider, voiceId: meta.voiceId, voiceSpeed: meta.voiceSpeed });
-    this.tts = setup.provider === "fishaudio" ? new fishaudio.TTS(setup.options) : new elevenlabs.TTS(setup.options);
+    this.tts = this.makeTts();
     this.prepareOpening();
 
     const answer = await waitForCallAnswer(room, (meta.ringTimeoutSec + 8) * 1000);
@@ -135,22 +160,29 @@ class OutreachCall {
           goodbye: z.string().describe("Your last words before hanging up: one short, warm sentence. For voicemail or a phone menu, the call-back message."),
           outcome: z.enum(AGENT_OUTCOMES).describe(
             "owner_callback: the owner wants a follow-up later (a call back at a time, or an email). not_interested: the owner said no. " +
+              "not_a_fit: the owner does not take large bookings or seats under about 20. " +
               "message_left: the owner was not there and staff could not say when they will be. call_back_later: staff gave a time (or the owner's usual hours) to call back. " +
               "refused: staff would not help, or said the restaurant is not interested. voicemail, phone_menu, wrong_number: no person to talk to. " +
               "do_not_call: they asked not to be called again. other: anything else.",
           ),
           summary: z.string().describe("Two short factual sentences: who you spoke to and what was agreed. Only what was said."),
-          ownerReached: z.boolean().describe("True only if you spoke to the owner or the manager who decides."),
+          ownerReached: z.boolean().describe("True if you spoke to the owner, or to a manager who says they make the decisions (\"I'm the manager, I make the calls\"). False for staff such as waiters or hosts."),
           contactName: z.string().optional().describe("Their name, or the owner's name, if someone gave it."),
-          callbackTime: z.string().optional().describe("When to call back, in their words."),
-          bookingSystem: z.string().optional().describe("The booking system or method they said they use."),
-          interested: z.boolean().optional().describe("Whether the owner sounded interested. Leave out if you did not speak to the owner."),
+          callbackTime: z.string().optional().describe("When to call back, or when the owner is free, in their words."),
+          takesLargeBookings: z.boolean().optional().describe("Whether they take large bookings. Leave out if not asked or not said."),
+          seats: z.number().int().optional().describe("How many people they can seat, as a whole number, whenever they gave any figure (\"about twelve\" is 12). Leave out only if they gave none."),
+          capacityNote: z.string().optional().describe("Their capacity answer in their own words, if it was not a plain number."),
+          vegetarianVegan: z.string().optional().describe("What they said about vegetarian or vegan food. Leave out if not asked."),
+          interestedInSystem: z.boolean().optional().describe("Whether the owner wants to hear about the AI phone assistant. Leave out if not asked."),
+          interested: z.boolean().optional().describe("Whether the owner clearly wants to talk to the rep. Leave out if you did not speak to the owner."),
         }),
         execute: async ({ goodbye, ...filed }) => {
           // "Not interested" from someone who is not the owner is staff turning the call away.
           if (filed.outcome === "not_interested" && filed.ownerReached === false) filed.outcome = "refused";
           // "The owner wants a follow-up" is only true if an owner was reached; from staff it is a better time to call.
           if (filed.outcome === "owner_callback" && filed.ownerReached === false) filed.outcome = "call_back_later";
+          // And the other way round: a better time from the owner themselves is the owner's callback.
+          if (filed.outcome === "call_back_later" && filed.ownerReached === true) filed.outcome = "owner_callback";
           this.filed = filed;
           this.pending = { type: "end", goodbye };
           return undefined;
@@ -203,7 +235,7 @@ class OutreachCall {
       if (!this.transferred) this.finalize(event.error ? "error" : "agent_ended");
     });
 
-    this.agent = new OutreachAgent(this, { instructions: buildInstructions(meta, this.openingLine), tools: this.buildTools() });
+    this.agent = new OutreachAgent(this, { instructions: buildInstructions(meta, this.openingLine, { previous: this.previousNote }), tools: this.buildTools() });
     await this.session.start({
       agent: this.agent,
       room: this.ctx.room,
@@ -212,7 +244,7 @@ class OutreachCall {
         audioNumChannels: 1,
         noiseCancellation: TelephonyBackgroundVoiceCancellation(),
         // Only the dialled phone is listened to: the rep joining later is never transcribed or answered.
-        participantIdentity: CALLEE_IDENTITY,
+        participantIdentity: this.calleeIdentity,
         closeOnDisconnect: false,
       },
       outputOptions: { audioSampleRate: 16000, audioNumChannels: 1, syncTranscription: false },
@@ -269,7 +301,7 @@ class OutreachCall {
         return kind;
       });
       if (this.agent) {
-        Promise.resolve(this.agent.updateInstructions(buildInstructions(this.meta, this.openingLine, { firstHeard: heard }))).catch((err) =>
+        Promise.resolve(this.agent.updateInstructions(buildInstructions(this.meta, this.openingLine, { firstHeard: heard, previous: this.previousNote }))).catch((err) =>
           this.log.warn(`[Call] could not add their first words to the instructions: ${err.message}`),
         );
       }
@@ -387,7 +419,7 @@ class OutreachCall {
 
   onParticipantLeft(participant) {
     const who = participant && participant.identity;
-    if (who === CALLEE_IDENTITY) this.finalize(this.transferred ? "transferred" : "callee_hung_up");
+    if (who === this.calleeIdentity) this.finalize(this.transferred ? "transferred" : "callee_hung_up");
     else if (who === REP_IDENTITY && this.transferred) this.finalize("transferred");
   }
 
@@ -429,7 +461,11 @@ class OutreachCall {
       ownerReached: this.transferred ? true : (filed.ownerReached ?? null),
       contactName: filed.contactName || null,
       callbackTime: filed.callbackTime || null,
-      bookingSystem: filed.bookingSystem || null,
+      takesLargeBookings: filed.takesLargeBookings ?? null,
+      seats: filed.seats ?? null,
+      capacityNote: filed.capacityNote || null,
+      vegetarianVegan: filed.vegetarianVegan || null,
+      interestedInSystem: filed.interestedInSystem ?? null,
       interested: this.transferred ? true : (filed.interested ?? null),
     });
 

@@ -26,6 +26,7 @@ export function callMetadata(call: Call, settings: Settings) {
     kind: "outreach" as const,
     callId: call._id,
     attempt: call.attempt,
+    direction: call.direction,
     phone: call.phone,
     label: call.label,
     fromNumber: call.fromNumber,

@@ -128,7 +128,7 @@ export function SettingsForm() {
         </div>
       </Section>
 
-      <Section title="Numbers" intro="Staff are never given details or a number to write down: the agent asks when the owner is free, and you call back then.">
+      <Section title="Numbers" intro="Staff are never given details. If the owner is out, they are asked when they will be free and to call back on the call-back number.">
         <Field
           label="Calls come from"
           hint={numbers.data?.error ?? "One of the numbers on the carrier account."}
@@ -157,8 +157,11 @@ export function SettingsForm() {
             ))}
           </select>
         </Field>
-        <Field label="Connect an interested owner to" hint="This phone rings when an owner says yes." error={fieldErrors.transferNumber}>
+        <Field label="Connect an interested owner to" hint="This phone rings when an owner clearly wants to talk to the rep." error={fieldErrors.transferNumber}>
           <input className="field" placeholder="+61 412 345 678" value={form.transferNumber} onChange={(e) => set("transferNumber", e.target.value)} />
+        </Field>
+        <Field label="Call-back number" hint="Said to staff and owners who want to call back. It must reach this agent (see the README), or they get another agent." error={fieldErrors.callbackNumber}>
+          <input className="field" placeholder="+1 418 431 3732" value={form.callbackNumber} onChange={(e) => set("callbackNumber", e.target.value)} />
         </Field>
       </Section>
 

@@ -81,6 +81,16 @@ export interface Call {
   callbackTime: string | null;
   bookingSystem: string | null;
   interested: boolean | null;
+  /** What the owner said about large bookings, capacity and food. null = not asked or not said. */
+  takesLargeBookings: boolean | null;
+  /** Seats, as a number, when they gave one. */
+  seats: number | null;
+  capacityNote: string | null;
+  vegetarianVegan: string | null;
+  /** Would the owner like to hear about the AI phone assistant. */
+  interestedInSystem: boolean | null;
+  /** "inbound": the owner rang us back. */
+  direction: "outbound" | "inbound";
   recording: CallRecording | null;
   error: string | null;
   /** A dry-run call is acted out by the app; nothing is dialled. */

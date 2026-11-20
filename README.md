@@ -82,6 +82,10 @@ Put the deployed app's address in `OUTREACH_WEB_URL` in `apps/agent/.env.prod`. 
 - `pnpm dev:agent:prod` runs the agent on your machine against the deployed app. Quickest way to make a first test call.
 - `pnpm deploy:agent` deploys it to LiveKit Cloud (the first run creates the agent there). Calls then work with no machine of yours running.
 
+## When an owner calls back
+
+The call-back number (Settings) is said to staff and owners. For a call to it to reach this agent, the number needs, in LiveKit, an inbound SIP trunk that includes it and a SIP dispatch rule for that trunk with the agent name `outreach-agent`. Then the agent recognises the caller's number, pulls up the earlier call to it, and carries on from what was noted. A number that is already attached to another agent (the Forktime phone agent) must not be reused.
+
 ## Before calling real restaurants
 
 - **Use separate phone numbers, ideally a separate carrier account.** `pnpm setup` points this project at the same LiveKit project and Telnyx trunk as the Forktime phone agent, which is fine for calling your own phone. Complaints about outbound calls land on the account that carries every live restaurant's line.

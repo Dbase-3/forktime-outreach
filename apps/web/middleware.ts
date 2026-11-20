@@ -4,7 +4,7 @@ import { SESSION_COOKIE, readSession } from "@/lib/session";
 // Everything needs a signed-in operator, except the login screen, the login
 // call itself, and the voice agent's event intake (which has its own key).
 
-const OPEN_PATHS = ["/login", "/api/auth/login", "/api/agent/events"];
+const OPEN_PATHS = ["/login", "/api/auth/login", "/api/agent/events", "/api/agent/inbound"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

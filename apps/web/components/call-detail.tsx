@@ -135,6 +135,7 @@ export function CallDetail({
             call.startedAt ? `Started ${dayAndTime(call.startedAt)}` : `Added ${dayAndTime(call.queuedAt)}`,
             call.durationSec != null ? `talked ${duration(call.durationSec)}` : null,
             call.attempt > 1 ? `try ${call.attempt}` : null,
+            call.direction === "inbound" ? "they called us back" : null,
             call.simulated ? "acted out, no phone rang" : null,
           ]
             .filter(Boolean)
@@ -193,13 +194,20 @@ export function CallDetail({
         )}
       </header>
 
-      {(call.summary || call.error || call.contactName || call.callbackTime || call.bookingSystem || call.ownerReached != null) && (
+      {(call.summary || call.error || call.contactName || call.callbackTime || call.bookingSystem || call.ownerReached != null || call.takesLargeBookings != null || call.seats != null || call.interestedInSystem != null) && (
         <section className="border-b border-gray-100 p-4">
           {call.summary && <p className="text-sm leading-relaxed text-gray-800">{call.summary}</p>}
           {call.error && <p className="text-sm text-red-700">{call.error}</p>}
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 empty:hidden">
             <Fact label="Spoke to the owner" value={yesNo(call.ownerReached)} />
             <Fact label="Interested" value={yesNo(call.interested)} />
+            <Fact label="Takes large bookings" value={yesNo(call.takesLargeBookings)} />
+            <Fact
+              label="Capacity"
+              value={call.seats != null ? `${call.seats} seats${call.capacityNote ? ` (${call.capacityNote})` : ""}` : call.capacityNote}
+            />
+            <Fact label="Vegetarian / vegan" value={call.vegetarianVegan} />
+            <Fact label="Wants to hear about the AI phone assistant" value={yesNo(call.interestedInSystem)} />
             <Fact label="Name" value={call.contactName} />
             <Fact label="Owner is free" value={call.callbackTime} />
             <Fact label="Booking system" value={call.bookingSystem} />

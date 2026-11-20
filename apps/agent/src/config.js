@@ -90,6 +90,8 @@ const TIMING = {
   openingWaitMs: 900,
   /** If they are still talking then, the longest the opening line waits for them to finish. */
   openingHardCapMs: 6000,
+  /** An inbound caller is already on the line: the welcome starts after this short beat. */
+  inboundWelcomeMs: 500,
   /** After the agent's last words, how long before the line is closed, so the words are not cut off. */
   hangupDelayMs: 1200,
   /** After the opening line, how long a recording is given to stay silent before the call is ended. */

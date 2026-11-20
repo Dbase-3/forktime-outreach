@@ -253,6 +253,55 @@ describe("the queue, as a dry run, outside calling hours", () => {
   });
 });
 
+describe("an owner ringing the call-back number", () => {
+  it("with no earlier call, it is a fresh inbound call with the general welcome, and it never takes the dialling line", async () => {
+    await setup();
+    const { startInboundCall } = await import("@/lib/inbound");
+    const { getActiveCall, getCall } = await import("@/lib/calls-repo");
+    const { callId, meta } = await startInboundCall({ phone: "+61889419999", calledNumber: "+14184313732", roomName: "room-1" });
+    expect(meta.direction).toBe("inbound");
+    expect(meta.previousNote).toBeNull();
+    expect(meta.openingLine).toContain("an AI assistant");
+    expect(meta.openingLine).toContain("How can I help?");
+    const call = await getCall(callId);
+    expect(call).toMatchObject({ direction: "inbound", status: "live", phone: "+61889419999", roomName: "room-1" });
+    expect(await getActiveCall()).toBeNull();
+  });
+
+  it("after an earlier call to that number, it is told what was noted and welcomes them back", async () => {
+    await setup();
+    const [first] = await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    await advanceQueue();
+    await applyAgentEvent({ type: "answered", callId: first._id, attempt: 1 });
+    await applyAgentEvent({
+      type: "ended", callId: first._id, attempt: 1, outcome: "call_back_later", endReason: "agent_ended",
+      summary: "Staff said the owner is in after five.", ownerReached: false, callbackTime: "after five", takesLargeBookings: null,
+    });
+    const { startInboundCall } = await import("@/lib/inbound");
+    const { meta } = await startInboundCall({ phone: "+61889410001", calledNumber: "+14184313732", roomName: "room-2" });
+    expect(meta.openingLine).toContain("thanks for calling back");
+    expect(meta.openingLine).toContain("I called earlier");
+    expect(meta.previousNote).toContain("you only reached staff");
+    expect(meta.previousNote).toContain("the owner is free: after five");
+    expect(meta.previousNote).toContain("Place 1");
+  });
+
+  it("the earlier answers are carried: large bookings, seats, food, interest", async () => {
+    const { previousNoteOf } = await import("@/lib/inbound");
+    const note = previousNoteOf({ summary: "Spoke to the owner.", takesLargeBookings: true, seats: 60, capacityNote: null, vegetarianVegan: "plenty", interestedInSystem: true, callbackTime: null, contactName: "Anne", ownerReached: true, label: "Rosie's", endedAt: null });
+    expect(note).toBe("the restaurant is Rosie's; you spoke to Anne; you reached the owner or manager; takes large bookings: yes; seats: 60; vegetarian/vegan: plenty; wants to hear about the AI phone assistant: yes; summary: Spoke to the owner.");
+  });
+
+  it("the agent's door for it needs the agent key", async () => {
+    const { POST } = await import("@/app/api/agent/inbound/route");
+    const request = (key?: string) => new Request("http://x/api/agent/inbound", { method: "POST", headers: { "Content-Type": "application/json", ...(key ? { "x-agent-key": key } : {}) }, body: JSON.stringify({ phone: "+61889410001", calledNumber: "+14184313732", roomName: "r" }) });
+    expect((await POST(request())).status).toBe(401);
+    expect((await POST(request("wrong"))).status).toBe(401);
+  });
+});
+
 describe("settings", () => {
   it("the voice speed stays between normal and 1.2, and rides to the agent with the call", async () => {
     const { DEFAULT_SETTINGS, validateSettings } = await import("@/lib/settings");

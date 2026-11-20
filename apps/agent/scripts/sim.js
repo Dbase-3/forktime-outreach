@@ -48,32 +48,142 @@ const STAFF_ENDINGS = ["call_back_later", "message_left", "refused", "other"];
 
 /** `ends`: the outcomes that are right. `transfers`: the agent must connect the rep. */
 const SCENARIOS = [
+  // ---- staff
   {
-    name: "staff-takes-message",
+    name: "staff-owner-out",
     greeting: "Good afternoon, Rosie's Diner.",
-    turns: ["She's not in right now. Can I take a message?", "Yep, got that.", "Probably after three tomorrow.", "Okay, will do. Bye."],
-    ends: ["call_back_later", "message_left"],
+    turns: ["She's not in right now.", "Probably after three tomorrow.", "Sure, go ahead.", "Got it, thanks."],
+    ends: ["call_back_later"],
     ownerReached: false,
+    mustSay: [/oh four one two/i],
   },
   {
-    name: "owner-yes",
+    name: "staff-wants-number-again",
     greeting: "Rosie's, hello?",
-    turns: ["Yeah, this is the owner speaking. What's this about?", "How many people, and when?", "Sure, put him on."],
-    transfers: true,
+    turns: ["The owner's not here until five.", "Yeah okay, what's the number?", "Sorry, can you say that again?", "Okay, thanks."],
+    ends: ["call_back_later"],
+    ownerReached: false,
+    mustSay: [/oh four one two/i],
   },
   {
-    name: "owner-no",
-    greeting: "Rosie's Diner.",
-    turns: ["I'm the owner. Not interested, thanks."],
+    name: "staff-asks-for-details",
+    greeting: "Rosie's Diner, Mia speaking.",
+    turns: ["What's it regarding exactly? How many people, what date, what's the budget?", "No, I'm just a waiter.", "I don't know when she's in.", "No thanks, I'm good."],
+    ends: ["message_left", "call_back_later", "refused"],
+    // It has no details, so it must never produce any.
+    neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons|dollars)\b|\b(next|this) (week|month|friday|saturday|sunday)\b/i],
+  },
+  {
+    name: "gatekeeper-refuses",
+    set: "new",
+    label: "Thai Orchid",
+    greeting: "Thai Orchid, hello.",
+    turns: ["Who is this? What's it about? We're not interested in whatever it is.", "No. I'm not giving out her details. Bye."],
+    ends: ["refused", "other"],
+    neverSayAfterFirstTurn: [/owner|manager/i],
+  },
+  {
+    name: "too-busy",
+    greeting: "Rosie's!",
+    turns: ["Mate, we're slammed. Can't talk.", "Dunno, after three maybe."],
+    ends: ["call_back_later", "message_left", "refused", "other"],
+    neverSayAfterFirstTurn: [/large bookings\?|how many people can you seat|vegetarian/i],
+  },
+  // ---- owner
+  {
+    name: "owner-yes-transfer",
+    greeting: "Rosie's, hello?",
+    turns: ["Yeah, this is the owner speaking. What's this about?", "Sure, go ahead.", "Yes, we do large bookings.", "We seat about sixty.", "Yes, plenty of vegetarian and some vegan.", "Hm, an AI phone assistant? Yeah, I'd like to hear more, can I talk to him?"],
+    transfers: true,
+    mustSay: [/large bookings\?/i, /how many people|seat/i, /vegetarian|vegan/i],
+  },
+  {
+    name: "owner-small-place",
+    greeting: "Luigi's.",
+    turns: ["That's me, I own the place. What's up?", "Sure.", "Large bookings? No, we only have about twelve seats.", "Nope, just a small family place."],
+    ends: ["not_a_fit"],
+    ownerReached: true,
+    expectFiled: { seats: 12 },
+    neverSay: [/phone assistant|answers (calls|the phone)/i],
+  },
+  {
+    name: "owner-qualifies-then-no",
+    greeting: "Bella Vista, good afternoon.",
+    turns: ["Yes, I'm the manager. What's it about?", "Go on.", "We take large parties, yes.", "Up to a hundred and twenty.", "Yes, both vegan and vegetarian.", "No thanks, not interested in that."],
     ends: ["not_interested"],
     ownerReached: true,
+    expectFiled: { takesLargeBookings: true, seats: 120 },
   },
   {
-    name: "are-you-human-and-booking",
+    name: "owner-maybe-later",
+    greeting: "Golden Dragon, hello.",
+    turns: ["Yes, owner speaking.", "Quick, sure.", "Yes, we do banquets.", "Around eighty.", "Vegetarian yes, vegan on request.", "Maybe. I'm busy now, ring me Thursday morning.", "Okay, got the number."],
+    ends: ["owner_callback"],
+    ownerReached: true,
+    mustSay: [/oh four one two/i],
+  },
+  {
+    name: "owner-busy-right-away",
+    set: "new",
+    label: "Luigi's Trattoria",
+    greeting: "Luigi's.",
+    turns: ["That's me, I own the place. How'd you get this number?", "Right. Look, I'm in the middle of prep.", "Call me Thursday morning."],
+    ends: ["owner_callback"],
+    ownerReached: true,
+    neverSayAfterFirstTurn: [/large bookings\?|how many people can you seat|vegetarian|put .* on now|connect him now/i],
+  },
+  {
+    name: "owner-asks-for-details",
+    set: "new",
+    label: "Bella Vista",
+    greeting: "Thank you for calling Bella Vista, this is Maria, how can I help?",
+    turns: ["Yes, I'm the manager, I make the calls here. What kind of booking?", "How many people is it, and when?", "Fine, ask away.", "We do large parties, up to forty.", "Vegetarian only a few dishes."],
+    // It must not invent the party size or the date.
+    neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons)\b.*(booking|party)|\b(next|this) (week|month|friday|saturday|sunday)\b/i],
+  },
+  // ---- the owner calling back (the dispatch rule sends the call-back number to this agent)
+  {
+    name: "inbound-owner-after-staff-call",
+    inbound: { previous: "the restaurant is Rosie's Diner; you only reached staff; the owner is free: after five; summary: Staff said the owner is in after five." },
+    turns: ["Hi, someone from this number called earlier? I'm the owner.", "Sure, go ahead.", "Yes, we take large bookings.", "About fifty seats.", "Yeah, vegetarian and vegan both.", "No thanks, not interested in that."],
+    ends: ["not_interested"],
+    ownerReached: true,
+    expectFiled: { takesLargeBookings: true, seats: 50 },
+    mustSay: [/large bookings\?/i, /vegetarian|vegan/i],
+  },
+  {
+    name: "inbound-owner-already-answered",
+    set: "new",
+    inbound: { previous: "the restaurant is Luigi's; you reached the owner or manager; takes large bookings: yes; seats: 90; vegetarian/vegan: both; the owner is free: Thursday morning; summary: The owner was busy and asked for a call Thursday." },
+    turns: ["Hi, it's Luigi, you wanted me to call back.", "Sure, what would you like to know?", "Yes, I'd like to hear about that. Put him on."],
+    transfers: true,
+    // The answers are already noted: it must not ask them again.
+    neverSay: [/large bookings\?|how many people can you seat|roughly how many/i],
+  },
+  {
+    name: "inbound-unknown-caller",
+    set: "new",
+    inbound: { previous: null },
+    turns: ["Hi, I missed a call from this number. Who's this?", "Oh, I see. No, I'm just a customer, I don't work there.", "Okay, bye."],
+    ends: ["wrong_number", "other", "not_interested", "refused", "message_left"],
+    mustSay: [/\bAI\b/i],
+  },
+  // ---- the machine, the unclear, the unwilling
+  {
+    name: "are-you-human",
     greeting: "Hello, Rosie's Diner, how can I help?",
-    turns: ["Sorry, are you a real person?", "Oh. So do you want to book a table, or what?", "She's busy. Just call back later.", "I don't know, try tomorrow morning."],
-    ends: STAFF_ENDINGS,
-    mustSay: [/\bAI\b|assistant|not a (real )?person/i, /Adil/i],
+    turns: ["Sorry, are you a real person?", "Oh. Okay. She's busy. Just call back later.", "I don't know, try tomorrow morning."],
+    ends: ["call_back_later", "message_left", "refused", "other"],
+    mustSay: [/\bAI\b|assistant/i],
+  },
+  {
+    name: "is-this-a-scam",
+    set: "new",
+    label: "Sakura Sushi",
+    greeting: "Sakura Sushi.",
+    turns: ["Is this a scam? Who is this really?", "The owner's my dad. He's not here till five.", "Okay.", "Yep."],
+    ends: ["call_back_later", "message_left", "refused", "other"],
+    mustSay: [/\bAI\b/i],
   },
   {
     name: "do-not-call",
@@ -89,49 +199,10 @@ const SCENARIOS = [
     ends: ["voicemail"],
   },
   {
-    name: "staff-asks-for-details",
-    greeting: "Rosie's Diner, Mia speaking.",
-    turns: ["What's it regarding exactly? How many people, what date, what's the budget?", "No, I'm just a waiter.", "Okay, I'll tell her.", "I don't know when she's in."],
-    ends: STAFF_ENDINGS,
-    // It has no details, so it must never produce any.
-    neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons|dollars)\b|\b(next|this) (week|month|friday|saturday|sunday)\b/i],
-  },
-  {
-    name: "too-busy",
-    greeting: "Rosie's!",
-    turns: ["Mate, we're slammed. Can't talk.", "Dunno, after three maybe."],
-    ends: STAFF_ENDINGS,
-  },
-
-  // A second set, with other restaurants and wordings: run these after any change to the
-  // instructions, to see that a fix tuned on the first set holds elsewhere (`sim new`).
-  {
-    name: "gatekeeper-refuses",
-    set: "new",
-    label: "Thai Orchid",
-    greeting: "Thai Orchid, hello.",
-    turns: ["Who is this? What's it about? We're not interested in whatever it is.", "No. I'm not giving out her details. Bye."],
-    ends: ["refused", "other"],
-    // After a no, it answers the question and goes: it never asks for the owner again.
-    neverSayAfterFirstTurn: [/owner|manager/i],
-    ownerReached: false,
-  },
-  {
-    name: "owner-busy-call-thursday",
-    set: "new",
-    label: "Luigi's Trattoria",
-    greeting: "Luigi's.",
-    turns: ["That's me, I own the place. How'd you get this number?", "Right. Look, I'm in the middle of prep.", "Call me Thursday morning."],
-    ends: ["owner_callback"],
-    ownerReached: true,
-    // Once they say they are busy, the transfer is never offered again.
-    neverSayAfterFirstTurn: [/put .* on now|connect him now|connect you/i],
-  },
-  {
     name: "phone-menu",
     set: "new",
-    label: "Golden Dragon",
     kind: "menu",
+    label: "Golden Dragon",
     greeting: "Thank you for calling Golden Dragon. For bookings, press one. For takeaway, press two. For opening hours, press three.",
     turns: [SILENCE],
     ends: ["phone_menu"],
@@ -145,41 +216,13 @@ const SCENARIOS = [
     ends: ["wrong_number"],
   },
   {
-    name: "manager-asks-price-then-yes",
-    set: "new",
-    label: "Bella Vista",
-    greeting: "Thank you for calling Bella Vista, this is Maria, how can I help?",
-    turns: ["Yes, I'm the manager, I make the calls here. What kind of booking?", "How many people is it?", "Yeah alright, I've got a couple of minutes."],
-    transfers: true,
-    neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons)\b/i],
-  },
-  {
-    name: "is-this-a-scam",
-    set: "new",
-    label: "Sakura Sushi",
-    greeting: "Sakura Sushi.",
-    turns: ["Is this a scam? Who is this really?", "The owner's my dad. He's not here till five.", "Okay.", "Yep."],
-    ends: STAFF_ENDINGS,
-    mustSay: [/\bAI\b/i],
-  },
-  {
     name: "person-goes-quiet",
     set: "new",
     label: "Harbour Grill",
     greeting: "Harbour Grill, can you hold a second?",
     turns: [SILENCE, "Sorry about that. She's not in today.", "Okay, I'll let her know.", "No idea, sorry."],
-    ends: STAFF_ENDINGS,
+    ends: ["call_back_later", "message_left", "refused", "other"],
     mustSay: [/still there|are you there|hello/i],
-  },
-  {
-    name: "owner-fetched-then-email-me",
-    set: "new",
-    label: "The Corner Bistro",
-    greeting: "Hello, The Corner Bistro.",
-    turns: ["Hang on, I'll grab her.", "Hi, this is Anne, I'm the owner. Who's this?", "Oh wow, okay. When's it for?", "Not right now. Tell him to email me instead."],
-    ends: ["owner_callback"],
-    ownerReached: true,
-    mustSay: [/\bAI\b/i],
   },
 ];
 
@@ -187,20 +230,27 @@ const SCENARIOS = [
 const NEVER = [
   /\b(i'd|i would|i'?d) like to (book|make a (booking|reservation))/i,
   /\b(i|we) (want|need|am looking) to (book|reserve)/i,
-  /\b(sets? restaurants? up|booking system|phone assistant|forktime)\b/i,
   /\b(he|aadeel|adil)'?s? (is )?(a )?(customer|sales)\b/i,
   /\bi'?m (a )?(real )?(person|human)\b/i,
 ];
 const WORD_LIMIT = 32;
 // It never reads a phone number out, and never asks staff to pass a message on or call back.
-NEVER.push(/\b(oh|zero|four|one|two|three|five|six|seven|eight|nine)[ ,]+(oh|zero|four|one|two|three|five|six|seven|eight|nine)[ ,]+(oh|zero|four|one|two|three|five|six|seven|eight|nine)\b/i);
-NEVER.push(/\b(ask|tell) (them|him|her) to (call|ring|phone)\b|\bcould you (ask|pass)\b|\bcall (him|aadeel|adil) back\b|\bpass (that|it|this|the message) on\b/i);
 
 /** Words in a reply, not counting the phone number read out digit by digit. */
-const words = (text) => (text.replace(META.callbackNumberSpoken, "").match(/[\p{L}\p{N}']+/gu) || []).length;
+const words = (text) => (text.replace(new RegExp(META.callbackNumberSpoken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "").match(/[\p{L}\p{N}']+/gu) || []).length;
+
+const INBOUND_OPENING = {
+  withHistory: "Hi, thanks for calling back! This is Sara, an AI assistant. I called earlier for Adil about a large booking. This call is recorded. Am I speaking with the owner?",
+  fresh: "Hi, you've reached Adil's line. This is Sara, an AI assistant. This call is recorded. How can I help?",
+};
 
 async function play(scenario) {
-  const meta = { ...META, label: scenario.label || META.label };
+  const inbound = scenario.inbound || null;
+  const meta = {
+    ...META,
+    label: scenario.label || META.label,
+    ...(inbound ? { direction: "inbound", previousNote: inbound.previous, openingLine: inbound.previous ? INBOUND_OPENING.withHistory : INBOUND_OPENING.fresh } : {}),
+  };
   const call = new OutreachCall({ ctx: { room: { name: "sim" } }, meta, vad: null });
   // As on a real call: their first words are not a turn the model answered (the opening line
   // answered them); they reach the model through its instructions.
@@ -218,12 +268,12 @@ async function play(scenario) {
     for (const fn of event.functionCalls || []) toolCalls.push(fn.name);
   });
 
-  const instructions = buildInstructions(meta, call.openingLine, { firstHeard: scenario.greeting });
+  const instructions = buildInstructions(meta, call.openingLine, { firstHeard: inbound ? null : scenario.greeting, previous: inbound ? inbound.previous : null });
   await session.start({ agent: new voice.Agent({ instructions, tools: call.buildTools(), chatCtx }) });
   // Who answered, judged from their first words exactly as on a real call.
   call.llm = model;
-  call.lineKind = await classifyLine({ llmModel: model, firstHeard: scenario.greeting, ChatContext: llm.ChatContext });
-  const log = [`  them : ${scenario.greeting}`, `  agent: ${call.openingLine}`];
+  call.lineKind = inbound ? "person" : await classifyLine({ llmModel: model, firstHeard: scenario.greeting, ChatContext: llm.ChatContext });
+  const log = inbound ? [`  agent: ${call.openingLine}`] : [`  them : ${scenario.greeting}`, `  agent: ${call.openingLine}`];
 
   let spokeInLastTurn = false;
   let firstTurnEnd = null;
@@ -241,6 +291,14 @@ async function play(scenario) {
     for (const reply of replies.slice(before)) log.push(`  agent: ${reply}`);
     spokeInLastTurn = replies.length > before;
     if (firstTurnEnd == null) firstTurnEnd = replies.length;
+  }
+  // A real call goes on until it ends: if the script ran out, the other side closes politely.
+  for (let extra = 0; extra < 2 && !call.pending && !scenario.transfers; extra += 1) {
+    const before = replies.length;
+    log.push("  them : Okay, thanks. Bye.");
+    await session.run({ userInput: "Okay, thanks. Bye." }).wait();
+    for (const reply of replies.slice(before)) log.push(`  agent: ${reply}`);
+    spokeInLastTurn = replies.length > before;
   }
   await session.close().catch(() => undefined);
   // The goodbye rides in the tool and is spoken by the call itself, unless the agent already said one.
@@ -260,7 +318,8 @@ async function play(scenario) {
   } else if (!call.filed) {
     problems.push("the call was never ended with end_call");
   } else {
-    if (!scenario.ends.includes(call.filed.outcome)) problems.push(`outcome ${call.filed.outcome}, wanted one of ${scenario.ends.join("/")}`);
+    if (scenario.ends && !scenario.ends.includes(call.filed.outcome)) problems.push(`outcome ${call.filed.outcome}, wanted one of ${scenario.ends.join("/")}`);
+    for (const [field, want] of Object.entries(scenario.expectFiled || {})) if (call.filed[field] !== want) problems.push(`${field} filed as ${call.filed[field]}, wanted ${want}`);
     if (scenario.ownerReached != null && call.filed.ownerReached !== scenario.ownerReached) problems.push(`ownerReached ${call.filed.ownerReached}`);
   }
   for (const pattern of NEVER.concat(scenario.neverSay || [])) if (pattern.test(said)) problems.push(`said something it must not: ${pattern}`);

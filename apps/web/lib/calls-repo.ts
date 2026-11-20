@@ -56,6 +56,12 @@ export async function addCalls(entries: NumberEntry[], fromNumber: string, now =
     callbackTime: null,
     bookingSystem: null,
     interested: null,
+    takesLargeBookings: null,
+    seats: null,
+    capacityNote: null,
+    vegetarianVegan: null,
+    interestedInSystem: null,
+    direction: "outbound",
     recording: null,
     error: null,
     simulated: false,
@@ -145,6 +151,11 @@ export interface CallEnding {
   callbackTime?: string | null;
   bookingSystem?: string | null;
   interested?: boolean | null;
+  takesLargeBookings?: boolean | null;
+  seats?: number | null;
+  capacityNote?: string | null;
+  vegetarianVegan?: string | null;
+  interestedInSystem?: boolean | null;
   error?: string | null;
 }
 
@@ -169,6 +180,11 @@ export async function endCall(id: string, ending: CallEnding, now = new Date()):
         callbackTime: ending.callbackTime ?? null,
         bookingSystem: ending.bookingSystem ?? null,
         interested: ending.interested ?? null,
+        takesLargeBookings: ending.takesLargeBookings ?? null,
+        seats: ending.seats ?? null,
+        capacityNote: ending.capacityNote ?? null,
+        vegetarianVegan: ending.vegetarianVegan ?? null,
+        interestedInSystem: ending.interestedInSystem ?? null,
         error: ending.error ?? null,
       },
       $unset: { active: "" },

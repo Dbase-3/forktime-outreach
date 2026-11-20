@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import callAnswer from "../src/callAnswer.js";
 import config from "../src/config.js";
 import events from "../src/events.js";
+import inbound from "../src/inbound.js";
 import lineCheck from "../src/lineCheck.js";
 import opening from "../src/opening.js";
 import prompt from "../src/prompt.js";
@@ -48,23 +49,22 @@ describe("the agent's instructions", () => {
     expect(text).toContain("You are Sara, an AI voice assistant");
     expect(text).toContain("on behalf of Adil Khan");
     expect(text).toContain(`You have already said, word for word: "${meta.openingLine}"`);
-    expect(text).toContain("You are calling: Rosie's Diner.");
+    expect(text).toContain("You are talking to: Rosie's Diner.");
   });
 
   it("never let it pose as a customer or deny being an AI", () => {
-    expect(text).toContain("you have no details");
-    expect(text).toContain("Never claim or hint that you are a person.");
-    expect(text).not.toMatch(/party of|pretend|Forktime|booking system/i);
+    expect(text).toContain("you have no date, party size or budget");
+    expect(text).toContain("Never claim or hint that you are a person");
+    expect(text).not.toMatch(/party of|pretend|booking system/i);
   });
 
   it("teach it to say goodbye through the tool, and what to do with a machine that talks back", () => {
     expect(text).toContain("Another AI assistant or a phone system that answers for the restaurant");
     expect(text).toContain("Your last words go in its goodbye field");
-    expect(text).toContain("Never give a phone number");
   });
 
   it("take a no, and a busy owner, at their word", () => {
-    expect(text).toContain("Never ask for the owner again after a no.");
+    expect(text).toContain("Never ask again after a no.");
     expect(text).toContain("never offer to connect Adil now");
   });
 
@@ -75,9 +75,28 @@ describe("the agent's instructions", () => {
     );
   });
 
-  it("never carries a phone number for the agent to read out", () => {
-    expect(text).not.toMatch(/call-back number|four one two|oh four/i);
-    expect(prompt.buildInstructions({ ...meta, callbackNumberSpoken: "oh four one two" }, meta.openingLine)).not.toContain("oh four one two");
+  it("ask the three questions in order, then one soft mention, and connect the rep only on a clear yes", () => {
+    expect(text).toContain('"Do you take large bookings?"');
+    expect(text).toContain('"Roughly how many people can you seat?"');
+    expect(text).toContain('"And do you have vegetarian or vegan options?"');
+    expect(text).toContain("outcome not_a_fit");
+    expect(text).toContain("Clearly yes, or they ask to talk to Adil: call transfer_to_rep");
+    expect(text).toContain("Connect them to Adil only if they clearly want to talk to him");
+  });
+
+  it("say the call-back number slowly and offer to repeat it, never hang up on it", () => {
+    expect(text).toContain("I'll say it slowly");
+    expect(text).toContain("Would you like me to say that again?");
+    expect(text).toContain("Only then end the call");
+  });
+
+  it("an inbound call-back says so, confirms who it is, and carries what was noted before", () => {
+    const inbound = prompt.buildInstructions({ ...meta, direction: "inbound" }, "Thanks for calling back.", { previous: "Owner of Rosie's seats 40 and takes large bookings." });
+    expect(inbound).toContain("Someone is calling you back on Adil's line");
+    expect(inbound).toContain('Confirm it: "Am I speaking with the owner?"');
+    expect(inbound).toContain("Owner of Rosie's seats 40 and takes large bookings.");
+    expect(inbound).toContain("Do not ask again anything already answered");
+    expect(text).not.toContain("Someone is calling you back");
   });
 
 });
@@ -190,7 +209,10 @@ describe("filing a call that ended on its own", () => {
       ownerReached: false,
       contactName: null,
       callbackTime: "After 3 PM tomorrow",
-      bookingSystem: null,
+      takesLargeBookings: null,
+      seats: null,
+      vegetarianVegan: null,
+      interestedInSystem: null,
       interested: null,
     });
     expect(wrapup.parseWrapUp('{"outcome":"sold","summary":"x"}').outcome).toBeNull();
@@ -285,6 +307,33 @@ describe("which voice company speaks", () => {
   });
 });
 
+describe("an inbound call-back", () => {
+  it("reads who rang and which number they rang from the phone participant", () => {
+    expect(inbound.inboundNumbers({ attributes: { "sip.phoneNumber": "+923131083726", "sip.trunkPhoneNumber": "+14184313732" } })).toEqual({
+      phone: "+923131083726",
+      calledNumber: "+14184313732",
+    });
+    expect(inbound.inboundNumbers({ attributes: { "sip.trunkPhoneNumber": "+14184313732" } })).toEqual({ phone: "", calledNumber: "+14184313732" });
+    expect(inbound.inboundNumbers({ attributes: {} })).toBeNull();
+    expect(inbound.inboundNumbers(undefined)).toBeNull();
+  });
+
+  it("asks the app with the agent key, sends a hidden number as unknown, and gives up quietly", async () => {
+    const ok = vi.fn(async () => ({ ok: true, json: async () => ({ callId: "c1", meta: { callId: "c1" } }) }));
+    const found = await inbound.fetchInbound({ baseUrl: "http://app", key: "k", phone: "", calledNumber: "+1418", roomName: "r", fetchImpl: ok });
+    expect(found).toEqual({ callId: "c1", meta: { callId: "c1" } });
+    expect(ok.mock.calls[0][0]).toBe("http://app/api/agent/inbound");
+    expect(ok.mock.calls[0][1].headers["x-agent-key"]).toBe("k");
+    expect(JSON.parse(ok.mock.calls[0][1].body)).toEqual({ phone: "unknown", calledNumber: "+1418", roomName: "r" });
+
+    const log = { warn: () => {} };
+    const refused = vi.fn(async () => ({ ok: false, status: 401 }));
+    expect(await inbound.fetchInbound({ baseUrl: "http://app", key: "k", phone: "+1", roomName: "r", fetchImpl: refused, log })).toBeNull();
+    const down = vi.fn(async () => { throw new Error("down"); });
+    expect(await inbound.fetchInbound({ baseUrl: "http://app", key: "k", phone: "+1", roomName: "r", fetchImpl: down, log })).toBeNull();
+  });
+});
+
 describe("small helpers", () => {
   it("Australian numbers go out on the Australian trunk when there is one", () => {
     expect(transfer.trunkFor("+61400000001", { standard: "T1", au: "T2" })).toBe("T2");
@@ -353,6 +402,17 @@ describe("the agent's tools and call details", () => {
     expect(call.session.say.mock.calls[0][1]).toMatchObject({ allowInterruptions: false, addToChatCtx: true });
   });
 
+  it("an inbound caller is told apart from the dialled phone by who leaves", () => {
+    const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta: { ...meta, direction: "inbound", previousNote: "seats: 60" }, vad: null });
+    call.calleeIdentity = "sip_+923131083726";
+    const finalize = vi.spyOn(call, "finalize").mockImplementation(() => {});
+    call.onParticipantLeft({ identity: "callee" });
+    expect(finalize).not.toHaveBeenCalled();
+    call.onParticipantLeft({ identity: "sip_+923131083726" });
+    expect(finalize).toHaveBeenCalledWith("callee_hung_up");
+    expect(call.previousNote).toBe("seats: 60");
+  });
+
   it("the opening line uses the audio made while it rang, when there is some", async () => {
     const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
     call.session = { say: vi.fn(() => ({ waitForPlayout: () => new Promise(() => {}) })) };
@@ -379,6 +439,9 @@ describe("the agent's tools and call details", () => {
     };
     expect(await file(false)).toBe("call_back_later");
     expect(await file(true)).toBe("owner_callback");
+    const later = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+    await later.buildTools().end_call.execute({ goodbye: "Thanks.", outcome: "call_back_later", summary: "x", ownerReached: true }, {});
+    expect(later.filed.outcome).toBe("owner_callback");
   });
 
   it("a quiet line is ended when a recording answered, with the message for a voicemail only", async () => {

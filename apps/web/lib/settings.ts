@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a large booking he'd like to arrange",
+  topic: "a possible large-party booking for a customer",
   transferNumber: "",
   callbackNumber: "",
   ...DEFAULT_WELCOME,
@@ -83,7 +83,8 @@ export function validateSettings(input: unknown): { settings: Settings } | { err
   }
   const settings: Settings = { ...parsed.data, defaultCountry: parsed.data.defaultCountry.toUpperCase() };
   const errors: SettingsError[] = [];
-  // A welcome that doesn't say it is an AI is refused here, so a later edit can't remove it by accident.
+  // Welcome templates are operator-controlled. Unknown placeholders and empty
+  // messages are still rejected by welcomeProblem.
   for (const key of ["welcomeOutbound", "welcomeCallbackKnown", "welcomeCallbackNew"] as const) {
     const problem = welcomeProblem(settings[key], settings);
     if (problem) errors.push({ field: key, message: problem });

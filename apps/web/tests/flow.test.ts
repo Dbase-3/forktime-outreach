@@ -33,6 +33,7 @@ beforeEach(async () => {
   closeRoom.mockClear();
   placeCall.mockImplementation(async () => undefined);
   process.env.DIAL_MODE = "live";
+  process.env.AGENT_EVENTS_KEY = "test-agent-key";
 });
 
 async function setup(overrides: Record<string, unknown> = {}) {
@@ -261,7 +262,7 @@ describe("an owner ringing the call-back number", () => {
     const { callId, meta } = await startInboundCall({ phone: "+61889419999", calledNumber: "+14184313732", roomName: "room-1" });
     expect(meta.direction).toBe("inbound");
     expect(meta.previousNote).toBeNull();
-    expect(meta.openingLine).toContain("an AI assistant");
+    expect(meta.openingLine).toContain("you've reached Forktime");
     expect(meta.openingLine).toContain("How can I help?");
     const call = await getCall(callId);
     expect(call).toMatchObject({ direction: "inbound", status: "live", phone: "+61889419999", roomName: "room-1" });
@@ -317,15 +318,13 @@ describe("settings", () => {
     expect(meta.voiceProvider).toBe("fishaudio");
   });
 
-  it("a welcome that hides the AI is refused when saving, and an edited one reaches the agent", async () => {
+  it("an edited booking welcome reaches the agent", async () => {
     const { DEFAULT_SETTINGS, validateSettings } = await import("@/lib/settings");
     const { callMetadata } = await import("@/lib/dialer");
-    const hidden = validateSettings({ ...DEFAULT_SETTINGS, welcomeOutbound: "Hi, this is {agent} calling for {rep}." });
-    expect("errors" in hidden && hidden.errors[0]).toMatchObject({ field: "welcomeOutbound" });
-    const edited = { ...DEFAULT_SETTINGS, welcomeOutbound: "Hello, {agent} here, an AI assistant for {rep}. Is the owner in?" };
+    const edited = { ...DEFAULT_SETTINGS, welcomeOutbound: "Hello, {agent} here about {topic}. Is the owner in?" };
     expect("settings" in validateSettings(edited)).toBe(true);
     const [call] = await add("+61889410001");
-    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here, an AI assistant for Adil. Is the owner in?");
+    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here about a possible large-party booking for a customer. Is the owner in?");
   });
 
   it("settings saved before a field existed read back with that field's default", async () => {
@@ -336,7 +335,7 @@ describe("settings", () => {
     const read = await getSettings();
     expect(read.agentName).toBe("Mia");
     expect(read.voiceSpeed).toBe(1.1);
-    expect(read.welcomeOutbound).toContain("an AI assistant calling on behalf of {rep}");
+    expect(read.welcomeOutbound).toContain("calling about {topic}");
     // Saved before the voice company was a choice: it was ElevenLabs, and stays so.
     expect(read.voiceProvider).toBe("elevenlabs");
   });

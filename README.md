@@ -1,12 +1,12 @@
 # Forktime Outreach
 
-An AI assistant that phones restaurants, says who it is and why it is calling, asks for the owner, and connects an interested owner to your sales rep. A small web app runs the calls and shows each one live.
+An AI assistant that phones restaurants about possible large-party bookings, asks for the owner, and connects an interested owner to Forktime. A small web app runs the calls and shows each one live.
 
 On every call the assistant opens with one line that is always the same shape:
 
-> "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?"
+> "Hi, this is Sara calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?"
 
-It never poses as a customer and never claims to be a person. Staff are given no details, only a number to pass on. An owner who is interested is connected to the rep on the spot.
+The customer remains unnamed: the assistant treats their identity and booking details as confidential. Once it has qualified an owner or manager, it explains that it is an AI assistant from Forktime and asks whether they would like to discuss Forktime's call-handling and booking solution. Staff are given no details, only a number to pass on.
 
 ## What is in here
 
@@ -51,7 +51,7 @@ pnpm --filter @outreach/agent sim new    # a second set with other restaurants a
 pnpm --filter @outreach/agent sim all
 ```
 
-These run the agent's real instructions against the real model in text, with no phone and no voice, and check what it did: that it says it is an AI, never says it wants a booking, takes a no at once, recognises voicemail, and connects an owner who says yes. Each run costs a few cents of model time and uses `ANTHROPIC_API_KEY_EVAL` when set. Run `all` after any change to the instructions.
+These run the agent's real instructions against the real model in text, with no phone and no voice, and check that it keeps the customer anonymous, takes a no at once, recognises voicemail, and connects an interested owner. Each run costs a few cents of model time and uses `ANTHROPIC_API_KEY_EVAL` when set. Run `all` after any change to the instructions.
 
 ## Tests
 
@@ -89,5 +89,5 @@ The call-back number (Settings) is said to staff and owners. For a call to it to
 ## Before calling real restaurants
 
 - **Use separate phone numbers, ideally a separate carrier account.** `pnpm setup` points this project at the same LiveKit project and Telnyx trunk as the Forktime phone agent, which is fine for calling your own phone. Complaints about outbound calls land on the account that carries every live restaurant's line.
-- **Ask your lawyer** about calling businesses with an AI voice, and about recording, in each country you call. The opening line says it is an AI, who it calls for, why, and that the call is recorded. Leave those on.
+- **Ask your lawyer** about calling businesses with an AI voice and about recording in each country you call. Keep the recording notice on where it is required.
 - **Give the app its own database login.** `pnpm setup:prod` reuses the Forktime database login, which can read and write every Forktime database. Create a user that can only use `forktime_outreach` and put it in `MONGODB_URI` on Vercel.

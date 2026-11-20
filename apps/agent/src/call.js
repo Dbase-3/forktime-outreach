@@ -341,7 +341,7 @@ class OutreachCall {
   async handleQuietLine() {
     const kind = this.lineKind || (this.lineCheck ? await this.lineCheck : "person");
     if (kind === "person" || this.ended || this.pending) return false;
-    const { meta, rep } = this;
+    const { meta } = this;
     const voicemail = kind === "voicemail";
     this.filed = {
       outcome: voicemail ? "voicemail" : "phone_menu",
@@ -349,7 +349,7 @@ class OutreachCall {
       ownerReached: false,
     };
     // A menu is not listening; a voicemail is, so it hears who called and why (no number: the team calls again).
-    const message = voicemail ? `This is ${meta.agentName}, an AI assistant calling for ${rep} about a large booking. He'll try again later. Thank you.` : null;
+    const message = voicemail ? `This is ${meta.agentName} calling about a possible large-party booking. Please call us back when you can. Thank you.` : null;
     this.pending = { type: "end", goodbye: message };
     this.agentSpokeLast = false;
     return true;

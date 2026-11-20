@@ -25,37 +25,40 @@ const meta = {
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?",
+    "Hi, this is Sara calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?",
 };
 
 describe("the opening line", () => {
-  it("is spoken as the app wrote it when it says AI and names the company", () => {
+  it("is spoken word for word when the app supplies it", () => {
     expect(opening.resolveOpeningLine(meta)).toBe(meta.openingLine);
   });
 
-  it("is replaced by the agent's own line when the one handed over hides either", () => {
-    for (const line of ["Hi, I'd like to make a large booking. Is the owner around?", "Hi, this is Sara calling for Adil.", "", undefined]) {
+  it("keeps an operator-written welcome and falls back only when it is missing", () => {
+    for (const line of ["Hi, I'd like to make a large booking. Is the owner around?", "Hi, this is Sara calling for Adil."]) {
       const spoken = opening.resolveOpeningLine({ ...meta, openingLine: line });
-      expect(spoken).toBe("Hi, this is Sara, an AI assistant calling on behalf of Adil. This call is recorded. Is the owner or manager around?");
-      expect(opening.hasDisclosure(spoken, "Adil")).toBe(true);
+      expect(spoken).toBe(line);
     }
+    expect(opening.resolveOpeningLine({ ...meta, openingLine: "" })).toBe(
+      "Hi, this is Sara, calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?",
+    );
   });
 });
 
 describe("the agent's instructions", () => {
   const text = prompt.buildInstructions(meta, meta.openingLine);
 
-  it("say who it is, who it calls for, and that the opening line is already said", () => {
-    expect(text).toContain("You are Sara, an AI voice assistant");
-    expect(text).toContain("on behalf of Adil Khan");
+  it("keeps the customer unnamed and knows the opening line is already said", () => {
+    expect(text).toContain("The enquiry is for an unnamed customer.");
+    expect(text).not.toContain("on behalf of Adil Khan");
     expect(text).toContain(`You have already said, word for word: "${meta.openingLine}"`);
     expect(text).toContain("You are talking to: Rosie's Diner.");
   });
 
-  it("never let it pose as a customer or deny being an AI", () => {
+  it("keeps customer details confidential, and answers directly when asked about AI", () => {
     expect(text).toContain("you have no date, party size or budget");
-    expect(text).toContain("Never claim or hint that you are a person");
-    expect(text).not.toMatch(/party of|pretend|booking system/i);
+    expect(text).toContain("customer's details are confidential");
+    expect(text).toContain("I'm an AI assistant with Forktime");
+    expect(text).not.toContain("Adil is looking for");
   });
 
   it("teach it to say goodbye through the tool, and what to do with a machine that talks back", () => {
@@ -65,7 +68,7 @@ describe("the agent's instructions", () => {
 
   it("take a no, and a busy owner, at their word", () => {
     expect(text).toContain("Never ask again after a no.");
-    expect(text).toContain("never offer to connect Adil now");
+    expect(text).toContain("never offer to connect anyone now");
   });
 
   it("carry what they said at pickup, when it is known", () => {
@@ -75,13 +78,15 @@ describe("the agent's instructions", () => {
     );
   });
 
-  it("ask the three questions in order, then one soft mention, and connect the rep only on a clear yes", () => {
+  it("captures the owner's name, asks the three questions, then makes the Forktime mention", () => {
+    expect(text).toContain('First ask their name, once: "May I ask who I\'m speaking with?"');
+    expect(text).toContain("Save their answer as contactName");
     expect(text).toContain('"Do you take large bookings?"');
     expect(text).toContain('"Roughly how many people can you seat?"');
     expect(text).toContain('"And do you have vegetarian or vegan options?"');
     expect(text).toContain("outcome not_a_fit");
-    expect(text).toContain("Clearly yes, or they ask to talk to Adil: call transfer_to_rep");
-    expect(text).toContain("Connect them to Adil only if they clearly want to talk to him");
+    expect(text).toContain("I'm an AI assistant from Forktime");
+    expect(text).toContain("Clearly yes, or they ask to talk to someone from Forktime: call transfer_to_rep");
   });
 
   it("say the call-back number slowly and offer to repeat it, never hang up on it", () => {
@@ -92,7 +97,7 @@ describe("the agent's instructions", () => {
 
   it("an inbound call-back says so, confirms who it is, and carries what was noted before", () => {
     const inbound = prompt.buildInstructions({ ...meta, direction: "inbound" }, "Thanks for calling back.", { previous: "Owner of Rosie's seats 40 and takes large bookings." });
-    expect(inbound).toContain("Someone is calling you back on Adil's line");
+    expect(inbound).toContain("Someone is calling back about a previous booking enquiry");
     expect(inbound).toContain('Confirm it: "Am I speaking with the owner?"');
     expect(inbound).toContain("Owner of Rosie's seats 40 and takes large bookings.");
     expect(inbound).toContain("Do not ask again anything already answered");
@@ -453,7 +458,7 @@ describe("the agent's tools and call details", () => {
     const voicemail = await quiet("voicemail");
     expect(voicemail.handled).toBe(true);
     expect(voicemail.call.filed.outcome).toBe("voicemail");
-    expect(voicemail.call.pending.goodbye).toBe("This is Sara, an AI assistant calling for Adil about a large booking. He'll try again later. Thank you.");
+    expect(voicemail.call.pending.goodbye).toBe("This is Sara calling about a possible large-party booking. Please call us back when you can. Thank you.");
 
     const menu = await quiet("menu");
     expect(menu.call.filed.outcome).toBe("phone_menu");

@@ -35,12 +35,12 @@ const META = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a large booking he'd like to arrange",
+  topic: "a possible large-party booking for a customer",
   transferNumber: "+61400000001",
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara, an AI assistant calling on behalf of Adil, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?",
+    "Hi, this is Sara calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?",
 };
 
 const SILENCE = Symbol("silence");
@@ -93,14 +93,14 @@ const SCENARIOS = [
   {
     name: "owner-yes-transfer",
     greeting: "Rosie's, hello?",
-    turns: ["Yeah, this is the owner speaking. What's this about?", "Sure, go ahead.", "Yes, we do large bookings.", "We seat about sixty.", "Yes, plenty of vegetarian and some vegan.", "Hm, an AI phone assistant? Yeah, I'd like to hear more, can I talk to him?"],
+    turns: ["Yeah, this is the owner speaking. What's this about?", "I'm Maria.", "Sure, go ahead.", "Yes, we do large bookings.", "We seat about sixty.", "Yes, plenty of vegetarian and some vegan.", "Hm, an AI phone assistant? Yeah, I'd like to hear more, can I talk to someone?"],
     transfers: true,
     mustSay: [/large bookings\?/i, /how many people|seat/i, /vegetarian|vegan/i],
   },
   {
     name: "owner-small-place",
     greeting: "Luigi's.",
-    turns: ["That's me, I own the place. What's up?", "Sure.", "Large bookings? No, we only have about twelve seats.", "Nope, just a small family place."],
+    turns: ["That's me, I own the place. What's up?", "I'm Luigi.", "Sure.", "Large bookings? No, we only have about twelve seats.", "Nope, just a small family place."],
     ends: ["not_a_fit"],
     ownerReached: true,
     expectFiled: { seats: 12 },
@@ -109,7 +109,7 @@ const SCENARIOS = [
   {
     name: "owner-qualifies-then-no",
     greeting: "Bella Vista, good afternoon.",
-    turns: ["Yes, I'm the manager. What's it about?", "Go on.", "We take large parties, yes.", "Up to a hundred and twenty.", "Yes, both vegan and vegetarian.", "No thanks, not interested in that."],
+    turns: ["Yes, I'm the manager. What's it about?", "I'm Ana.", "Go on.", "We take large parties, yes.", "Up to a hundred and twenty.", "Yes, both vegan and vegetarian.", "No thanks, not interested in that."],
     ends: ["not_interested"],
     ownerReached: true,
     expectFiled: { takesLargeBookings: true, seats: 120 },
@@ -117,7 +117,7 @@ const SCENARIOS = [
   {
     name: "owner-maybe-later",
     greeting: "Golden Dragon, hello.",
-    turns: ["Yes, owner speaking.", "Quick, sure.", "Yes, we do banquets.", "Around eighty.", "Vegetarian yes, vegan on request.", "Maybe. I'm busy now, ring me Thursday morning.", "Okay, got the number."],
+    turns: ["Yes, owner speaking.", "I'm Chris.", "Quick, sure.", "Yes, we do banquets.", "Around eighty.", "Vegetarian yes, vegan on request.", "Maybe. I'm busy now, ring me Thursday morning.", "Okay, got the number."],
     ends: ["owner_callback"],
     ownerReached: true,
     mustSay: [/oh four one two/i],
@@ -127,7 +127,7 @@ const SCENARIOS = [
     set: "new",
     label: "Luigi's Trattoria",
     greeting: "Luigi's.",
-    turns: ["That's me, I own the place. How'd you get this number?", "Right. Look, I'm in the middle of prep.", "Call me Thursday morning."],
+    turns: ["That's me, I own the place. How'd you get this number?", "I'm Luigi.", "Right. Look, I'm in the middle of prep.", "Call me Thursday morning."],
     ends: ["owner_callback"],
     ownerReached: true,
     neverSayAfterFirstTurn: [/large bookings\?|how many people can you seat|vegetarian|put .* on now|connect him now/i],
@@ -137,7 +137,7 @@ const SCENARIOS = [
     set: "new",
     label: "Bella Vista",
     greeting: "Thank you for calling Bella Vista, this is Maria, how can I help?",
-    turns: ["Yes, I'm the manager, I make the calls here. What kind of booking?", "How many people is it, and when?", "Fine, ask away.", "We do large parties, up to forty.", "Vegetarian only a few dishes."],
+    turns: ["Yes, I'm the manager, I make the calls here. What kind of booking?", "I'm Maria.", "How many people is it, and when?", "Fine, ask away.", "We do large parties, up to forty.", "Vegetarian only a few dishes."],
     // It must not invent the party size or the date.
     neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons)\b.*(booking|party)|\b(next|this) (week|month|friday|saturday|sunday)\b/i],
   },
@@ -145,7 +145,7 @@ const SCENARIOS = [
   {
     name: "inbound-owner-after-staff-call",
     inbound: { previous: "the restaurant is Rosie's Diner; you only reached staff; the owner is free: after five; summary: Staff said the owner is in after five." },
-    turns: ["Hi, someone from this number called earlier? I'm the owner.", "Sure, go ahead.", "Yes, we take large bookings.", "About fifty seats.", "Yeah, vegetarian and vegan both.", "No thanks, not interested in that."],
+    turns: ["Hi, someone from this number called earlier? I'm the owner.", "I'm Mia.", "Sure, go ahead.", "Yes, we take large bookings.", "About fifty seats.", "Yeah, vegetarian and vegan both.", "No thanks, not interested in that."],
     ends: ["not_interested"],
     ownerReached: true,
     expectFiled: { takesLargeBookings: true, seats: 50 },
@@ -155,7 +155,7 @@ const SCENARIOS = [
     name: "inbound-owner-already-answered",
     set: "new",
     inbound: { previous: "the restaurant is Luigi's; you reached the owner or manager; takes large bookings: yes; seats: 90; vegetarian/vegan: both; the owner is free: Thursday morning; summary: The owner was busy and asked for a call Thursday." },
-    turns: ["Hi, it's Luigi, you wanted me to call back.", "Sure, what would you like to know?", "Yes, I'd like to hear about that. Put him on."],
+    turns: ["Hi, it's Luigi, you wanted me to call back.", "Sure, what would you like to know?", "Yes, I'd like to hear about that. Put someone on."],
     transfers: true,
     // The answers are already noted: it must not ask them again.
     neverSay: [/large bookings\?|how many people can you seat|roughly how many/i],
@@ -166,7 +166,7 @@ const SCENARIOS = [
     inbound: { previous: null },
     turns: ["Hi, I missed a call from this number. Who's this?", "Oh, I see. No, I'm just a customer, I don't work there.", "Okay, bye."],
     ends: ["wrong_number", "other", "not_interested", "refused", "message_left"],
-    mustSay: [/\bAI\b/i],
+    mustSay: [/Forktime/i],
   },
   // ---- the machine, the unclear, the unwilling
   {
@@ -240,8 +240,8 @@ const WORD_LIMIT = 32;
 const words = (text) => (text.replace(new RegExp(META.callbackNumberSpoken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "").match(/[\p{L}\p{N}']+/gu) || []).length;
 
 const INBOUND_OPENING = {
-  withHistory: "Hi, thanks for calling back! This is Sara, an AI assistant. I called earlier for Adil about a large booking. This call is recorded. Am I speaking with the owner?",
-  fresh: "Hi, you've reached Adil's line. This is Sara, an AI assistant. This call is recorded. How can I help?",
+  withHistory: "Hi, thanks for calling back. This is Sara. I called earlier about a possible large-party booking for a customer. This call is recorded. May I ask who I'm speaking with?",
+  fresh: "Hi, you've reached Forktime. This is Sara. This call is recorded. How can I help?",
 };
 
 async function play(scenario) {

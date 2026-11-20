@@ -1,9 +1,8 @@
 import type { Settings } from "./types";
 
-// The first thing the person who picks up hears. It always says three things
-// before anything else: this is an AI assistant, who it is calling for, and
-// what the call is about. The agent speaks it word for word and refuses a
-// line without them (apps/agent/src/opening.js mirrors `hasDisclosure`).
+// The first thing the person who picks up hears. The booking enquiry comes
+// first; the agent gives the Forktime and AI explanation to a qualified owner
+// or whenever someone asks directly.
 
 /** "Adil Khan" → "Adil": how a person is named out loud. */
 export function firstName(fullName: string): string {
@@ -32,13 +31,13 @@ export type WelcomeKey =
 export const DEFAULT_WELCOME: Record<WelcomeKey, string> = {
   // We rang them.
   welcomeOutbound:
-    "Hi, this is {agent}, an AI assistant calling on behalf of {rep}, about {topic}. {recorded} Is the owner or manager around?",
+    "Hi, this is {agent} calling about {topic}. {recorded} Is the owner or manager around?",
   // They rang back, and we have spoken to that number before.
   welcomeCallbackKnown:
-    "Hi, thanks for calling back! This is {agent}, an AI assistant. I called earlier for {rep} about {topic}. {recorded} Am I speaking with the owner?",
+    "Hi, thanks for calling back. This is {agent}. I called earlier about {topic}. {recorded} May I ask who I'm speaking with?",
   // They rang the call-back number and we know nothing about them.
   welcomeCallbackNew:
-    "Hi, you've reached {rep}'s line. This is {agent}, an AI assistant. {recorded} How can I help?",
+    "Hi, you've reached Forktime. This is {agent}. {recorded} How can I help?",
 };
 
 export const WELCOME_LABELS: Record<

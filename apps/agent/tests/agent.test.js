@@ -20,12 +20,12 @@ const meta = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a large booking he'd like to arrange",
+  topic: "a large-party booking for around 12 to 14 people",
   transferNumber: "+61400000001",
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?",
+    "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. This call is recorded. Is the owner or manager around?",
 };
 
 describe("the opening line", () => {
@@ -39,7 +39,7 @@ describe("the opening line", () => {
       expect(spoken).toBe(line);
     }
     expect(opening.resolveOpeningLine({ ...meta, openingLine: "" })).toBe(
-      "Hi, this is Sara, calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?",
+      "Hi, this is Sara calling about a large-party booking for around twelve to fourteen people. This call is recorded. Is the owner or manager around?",
     );
   });
 });
@@ -55,7 +55,7 @@ describe("the agent's instructions", () => {
   });
 
   it("keeps customer details confidential, and answers directly when asked about AI", () => {
-    expect(text).toContain("you have no date, party size or budget");
+    expect(text).toContain("group is around twelve to fourteen people");
     expect(text).toContain("customer's details are confidential");
     expect(text).toContain("I'm an AI assistant with Forktime");
     expect(text).not.toContain("Adil is looking for");
@@ -458,7 +458,7 @@ describe("the agent's tools and call details", () => {
     const voicemail = await quiet("voicemail");
     expect(voicemail.handled).toBe(true);
     expect(voicemail.call.filed.outcome).toBe("voicemail");
-    expect(voicemail.call.pending.goodbye).toBe("This is Sara calling about a possible large-party booking. Please call us back when you can. Thank you.");
+    expect(voicemail.call.pending.goodbye).toBe("This is Sara calling about a large-party booking for around twelve to fourteen people. Please call us back when you can. Thank you.");
 
     const menu = await quiet("menu");
     expect(menu.call.filed.outcome).toBe("phone_menu");

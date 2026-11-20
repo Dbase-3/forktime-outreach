@@ -35,12 +35,12 @@ const META = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a possible large-party booking for a customer",
+  topic: "a large-party booking for around 12 to 14 people",
   transferNumber: "+61400000001",
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?",
+    "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. This call is recorded. Is the owner or manager around?",
 };
 
 const SILENCE = Symbol("silence");
@@ -70,7 +70,7 @@ const SCENARIOS = [
     greeting: "Rosie's Diner, Mia speaking.",
     turns: ["What's it regarding exactly? How many people, what date, what's the budget?", "No, I'm just a waiter.", "I don't know when she's in.", "No thanks, I'm good."],
     ends: ["message_left", "call_back_later", "refused"],
-    // It has no details, so it must never produce any.
+    // It gives the known group size but never invents a date or budget.
     neverSay: [/\$\s?\d|\b\d+\s?(people|guests|persons|dollars)\b|\b(next|this) (week|month|friday|saturday|sunday)\b/i],
   },
   {
@@ -240,7 +240,7 @@ const WORD_LIMIT = 32;
 const words = (text) => (text.replace(new RegExp(META.callbackNumberSpoken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "").match(/[\p{L}\p{N}']+/gu) || []).length;
 
 const INBOUND_OPENING = {
-  withHistory: "Hi, thanks for calling back. This is Sara. I called earlier about a possible large-party booking for a customer. This call is recorded. May I ask who I'm speaking with?",
+  withHistory: "Hi, thanks for calling back. This is Sara. I called earlier about a large-party booking for around 12 to 14 people. This call is recorded. May I ask who I'm speaking with?",
   fresh: "Hi, you've reached Forktime. This is Sara. This call is recorded. How can I help?",
 };
 

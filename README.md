@@ -1,12 +1,12 @@
 # Forktime Outreach
 
-An AI assistant that phones restaurants about possible large-party bookings, asks for the owner, and connects an interested owner to Forktime. A small web app runs the calls and shows each one live.
+An AI assistant that phones restaurants about large-party bookings for around 12 to 14 people, asks for the owner, and connects an interested owner to Forktime. A small web app runs the calls and shows each one live.
 
 On every call the assistant opens with one line that is always the same shape:
 
-> "Hi, this is Sara calling about a possible large-party booking for a customer. This call is recorded. Is the owner or manager around?"
+> "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. This call is recorded. Is the owner or manager around?"
 
-The customer remains unnamed: the assistant treats their identity and booking details as confidential. Once it has qualified an owner or manager, it explains that it is an AI assistant from Forktime and asks whether they would like to discuss Forktime's call-handling and booking solution. Staff are given no details, only a number to pass on.
+The customer remains unnamed. The assistant can say the group is around 12 to 14 people but treats their identity, date, and budget as confidential. Once it has qualified an owner or manager, it explains that it is an AI assistant from Forktime and asks whether they would like to discuss Forktime's call-handling and booking solution.
 
 ## What is in here
 

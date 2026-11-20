@@ -349,7 +349,7 @@ class OutreachCall {
       ownerReached: false,
     };
     // A menu is not listening; a voicemail is, so it hears who called and why (no number: the team calls again).
-    const message = voicemail ? `This is ${meta.agentName} calling about a possible large-party booking. Please call us back when you can. Thank you.` : null;
+    const message = voicemail ? `This is ${meta.agentName} calling about a large-party booking for around twelve to fourteen people. Please call us back when you can. Thank you.` : null;
     this.pending = { type: "end", goodbye: message };
     this.agentSpokeLast = false;
     return true;

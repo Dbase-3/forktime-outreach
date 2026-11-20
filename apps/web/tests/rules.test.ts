@@ -80,14 +80,14 @@ describe("the opening line", () => {
     agentName: "Sara",
     repName: "Adil Khan",
     company: "Forktime",
-    topic: "A large booking he'd like to arrange.",
+    topic: "A large-party booking for around 12 to 14 people.",
     recordCalls: true,
     recordingNotice: true,
   };
 
   it("opens with the booking enquiry before it asks for anyone", () => {
     expect(buildOpeningLine(settings)).toBe(
-      "Hi, this is Sara calling about a large booking he'd like to arrange. " +
+      "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. " +
         "This call is recorded. Is the owner or manager around?",
     );
   });
@@ -109,21 +109,21 @@ describe("the opening line", () => {
 });
 
 describe("the editable welcome messages", () => {
-  const settings = { agentName: "Sara", repName: "Aadeel Khan", topic: "A large booking he'd like to arrange.", recordCalls: true, recordingNotice: true };
+  const settings = { agentName: "Sara", repName: "Aadeel Khan", topic: "A large-party booking for around 12 to 14 people.", recordCalls: true, recordingNotice: true };
 
   it("the shipped wording leads with the booking enquiry", () => {
     expect(buildOpeningLine(settings)).toBe(
-      "Hi, this is Sara calling about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?",
+      "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. This call is recorded. Is the owner or manager around?",
     );
     expect(buildCallbackWelcome(settings, true)).toBe(
-      "Hi, thanks for calling back. This is Sara. I called earlier about a large booking he'd like to arrange. This call is recorded. May I ask who I'm speaking with?",
+      "Hi, thanks for calling back. This is Sara. I called earlier about a large-party booking for around 12 to 14 people. This call is recorded. May I ask who I'm speaking with?",
     );
     expect(buildCallbackWelcome(settings, false)).toBe("Hi, you've reached Forktime. This is Sara. This call is recorded. How can I help?");
   });
 
   it("an edited template is what gets said, with its placeholders filled in", () => {
     const edited = { ...settings, welcomeOutbound: "Hello! {agent} here about {topic}. Is the owner in?" };
-    expect(buildOpeningLine(edited)).toBe("Hello! Sara here about a large booking he'd like to arrange. Is the owner in?");
+    expect(buildOpeningLine(edited)).toBe("Hello! Sara here about a large-party booking for around 12 to 14 people. Is the owner in?");
     expect(renderWelcome("{recorded} Hi {rep}.", { ...settings, recordCalls: false })).toBe("Hi Aadeel.");
     expect(renderWelcome("Hi {nobody}", settings)).toBe("Hi {nobody}");
   });

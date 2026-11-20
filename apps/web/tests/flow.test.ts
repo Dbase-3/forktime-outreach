@@ -324,7 +324,7 @@ describe("settings", () => {
     const edited = { ...DEFAULT_SETTINGS, welcomeOutbound: "Hello, {agent} here about {topic}. Is the owner in?" };
     expect("settings" in validateSettings(edited)).toBe(true);
     const [call] = await add("+61889410001");
-    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here about a possible large-party booking for a customer. Is the owner in?");
+    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here about a large-party booking for around 12 to 14 people. Is the owner in?");
   });
 
   it("settings saved before a field existed read back with that field's default", async () => {

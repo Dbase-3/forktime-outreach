@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a possible large-party booking for a customer",
+  topic: "a large-party booking for around 12 to 14 people",
   transferNumber: "",
   callbackNumber: "",
   ...DEFAULT_WELCOME,

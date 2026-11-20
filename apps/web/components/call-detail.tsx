@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CalendarClock, PhoneOff, RotateCcw, X } from "lucide-react";
+import { Ban, CalendarClock, Check, Copy, PhoneOff, RotateCcw, X } from "lucide-react";
 import clsx from "clsx";
 import { client } from "@/lib/api";
 import { clockTime, dayAndTime, duration } from "@/lib/format";
@@ -65,6 +65,15 @@ function Transcript({ lines, live, agentName }: { lines: TranscriptLineJson[]; l
   );
 }
 
+function transcriptText(call: CallJson, lines: TranscriptLineJson[], agentName: string): string {
+  const title = call.label || formatPhone(call.phone);
+  const rows = lines.map((line) => {
+    const speaker = line.role === "agent" ? agentName : line.role === "callee" ? "Restaurant" : "System";
+    return `${speaker} · ${clockTime(line.at)}\n${line.text}`;
+  });
+  return [`Call transcript — ${title}`, formatPhone(call.phone), "", ...rows].join("\n\n");
+}
+
 export function CallDetail({
   callId,
   repFirstName,
@@ -97,6 +106,7 @@ export function CallDetail({
   };
   const cancel = useMutation({ mutationFn: () => client.cancelCall(callId as string), onSuccess: refresh });
   const [recallAt, setRecallAt] = useState("");
+  const [copied, setCopied] = useState(false);
   const again = useMutation({
     mutationFn: (at?: string) => client.callAgain(callId as string, at),
     onSuccess: (result) => {
@@ -117,6 +127,11 @@ export function CallDetail({
   const { call, transcript } = data;
   const open = isOpen(call);
   const failure = cancel.error || again.error || block.error;
+  const copyTranscript = async () => {
+    await navigator.clipboard.writeText(transcriptText(call, transcript, agentName));
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     // One scroll for the whole panel: the summary and recording scroll away and the
@@ -224,7 +239,15 @@ export function CallDetail({
       )}
 
       <section className="p-4">
-        <h3 className="mb-3 text-xs font-medium text-gray-700">Conversation</h3>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-xs font-medium text-gray-700">Conversation</h3>
+          {!!transcript.length && (
+            <button type="button" className="btn-secondary px-2.5 py-1.5 text-xs" onClick={() => void copyTranscript()}>
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copied" : "Copy transcript"}
+            </button>
+          )}
+        </div>
         <Transcript lines={transcript} live={open} agentName={agentName} />
       </section>
     </article>

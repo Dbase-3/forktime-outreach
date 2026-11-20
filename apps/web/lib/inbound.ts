@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { collections } from "./db";
 import { callMetadata } from "./dialer";
-import { firstName } from "./opening-line";
+import { buildCallbackWelcome } from "./opening-line";
 import { getSettings } from "./settings";
 import type { Call, Settings } from "./types";
 
@@ -25,15 +25,6 @@ export function previousNoteOf(call: Pick<Call, "summary" | "takesLargeBookings"
   if (call.callbackTime) parts.push(`the owner is free: ${call.callbackTime}`);
   if (call.summary) parts.push(`summary: ${call.summary}`);
   return parts.join("; ");
-}
-
-/** The first thing a caller hears. It says it is an AI and who the line is for. */
-export function inboundOpeningLine(settings: Pick<Settings, "agentName" | "repName" | "recordCalls" | "recordingNotice">, spokeBefore: boolean): string {
-  const rep = firstName(settings.repName);
-  const notice = settings.recordCalls && settings.recordingNotice ? " This call is recorded." : "";
-  return spokeBefore
-    ? `Hi, thanks for calling back! This is ${settings.agentName.trim()}, an AI assistant. I called earlier for ${rep} about a large booking.${notice} Am I speaking with the owner?`
-    : `Hi, you've reached ${rep}'s line. This is ${settings.agentName.trim()}, an AI assistant.${notice} How can I help?`;
 }
 
 /**
@@ -84,7 +75,7 @@ export async function startInboundCall(input: { phone: string; calledNumber: str
 
   const meta = {
     ...callMetadata(call, settings),
-    openingLine: inboundOpeningLine(settings, !!previous),
+    openingLine: buildCallbackWelcome(settings, !!previous),
     previousNote: previous ? previousNoteOf(previous) : null,
   };
   return { callId: call._id, meta };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { describeWindow, insideCallingWindow, type CallingWindow } from "@/lib/calling-window";
-import { buildOpeningLine, firstName, hasDisclosure } from "@/lib/opening-line";
+import { DEFAULT_WELCOME, buildCallbackWelcome, buildOpeningLine, firstName, hasDisclosure, renderWelcome, unknownPlaceholders, welcomeProblem } from "@/lib/opening-line";
 import { formatPhone, parseNumberList, spokenPhone, toE164 } from "@/lib/phone";
 import { planNext, retryPlan, staleVerdict } from "@/lib/queue";
 
@@ -108,6 +108,41 @@ describe("the opening line", () => {
   it("names a person by their first name", () => {
     expect(firstName("  Adil Khan ")).toBe("Adil");
     expect(firstName("Adil")).toBe("Adil");
+  });
+});
+
+describe("the editable welcome messages", () => {
+  const settings = { agentName: "Sara", repName: "Aadeel Khan", topic: "A large booking he'd like to arrange.", recordCalls: true, recordingNotice: true };
+
+  it("the shipped wording reads exactly as the lines it replaced", () => {
+    expect(buildOpeningLine(settings)).toBe(
+      "Hi, this is Sara, an AI assistant calling on behalf of Aadeel, about a large booking he'd like to arrange. This call is recorded. Is the owner or manager around?",
+    );
+    expect(buildCallbackWelcome(settings, true)).toBe(
+      "Hi, thanks for calling back! This is Sara, an AI assistant. I called earlier for Aadeel about a large booking he'd like to arrange. This call is recorded. Am I speaking with the owner?",
+    );
+    expect(buildCallbackWelcome(settings, false)).toBe("Hi, you've reached Aadeel's line. This is Sara, an AI assistant. This call is recorded. How can I help?");
+  });
+
+  it("an edited template is what gets said, with its placeholders filled in", () => {
+    const edited = { ...settings, welcomeOutbound: "Hello! {agent} here, an AI helper for {rep}. Is the owner in?" };
+    expect(buildOpeningLine(edited)).toBe("Hello! Sara here, an AI helper for Aadeel. Is the owner in?");
+    expect(renderWelcome("{recorded} Hi {rep}.", { ...settings, recordCalls: false })).toBe("Hi Aadeel.");
+    expect(renderWelcome("Hi {nobody}", settings)).toBe("Hi {nobody}");
+  });
+
+  it("a blank or missing template falls back to the shipped wording", () => {
+    expect(buildOpeningLine({ ...settings, welcomeOutbound: "" })).toBe(buildOpeningLine(settings));
+    expect(buildCallbackWelcome({ ...settings, welcomeCallbackNew: undefined }, false)).toContain("you've reached Aadeel's line");
+  });
+
+  it("refuses a template that hides the AI, forgets who it calls for, or has a typo'd placeholder", () => {
+    expect(welcomeProblem(DEFAULT_WELCOME.welcomeOutbound, settings)).toBeNull();
+    expect(welcomeProblem("Hi, this is {agent} calling for {rep}.", settings)).toMatch(/say it is an AI/);
+    expect(welcomeProblem("Hi, this is an AI assistant.", settings)).toMatch(/use \{rep\}/);
+    expect(welcomeProblem("Hi, AI here for {rep}, about {topc}.", settings)).toMatch(/Unknown placeholder: \{topc\}/);
+    expect(welcomeProblem("   ", settings)).toMatch(/can't be empty/);
+    expect(unknownPlaceholders("{agent} {rep} {x} {x} {y}")).toEqual(["x", "y"]);
   });
 });
 

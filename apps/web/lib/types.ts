@@ -18,6 +18,10 @@ export interface Settings {
   transferNumber: string;
   /** The number staff are asked to pass to the owner. E.164. */
   callbackNumber: string;
+  /** What the agent says first, as editable templates ({agent} {rep} {topic} {recorded}). */
+  welcomeOutbound: string;
+  welcomeCallbackKnown: string;
+  welcomeCallbackNew: string;
   /** Which company makes the voice. */
   voiceProvider: "elevenlabs" | "fishaudio";
   /** The voice's id at that company. */

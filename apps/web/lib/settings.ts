@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { collections } from "./db";
 import { toE164 } from "./phone";
+import { DEFAULT_WELCOME, welcomeProblem } from "./opening-line";
 import type { QueueState, Settings } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -10,6 +11,7 @@ export const DEFAULT_SETTINGS: Settings = {
   topic: "a large booking he'd like to arrange",
   transferNumber: "",
   callbackNumber: "",
+  ...DEFAULT_WELCOME,
   voiceProvider: "fishaudio",
   voiceId: "4c2a4dcc3c5e4ed6adaad45299169d2b",
   voiceSpeed: 1.1,
@@ -47,6 +49,9 @@ const settingsShape = z.object({
   topic: z.string().trim().min(3).max(160),
   transferNumber: z.string().trim().max(32),
   callbackNumber: z.string().trim().max(32),
+  welcomeOutbound: z.string().trim().min(1, "This message can't be empty.").max(500),
+  welcomeCallbackKnown: z.string().trim().min(1, "This message can't be empty.").max(500),
+  welcomeCallbackNew: z.string().trim().min(1, "This message can't be empty.").max(500),
   voiceProvider: z.enum(["elevenlabs", "fishaudio"]),
   voiceId: z.string().trim().min(1).max(64),
   voiceSpeed: z.number().min(1, "The slowest is normal speed").max(1.2, "1.2 is the fastest the voice can go"),
@@ -78,6 +83,11 @@ export function validateSettings(input: unknown): { settings: Settings } | { err
   }
   const settings: Settings = { ...parsed.data, defaultCountry: parsed.data.defaultCountry.toUpperCase() };
   const errors: SettingsError[] = [];
+  // A welcome that doesn't say it is an AI is refused here, so a later edit can't remove it by accident.
+  for (const key of ["welcomeOutbound", "welcomeCallbackKnown", "welcomeCallbackNew"] as const) {
+    const problem = welcomeProblem(settings[key], settings);
+    if (problem) errors.push({ field: key, message: problem });
+  }
   for (const field of ["transferNumber", "callbackNumber", "fromNumber"] as const) {
     if (!settings[field]) continue;
     const e164 = toE164(settings[field], settings.defaultCountry);

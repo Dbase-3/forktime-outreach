@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, client } from "@/lib/api";
 import { describeWindow } from "@/lib/calling-window";
-import { buildOpeningLine } from "@/lib/opening-line";
+import { DEFAULT_WELCOME, PLACEHOLDERS, WELCOME_LABELS, renderWelcome, type WelcomeKey } from "@/lib/opening-line";
 import { formatPhone } from "@/lib/phone";
 import type { Settings } from "@/lib/types";
 
@@ -58,6 +58,65 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
         {hint && <span className="block text-xs text-gray-500">{hint}</span>}
       </span>
     </label>
+  );
+}
+
+/** One welcome message: the template to edit, buttons that drop in a placeholder, and how it will sound. */
+function WelcomeField({
+  title,
+  when,
+  value,
+  preview,
+  error,
+  isDefault,
+  onChange,
+  onReset,
+}: {
+  title: string;
+  when: string;
+  value: string;
+  preview: string;
+  error?: string;
+  isDefault: boolean;
+  onChange: (next: string) => void;
+  onReset: () => void;
+}) {
+  const box = useRef<HTMLTextAreaElement>(null);
+  const insert = (name: string) => {
+    const el = box.current;
+    const at = el ? el.selectionStart : value.length;
+    const end = el ? el.selectionEnd : value.length;
+    onChange(`${value.slice(0, at)}{${name}}${value.slice(end)}`);
+  };
+  return (
+    <div className="sm:col-span-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="label mb-0">{title}</span>
+        {!isDefault && (
+          <button type="button" className="text-xs text-gray-600 underline hover:text-gray-900" onClick={onReset}>
+            Reset to the original
+          </button>
+        )}
+      </div>
+      <p className="hint mb-1.5 mt-0">{when}</p>
+      <textarea ref={box} rows={3} className="field leading-relaxed" value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={!!error} />
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {PLACEHOLDERS.map((p) => (
+          <button key={p.name} type="button" title={p.meaning} className="rounded border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-700 hover:bg-gray-50" onClick={() => insert(p.name)}>
+            {`{${p.name}}`}
+          </button>
+        ))}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-red-700">
+          {error}
+        </p>
+      ) : (
+        <p className="mt-2 rounded-md bg-gray-50 p-3 text-sm leading-relaxed text-gray-800">
+          <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-gray-400">As it will be said</span>“{preview}”
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -122,10 +181,35 @@ export function SettingsForm() {
         <Field label="What the call is about" hint='Reads after "about", so start in lower case. It must be true: the agent says it on every call.' error={fieldErrors.topic}>
           <input className="field" value={form.topic} onChange={(e) => set("topic", e.target.value)} />
         </Field>
-        <div className="sm:col-span-2">
-          <span className="label">The opening line, as it will be said</span>
-          <p className="rounded-md bg-gray-50 p-3 text-sm leading-relaxed text-gray-800">“{buildOpeningLine(form)}”</p>
-        </div>
+      </Section>
+
+      <Section
+        id="welcome-messages"
+        title="What the agent says first"
+        intro="Three messages, for the three ways a call starts. Change the wording freely; the agent says them word for word. Every message must say it is an AI and who it calls for ({rep})."
+      >
+        {(Object.keys(WELCOME_LABELS) as WelcomeKey[]).map((key) => (
+          <WelcomeField
+            key={key}
+            title={WELCOME_LABELS[key].title}
+            when={WELCOME_LABELS[key].when}
+            value={form[key]}
+            preview={renderWelcome(form[key], form)}
+            error={fieldErrors[key]}
+            isDefault={form[key] === DEFAULT_WELCOME[key]}
+            onChange={(next) => set(key, next)}
+            onReset={() => set(key, DEFAULT_WELCOME[key])}
+          />
+        ))}
+        <p className="hint sm:col-span-2">
+          Placeholders:{" "}
+          {PLACEHOLDERS.map((p, i) => (
+            <span key={p.name}>
+              {i > 0 && " · "}
+              <code className="rounded bg-gray-100 px-1">{`{${p.name}}`}</code> {p.meaning}
+            </span>
+          ))}
+        </p>
       </Section>
 
       <Section title="Numbers" intro="Staff are never given details. If the owner is out, they are asked when they will be free and to call back on the call-back number.">

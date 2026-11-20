@@ -317,14 +317,26 @@ describe("settings", () => {
     expect(meta.voiceProvider).toBe("fishaudio");
   });
 
+  it("a welcome that hides the AI is refused when saving, and an edited one reaches the agent", async () => {
+    const { DEFAULT_SETTINGS, validateSettings } = await import("@/lib/settings");
+    const { callMetadata } = await import("@/lib/dialer");
+    const hidden = validateSettings({ ...DEFAULT_SETTINGS, welcomeOutbound: "Hi, this is {agent} calling for {rep}." });
+    expect("errors" in hidden && hidden.errors[0]).toMatchObject({ field: "welcomeOutbound" });
+    const edited = { ...DEFAULT_SETTINGS, welcomeOutbound: "Hello, {agent} here, an AI assistant for {rep}. Is the owner in?" };
+    expect("settings" in validateSettings(edited)).toBe(true);
+    const [call] = await add("+61889410001");
+    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here, an AI assistant for Adil. Is the owner in?");
+  });
+
   it("settings saved before a field existed read back with that field's default", async () => {
     const { collections } = await import("@/lib/db");
     const { DEFAULT_SETTINGS, getSettings } = await import("@/lib/settings");
-    const { voiceSpeed: _speed, voiceProvider: _provider, ...older } = DEFAULT_SETTINGS;
+    const { voiceSpeed: _speed, voiceProvider: _provider, welcomeOutbound: _welcome, ...older } = DEFAULT_SETTINGS;
     await (await collections()).settings.updateOne({ _id: "app" }, { $set: { ...older, agentName: "Mia" } }, { upsert: true });
     const read = await getSettings();
     expect(read.agentName).toBe("Mia");
     expect(read.voiceSpeed).toBe(1.1);
+    expect(read.welcomeOutbound).toContain("an AI assistant calling on behalf of {rep}");
     // Saved before the voice company was a choice: it was ElevenLabs, and stays so.
     expect(read.voiceProvider).toBe("elevenlabs");
   });

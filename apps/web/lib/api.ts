@@ -1,4 +1,5 @@
 import type { CallJson, DncEntry, Settings, TranscriptLineJson } from "./types";
+import type { ImportPreviewEntry } from "./imports";
 
 // The browser's calls to this app's own server routes.
 
@@ -22,6 +23,13 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     window.location.href = "/login";
     throw new ApiError("Not signed in", 401, null);
   }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new ApiError((body as { error?: string } | null)?.error || `Request failed (${response.status})`, response.status, body);
+  return body as T;
+}
+
+async function formApi<T>(path: string, form: FormData): Promise<T> {
+  const response = await fetch(path, { method: "POST", body: form, cache: "no-store" });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new ApiError((body as { error?: string } | null)?.error || `Request failed (${response.status})`, response.status, body);
   return body as T;
@@ -85,6 +93,12 @@ export const client = {
   setQueue: (workspaceId: string, action: "start" | "pause") => post<QueueSnapshot>(scoped("/api/queue", workspaceId), { action }),
   calls: (workspaceId: string) => api<{ calls: CallJson[] }>(scoped("/api/calls", workspaceId)),
   addNumbers: (workspaceId: string, numbers: string) => post<AddResult>(scoped("/api/calls", workspaceId), { numbers }),
+  addEntries: (workspaceId: string, entries: Array<{ label: string; phone: string }>) => post<AddResult>(scoped("/api/calls", workspaceId), { entries }),
+  parseImport: (workspaceId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return formApi<{ fileName: string; entries: ImportPreviewEntry[] }>(scoped("/api/imports/parse", workspaceId), form);
+  },
   call: (workspaceId: string, id: string) => api<{ call: CallJson; transcript: TranscriptLineJson[] }>(scoped(`/api/calls/${id}`, workspaceId)),
   cancelCall: (workspaceId: string, id: string) => post<{ ok: true }>(scoped(`/api/calls/${id}/cancel`, workspaceId)),
   callAgain: (workspaceId: string, id: string, at?: string) => post<{ ok: true; callId: string }>(scoped(`/api/calls/${id}/retry`, workspaceId), at ? { at } : {}),

@@ -35,4 +35,5 @@ export const env = {
 
   telnyxApiKey: () => process.env.TELNYX_API_KEY || "",
   elevenLabsApiKey: () => process.env.ELEVENLABS_API_KEY || "",
+  xaiApiKey: () => process.env.XAI_API_KEY || "",
 };

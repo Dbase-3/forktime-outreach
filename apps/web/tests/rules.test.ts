@@ -3,6 +3,7 @@ import { describeWindow, insideCallingWindow, type CallingWindow } from "@/lib/c
 import { DEFAULT_WELCOME, buildCallbackWelcome, buildOpeningLine, firstName, hasDisclosure, renderWelcome, unknownPlaceholders, welcomeProblem } from "@/lib/opening-line";
 import { formatPhone, parseNumberList, spokenPhone, toE164 } from "@/lib/phone";
 import { planNext, retryPlan, staleVerdict } from "@/lib/queue";
+import { reviewImportEntries } from "@/lib/imports";
 
 describe("parseNumberList", () => {
   it("reads one number per line, with a name on either side", () => {
@@ -38,6 +39,25 @@ describe("parseNumberList", () => {
   it("formats a stored number for the screen", () => {
     expect(formatPhone("+61889411234")).toBe("+61 8 8941 1234");
     expect(formatPhone("not a number")).toBe("not a number");
+  });
+});
+
+describe("restaurant file imports", () => {
+  it("normalizes usable phone numbers and makes invalid or repeated rows visible for review", () => {
+    expect(
+      reviewImportEntries(
+        [
+          { label: "Rosie's Diner", phone: "08 8941 1234" },
+          { label: "Rosie's duplicate", phone: "+61 8 8941 1234" },
+          { label: "No phone cafe", phone: "not a number" },
+        ],
+        "AU",
+      ),
+    ).toEqual([
+      { label: "Rosie's Diner", phone: "+61889411234", valid: true, problem: null },
+      { label: "Rosie's duplicate", phone: "+61889411234", valid: false, problem: "Duplicate number in this file" },
+      { label: "No phone cafe", phone: "not a number", valid: false, problem: "Could not read this phone number" },
+    ]);
   });
 });
 

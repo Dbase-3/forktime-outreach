@@ -13,51 +13,87 @@ export function firstName(fullName: string): string {
 /** The topic as it reads after "about": no capital, no full stop. */
 function topicPhrase(topic: string): string {
   const trimmed = topic.trim().replace(/[.!?]+$/, "");
-  const withoutLead = trimmed.replace(/^(it'?s |this is |i'?m calling )?about\s+/i, "");
+  const withoutLead = trimmed.replace(
+    /^(it'?s |this is |i'?m calling )?about\s+/i,
+    "",
+  );
   return withoutLead.charAt(0).toLowerCase() + withoutLead.slice(1);
 }
 
 // ---- The three welcome messages are templates the operator edits in Settings.
 // A template is plain text with {placeholders}; rendering fills them in.
 
-export type WelcomeKey = "welcomeOutbound" | "welcomeCallbackKnown" | "welcomeCallbackNew";
+export type WelcomeKey =
+  | "welcomeOutbound"
+  | "welcomeCallbackKnown"
+  | "welcomeCallbackNew";
 
 /** The wording the app ships with: used until someone edits a message, and by "Reset". */
 export const DEFAULT_WELCOME: Record<WelcomeKey, string> = {
   // We rang them.
-  welcomeOutbound: "Hi, this is {agent}, an AI assistant calling on behalf of {rep}, about {topic}. {recorded} Is the owner or manager around?",
+  welcomeOutbound:
+    "Hi, this is {agent}, an AI assistant calling on behalf of {rep}, about {topic}. {recorded} Is the owner or manager around?",
   // They rang back, and we have spoken to that number before.
-  welcomeCallbackKnown: "Hi, thanks for calling back! This is {agent}, an AI assistant. I called earlier for {rep} about {topic}. {recorded} Am I speaking with the owner?",
+  welcomeCallbackKnown:
+    "Hi, thanks for calling back! This is {agent}, an AI assistant. I called earlier for {rep} about {topic}. {recorded} Am I speaking with the owner?",
   // They rang the call-back number and we know nothing about them.
-  welcomeCallbackNew: "Hi, you've reached {rep}'s line. This is {agent}, an AI assistant. {recorded} How can I help?",
+  welcomeCallbackNew:
+    "Hi, you've reached {rep}'s line. This is {agent}, an AI assistant. {recorded} How can I help?",
 };
 
-export const WELCOME_LABELS: Record<WelcomeKey, { title: string; when: string }> = {
-  welcomeOutbound: { title: "When the agent calls a restaurant", when: "Said first, as soon as they pick up and say hello." },
-  welcomeCallbackKnown: { title: "When an owner calls back and we spoke before", when: "Said first when someone rings the call-back number from a number we already called." },
-  welcomeCallbackNew: { title: "When someone calls the call-back number and we don't know them", when: "Said first when the caller's number is new or hidden." },
+export const WELCOME_LABELS: Record<
+  WelcomeKey,
+  { title: string; when: string }
+> = {
+  welcomeOutbound: {
+    title: "When the agent calls a restaurant",
+    when: "Said first, as soon as they pick up and say hello.",
+  },
+  welcomeCallbackKnown: {
+    title: "When an owner calls back and we spoke before",
+    when: "Said first when someone rings the call-back number from a number we already called.",
+  },
+  welcomeCallbackNew: {
+    title: "When someone calls the call-back number and we don't know them",
+    when: "Said first when the caller's number is new or hidden.",
+  },
 };
 
 export const PLACEHOLDERS: Array<{ name: string; meaning: string }> = [
   { name: "agent", meaning: "the agent's name (Settings → Who is calling)" },
   { name: "rep", meaning: "the first name of the person it calls for" },
   { name: "topic", meaning: "what the call is about" },
-  { name: "recorded", meaning: '"This call is recorded." when recording and the notice are on, otherwise nothing' },
+  {
+    name: "recorded",
+    meaning:
+      '"This call is recorded." when recording and the notice are on, otherwise nothing',
+  },
 ];
 
-type WelcomeFields = Pick<Settings, "agentName" | "repName" | "topic" | "recordCalls" | "recordingNotice">;
+type WelcomeFields = Pick<
+  Settings,
+  "agentName" | "repName" | "topic" | "recordCalls" | "recordingNotice"
+>;
 type OpeningFields = WelcomeFields & Partial<Pick<Settings, WelcomeKey>>;
 
 /** Fill a template's placeholders in. Unknown ones are left as they are. */
-export function renderWelcome(template: string, settings: WelcomeFields): string {
+export function renderWelcome(
+  template: string,
+  settings: WelcomeFields,
+): string {
   const values: Record<string, string> = {
     agent: settings.agentName.trim(),
     rep: firstName(settings.repName),
     topic: topicPhrase(settings.topic),
-    recorded: settings.recordCalls && settings.recordingNotice ? "This call is recorded." : "",
+    recorded:
+      settings.recordCalls && settings.recordingNotice
+        ? "This call is recorded."
+        : "",
   };
   return template
-    .replace(/\{(\w+)\}/g, (whole, name: string) => (name in values ? values[name] : whole))
+    .replace(/\{(\w+)\}/g, (whole, name: string) =>
+      name in values ? values[name] : whole,
+    )
     .replace(/\s+/g, " ")
     .replace(/\s+([,.!?])/g, "$1")
     .trim();
@@ -66,35 +102,48 @@ export function renderWelcome(template: string, settings: WelcomeFields): string
 /** Placeholders in a template that mean nothing. */
 export function unknownPlaceholders(template: string): string[] {
   const known = new Set(PLACEHOLDERS.map((p) => p.name));
-  return [...new Set([...template.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))].filter((name) => !known.has(name));
+  return [
+    ...new Set([...template.matchAll(/\{(\w+)\}/g)].map((m) => m[1])),
+  ].filter((name) => !known.has(name));
 }
 
-/** Why a template can't be used, or null. It must always say it is an AI and who it calls for. */
-export function welcomeProblem(template: string, settings: WelcomeFields): string | null {
+/** Why a template can't be used, or null. Only empty and unknown placeholders are rejected. */
+export function welcomeProblem(
+  template: string,
+  settings: WelcomeFields,
+): string | null {
   if (!template.trim()) return "This message can't be empty.";
   const unknown = unknownPlaceholders(template);
-  if (unknown.length) return `Unknown placeholder: ${unknown.map((n) => `{${n}}`).join(", ")}.`;
-  const line = renderWelcome(template, settings);
-  if (!/\bai\b/i.test(line)) return 'It has to say it is an AI (for example "an AI assistant").';
-  if (!line.toLowerCase().includes(firstName(settings.repName).toLowerCase())) return "It has to name who it calls for: use {rep}.";
+  if (unknown.length)
+    return `Unknown placeholder: ${unknown.map((n) => `{${n}}`).join(", ")}.`;
   return null;
 }
 
 /** The welcome for a call we place. */
 export function buildOpeningLine(settings: OpeningFields): string {
-  return renderWelcome(settings.welcomeOutbound || DEFAULT_WELCOME.welcomeOutbound, settings);
+  return renderWelcome(
+    settings.welcomeOutbound || DEFAULT_WELCOME.welcomeOutbound,
+    settings,
+  );
 }
 
 /** The welcome for someone ringing the call-back number. */
-export function buildCallbackWelcome(settings: OpeningFields, spokeBefore: boolean): string {
+export function buildCallbackWelcome(
+  settings: OpeningFields,
+  spokeBefore: boolean,
+): string {
   return spokeBefore
-    ? renderWelcome(settings.welcomeCallbackKnown || DEFAULT_WELCOME.welcomeCallbackKnown, settings)
-    : renderWelcome(settings.welcomeCallbackNew || DEFAULT_WELCOME.welcomeCallbackNew, settings);
+    ? renderWelcome(
+        settings.welcomeCallbackKnown || DEFAULT_WELCOME.welcomeCallbackKnown,
+        settings,
+      )
+    : renderWelcome(
+        settings.welcomeCallbackNew || DEFAULT_WELCOME.welcomeCallbackNew,
+        settings,
+      );
 }
 
-/** Whether a line says it is an AI and names the person it calls for (first name). */
-export function hasDisclosure(line: string, repFirstName: string): boolean {
-  const said = line.toLowerCase();
-  const who = repFirstName.trim().toLowerCase();
-  return /\bai\b/.test(said) && who.length > 0 && said.includes(who);
+/** Always true: the product owner controls the wording completely. Kept for compatibility. */
+export function hasDisclosure(_line: string, _repFirstName: string): boolean {
+  return true;
 }

@@ -36,7 +36,7 @@ Out of the box `DIAL_MODE=dry`: **no phone rings**. Paste a few numbers, press *
 
 ### Real calls
 
-1. In **Settings**, set the number calls come from, the number an interested owner is connected to, and the call-back number staff are asked to pass on.
+1. In **Settings**, set the number calls come from, the number an interested owner is connected to, and the call-back number restaurants can use to reach the agent.
 2. In `apps/web/.env.local`, set `DIAL_MODE=live` and restart the app.
 3. Start the voice agent: `pnpm dev:agent` (terminal 3).
 4. Add your own mobile first, press **Start calling**, and answer it.
@@ -84,7 +84,7 @@ Put the deployed app's address in `OUTREACH_WEB_URL` in `apps/agent/.env.prod`. 
 
 ## When an owner calls back
 
-The call-back number (Settings) is said to staff and owners. For a call to it to reach this agent, the number needs, in LiveKit, an inbound SIP trunk that includes it and a SIP dispatch rule for that trunk with the agent name `outreach-agent`. Then the agent recognises the caller's number, pulls up the earlier call to it, and carries on from what was noted. A number that is already attached to another agent (the Forktime phone agent) must not be reused.
+The call-back number is the caller ID restaurants use to return the call; the agent does not read it aloud. For a call to it to reach this agent, the number needs, in LiveKit, an inbound SIP trunk that includes it and a SIP dispatch rule for that trunk with the agent name `outreach-agent`. Then the agent recognises the caller's number, pulls up the earlier call to it, and carries on from what was noted. A number that is already attached to another agent (the Forktime phone agent) must not be reused.
 
 ## Before calling real restaurants
 

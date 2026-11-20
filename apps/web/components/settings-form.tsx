@@ -244,7 +244,7 @@ export function SettingsForm() {
         <Field label="Connect an interested owner to" hint="This phone rings when an owner clearly wants to talk to the rep." error={fieldErrors.transferNumber}>
           <input className="field" placeholder="+61 412 345 678" value={form.transferNumber} onChange={(e) => set("transferNumber", e.target.value)} />
         </Field>
-        <Field label="Call-back number" hint="Said to staff and owners who want to call back. It must reach this agent (see the README), or they get another agent." error={fieldErrors.callbackNumber}>
+        <Field label="Call-back number" hint="The number restaurants call back. It must reach this agent (see the README), or they get another agent." error={fieldErrors.callbackNumber}>
           <input className="field" placeholder="+1 418 431 3732" value={form.callbackNumber} onChange={(e) => set("callbackNumber", e.target.value)} />
         </Field>
       </Section>

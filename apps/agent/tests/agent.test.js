@@ -89,10 +89,10 @@ describe("the agent's instructions", () => {
     expect(text).toContain("Clearly yes, or they ask to talk to someone from Forktime: call transfer_to_rep");
   });
 
-  it("say the call-back number slowly and offer to repeat it, never hang up on it", () => {
-    expect(text).toContain("I'll say it slowly");
-    expect(text).toContain("Would you like me to say that again?");
-    expect(text).toContain("Only then end the call");
+  it("asks for a callback to the caller ID without reading any digits", () => {
+    expect(text).toContain("Please ask them to call us back on the number this call came from.");
+    expect(text).toContain("Never say, read, spell, or repeat the phone number aloud.");
+    expect(text).not.toContain("I'll say it slowly");
   });
 
   it("an inbound call-back says so, confirms who it is, and carries what was noted before", () => {

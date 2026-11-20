@@ -55,7 +55,7 @@ const SCENARIOS = [
     turns: ["She's not in right now.", "Probably after three tomorrow.", "Sure, go ahead.", "Got it, thanks."],
     ends: ["call_back_later"],
     ownerReached: false,
-    mustSay: [/oh four one two/i],
+    neverSay: [/oh four one two/i],
   },
   {
     name: "staff-wants-number-again",
@@ -63,7 +63,7 @@ const SCENARIOS = [
     turns: ["The owner's not here until five.", "Yeah okay, what's the number?", "Sorry, can you say that again?", "Okay, thanks."],
     ends: ["call_back_later"],
     ownerReached: false,
-    mustSay: [/oh four one two/i],
+    neverSay: [/oh four one two/i],
   },
   {
     name: "staff-asks-for-details",
@@ -120,7 +120,7 @@ const SCENARIOS = [
     turns: ["Yes, owner speaking.", "I'm Chris.", "Quick, sure.", "Yes, we do banquets.", "Around eighty.", "Vegetarian yes, vegan on request.", "Maybe. I'm busy now, ring me Thursday morning.", "Okay, got the number."],
     ends: ["owner_callback"],
     ownerReached: true,
-    mustSay: [/oh four one two/i],
+    neverSay: [/oh four one two/i],
   },
   {
     name: "owner-busy-right-away",

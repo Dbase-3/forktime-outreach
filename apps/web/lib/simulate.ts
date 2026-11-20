@@ -25,7 +25,7 @@ function scripts(settings: Settings, call: Call): Step[][] {
       say("callee", `Good afternoon, ${place}.`),
       say("agent", opening),
       say("callee", "She's not in at the moment. Can I take a message?"),
-      say("agent", `Thanks. Could you ask her to call ${rep} back on ${settings.callbackNumber || "our number"}? When is a good time to catch her?`),
+      say("agent", "Thanks. Please ask her to call us back on the number this call came from. When is a good time to catch her?"),
       say("callee", "Try after three tomorrow."),
       say("agent", "After three tomorrow, got it. Thanks for your help. Bye."),
       {

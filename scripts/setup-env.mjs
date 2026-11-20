@@ -108,6 +108,7 @@ writeEnv(agentFile, prod ? "Forktime Outreach: the voice agent, in production" :
   ["ANTHROPIC_API_KEY_EVAL", () => from("ANTHROPIC_API_KEY_EVAL", "agent"), "Used by `pnpm sim` (practice conversations), so test spend stays off the live key."],
   ["SONIOX_API_KEY", () => from("SONIOX_API_KEY", "agent", "backend")],
   ["ELEVENLABS_API_KEY", () => from("ELEVENLABS_API_KEY", "agent")],
+  ["FISH_API_KEY", () => from("FISH_API_KEY", "agent"), "Fish Audio voices (a voice chosen in Settings)."],
   ["OUTREACH_LLM_MODEL", () => "claude-haiku-4-5"],
   ["TURN_DETECTOR", () => "stt", '"stt" or "multilingual" (LiveKit\'s end-of-turn model; needs its model files downloaded).'],
   ["EGRESS_S3_BUCKET", () => from("EGRESS_S3_BUCKET", "agent"), "Where call recordings are stored. Leave empty to not record."],

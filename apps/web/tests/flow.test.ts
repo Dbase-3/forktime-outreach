@@ -263,17 +263,21 @@ describe("settings", () => {
       expect("errors" in result && result.errors[0].field).toBe("voiceSpeed");
     }
     const [call] = await add("+61889410001");
-    expect(callMetadata(call, { ...DEFAULT_SETTINGS, voiceSpeed: 1.2 }).voiceSpeed).toBe(1.2);
+    const meta = callMetadata(call, { ...DEFAULT_SETTINGS, voiceSpeed: 1.2 });
+    expect(meta.voiceSpeed).toBe(1.2);
+    expect(meta.voiceProvider).toBe("fishaudio");
   });
 
   it("settings saved before a field existed read back with that field's default", async () => {
     const { collections } = await import("@/lib/db");
     const { DEFAULT_SETTINGS, getSettings } = await import("@/lib/settings");
-    const { voiceSpeed: _dropped, ...older } = DEFAULT_SETTINGS;
+    const { voiceSpeed: _speed, voiceProvider: _provider, ...older } = DEFAULT_SETTINGS;
     await (await collections()).settings.updateOne({ _id: "app" }, { $set: { ...older, agentName: "Mia" } }, { upsert: true });
     const read = await getSettings();
     expect(read.agentName).toBe("Mia");
-    expect(read.voiceSpeed).toBe(1);
+    expect(read.voiceSpeed).toBe(1.1);
+    // Saved before the voice company was a choice: it was ElevenLabs, and stays so.
+    expect(read.voiceProvider).toBe("elevenlabs");
   });
 });
 

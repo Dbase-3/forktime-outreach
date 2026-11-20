@@ -97,7 +97,7 @@ export function SettingsForm() {
     setForm({ ...form, [key]: value });
   };
   const dirty = JSON.stringify(form) !== JSON.stringify(saved.data?.settings);
-  const voice = voices.data?.voices.find((v) => v.voiceId === form.voiceId);
+  const voice = voices.data?.voices.find((v) => v.voiceId === form.voiceId && v.provider === form.voiceProvider);
   const carrier = numbers.data?.numbers ?? [];
   const fromListed = carrier.some((n) => n.phone === form.fromNumber);
 
@@ -164,10 +164,18 @@ export function SettingsForm() {
 
       <Section title="Voice">
         <Field label="The agent's voice" wide error={fieldErrors.voiceId}>
-          <select className="field" value={voice ? form.voiceId : ""} onChange={(e) => set("voiceId", e.target.value)}>
+          <select
+            className="field"
+            value={voice ? `${voice.provider}:${voice.voiceId}` : ""}
+            onChange={(e) => {
+              const [provider, ...id] = e.target.value.split(":");
+              setForm({ ...form, voiceProvider: provider as Settings["voiceProvider"], voiceId: id.join(":") });
+              save.reset();
+            }}
+          >
             {!voice && <option value="">{form.voiceId} (not in the list)</option>}
             {(voices.data?.voices ?? []).map((v) => (
-              <option key={v.voiceId} value={v.voiceId}>
+              <option key={`${v.provider}:${v.voiceId}`} value={`${v.provider}:${v.voiceId}`}>
                 {v.name} · {v.detail}
               </option>
             ))}
@@ -175,7 +183,7 @@ export function SettingsForm() {
         </Field>
         <Field
           label="Speaking speed"
-          hint="Normal uses the most natural voice model, which has one fixed speed. Faster uses the voice model that can be sped up, so it sounds slightly different."
+          hint="Fish Audio voices speed up with no change in sound. For ElevenLabs voices, normal uses the most natural model, which has one fixed speed, and faster switches to a model that can be sped up."
           error={fieldErrors.voiceSpeed}
           wide
         >

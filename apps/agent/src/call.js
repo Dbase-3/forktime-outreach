@@ -3,11 +3,12 @@
 const { voice, llm } = require("@livekit/agents");
 const anthropic = require("@livekit/agents-plugin-anthropic");
 const elevenlabs = require("@livekit/agents-plugin-elevenlabs");
+const fishaudio = require("@livekit/agents-plugin-fishaudio");
 const soniox = require("@livekit/agents-plugin-soniox");
 const { TelephonyBackgroundVoiceCancellation } = require("@livekit/noise-cancellation-node");
 const { z } = require("zod");
 
-const { VOICE, TIMING, BOOKING_TERMS, env, ttsOptions } = require("./config");
+const { VOICE, TIMING, BOOKING_TERMS, env, voiceSetup } = require("./config");
 const { waitForCallAnswer } = require("./callAnswer");
 const { createEmitter } = require("./events");
 const { classifyLine } = require("./lineCheck");
@@ -80,7 +81,8 @@ class OutreachCall {
     const room = ctx.room;
     this.emitter = createEmitter({ baseUrl: env.webUrl(), key: env.eventsKey(), callId: meta.callId, attempt: meta.attempt, log: this.log });
 
-    this.tts = new elevenlabs.TTS({ ...ttsOptions(meta.voiceSpeed), voiceId: meta.voiceId, apiKey: process.env.ELEVENLABS_API_KEY });
+    const setup = voiceSetup({ provider: meta.voiceProvider, voiceId: meta.voiceId, voiceSpeed: meta.voiceSpeed });
+    this.tts = setup.provider === "fishaudio" ? new fishaudio.TTS(setup.options) : new elevenlabs.TTS(setup.options);
     this.prepareOpening();
 
     const answer = await waitForCallAnswer(room, (meta.ringTimeoutSec + 8) * 1000);

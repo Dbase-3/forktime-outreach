@@ -60,6 +60,8 @@ const VOICE = {
     temperature: 0.4,
     maxTokens: 300,
   },
+  // Fish Audio's best-sounding model, as on the phone agent.
+  fish: { model: "s2.1-pro" },
   vad: { activationThreshold: 0.5 },
   // Milliseconds.
   endpointing: { mode: "fixed", minDelay: 600, maxDelay: 1000 },
@@ -113,6 +115,30 @@ function ttsOptions(voiceSpeed) {
   };
 }
 
+/**
+ * The text-to-speech to build for a voice: its plugin, and the options for it.
+ * Fish Audio speaks at any speed natively. ElevenLabs goes through ttsOptions.
+ * Pure: builds nothing.
+ */
+function voiceSetup({ provider, voiceId, voiceSpeed }) {
+  if (provider === "fishaudio") {
+    return {
+      provider: "fishaudio",
+      options: {
+        apiKey: process.env.FISH_API_KEY,
+        voiceId,
+        model: VOICE.fish.model,
+        sampleRate: 16000,
+        latencyMode: "low",
+        speed: Math.min(Math.max(Number(voiceSpeed) || 1, 1), VOICE.tts.maxSpeed),
+        temperature: 0.6,
+        topP: 0.7,
+      },
+    };
+  }
+  return { provider: "elevenlabs", options: { ...ttsOptions(voiceSpeed), voiceId, apiKey: process.env.ELEVENLABS_API_KEY } };
+}
+
 function required(name) {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is not set (apps/agent/.env)`);
@@ -142,4 +168,4 @@ const env = {
   }),
 };
 
-module.exports = { VOICE, TIMING, BOOKING_TERMS, env, ttsOptions };
+module.exports = { VOICE, TIMING, BOOKING_TERMS, env, ttsOptions, voiceSetup };

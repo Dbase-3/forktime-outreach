@@ -10,8 +10,9 @@ export const DEFAULT_SETTINGS: Settings = {
   topic: "a large booking he'd like to arrange",
   transferNumber: "",
   callbackNumber: "",
-  voiceId: "TgnhEILA8UwUqIMi20rp",
-  voiceSpeed: 1,
+  voiceProvider: "fishaudio",
+  voiceId: "4c2a4dcc3c5e4ed6adaad45299169d2b",
+  voiceSpeed: 1.1,
   fromNumber: "",
   timezone: "Australia/Sydney",
   windowStart: "14:00",
@@ -46,6 +47,7 @@ const settingsShape = z.object({
   topic: z.string().trim().min(3).max(160),
   transferNumber: z.string().trim().max(32),
   callbackNumber: z.string().trim().max(32),
+  voiceProvider: z.enum(["elevenlabs", "fishaudio"]),
   voiceId: z.string().trim().min(1).max(64),
   voiceSpeed: z.number().min(1, "The slowest is normal speed").max(1.2, "1.2 is the fastest the voice can go"),
   fromNumber: z.string().trim().max(32),
@@ -97,7 +99,9 @@ export async function getSettings(): Promise<Settings> {
   const stored = await settings.findOne({ _id: "app" });
   if (!stored) return { ...DEFAULT_SETTINGS };
   const { _id: _ignored, ...rest } = stored;
-  return { ...DEFAULT_SETTINGS, ...rest };
+  // Settings saved before the voice company was a choice were all ElevenLabs.
+  const saved: Partial<Settings> = rest;
+  return { ...DEFAULT_SETTINGS, ...rest, voiceProvider: saved.voiceProvider ?? "elevenlabs" };
 }
 
 export async function saveSettings(next: Settings): Promise<Settings> {

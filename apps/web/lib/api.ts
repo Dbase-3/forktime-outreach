@@ -60,6 +60,7 @@ export interface CarrierNumber {
 }
 
 export interface VoiceOption {
+  provider: "elevenlabs" | "fishaudio";
   voiceId: string;
   name: string;
   detail: string;

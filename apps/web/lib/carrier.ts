@@ -11,14 +11,24 @@ export interface CarrierNumber {
 }
 
 export interface VoiceOption {
+  provider: "elevenlabs" | "fishaudio";
   voiceId: string;
   name: string;
   detail: string;
   previewUrl: string | null;
 }
 
-/** The voices the phone agent already uses, by what they sound like. */
-export const HOUSE_VOICES: VoiceOption[] = [
+/** The Fish Audio voices the phone agent already uses. Fish speaks naturally at any speed. */
+export const FISH_VOICES: VoiceOption[] = [
+  { provider: "fishaudio", voiceId: "4c2a4dcc3c5e4ed6adaad45299169d2b", name: "American woman, conversational", detail: "Fish Audio", previewUrl: null },
+  { provider: "fishaudio", voiceId: "933563129e564b19a115bedd57b7406a", name: "American woman, soft", detail: "Fish Audio", previewUrl: null },
+  { provider: "fishaudio", voiceId: "4efcbb69dac949c287e2ead0ce8f80e4", name: "Canadian woman, upbeat", detail: "Fish Audio", previewUrl: null },
+  { provider: "fishaudio", voiceId: "4a49480b66434c538c5bd73198a42f49", name: "Australian woman, upbeat", detail: "Fish Audio", previewUrl: null },
+  { provider: "fishaudio", voiceId: "46e236a33f0e49ec977b6d5f3c639a41", name: "Australian woman, expressive", detail: "Fish Audio", previewUrl: null },
+];
+
+/** The ElevenLabs voices the phone agent already uses, by what they sound like. */
+export const HOUSE_VOICES: Omit<VoiceOption, "provider">[] = [
   { voiceId: "kdnRe2koJdOK4Ovxn2DI", name: "American woman, conversational", detail: "House voice", previewUrl: null },
   { voiceId: "g6xIsTj2HwM6VR4iXFCw", name: "American woman, chatty", detail: "House voice", previewUrl: null },
   { voiceId: "OYTbf65OHHFELVut7v2H", name: "American woman, calm", detail: "House voice", previewUrl: null },
@@ -68,11 +78,12 @@ export async function listCarrierNumbers(now = Date.now()): Promise<{ numbers: C
 /** The house voices, then the ElevenLabs account's own (with a sample to hear) when a key is set. */
 export async function listVoices(now = Date.now()): Promise<VoiceOption[]> {
   const apiKey = env.elevenLabsApiKey();
-  if (!apiKey) return HOUSE_VOICES;
+  const eleven = (list: Omit<VoiceOption, "provider">[]): VoiceOption[] => list.map((v) => ({ ...v, provider: "elevenlabs" as const }));
+  if (!apiKey) return [...FISH_VOICES, ...eleven(HOUSE_VOICES)];
   if (memo.voices && now - memo.voices.at < TTL_MS) return memo.voices.value;
   try {
     const response = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": apiKey }, cache: "no-store" });
-    if (!response.ok) return HOUSE_VOICES;
+    if (!response.ok) return [...FISH_VOICES, ...eleven(HOUSE_VOICES)];
     const body = (await response.json()) as {
       voices?: Array<{ voice_id: string; name: string; preview_url?: string | null; labels?: Record<string, string> }>;
     };
@@ -87,11 +98,11 @@ export async function listVoices(now = Date.now()): Promise<VoiceOption[]> {
         detail: [v.labels?.accent, v.labels?.gender, v.labels?.description].filter(Boolean).join(", ") || "ElevenLabs",
         previewUrl: v.preview_url ?? null,
       }));
-    const voices = [...house, ...others];
+    const voices = [...FISH_VOICES, ...eleven(house), ...eleven(others)];
     memo.voices = { at: now, value: voices };
     return voices;
   } catch {
     // ElevenLabs unreachable: the house list still lets a voice be picked.
-    return HOUSE_VOICES;
+    return [...FISH_VOICES, ...eleven(HOUSE_VOICES)];
   }
 }

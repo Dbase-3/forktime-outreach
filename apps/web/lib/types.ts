@@ -18,7 +18,9 @@ export interface Settings {
   transferNumber: string;
   /** The number staff are asked to pass to the owner. E.164. */
   callbackNumber: string;
-  /** ElevenLabs voice id. */
+  /** Which company makes the voice. */
+  voiceProvider: "elevenlabs" | "fishaudio";
+  /** The voice's id at that company. */
   voiceId: string;
   /**
    * How fast the voice speaks: 1 is normal, up to 1.2. Normal uses the most

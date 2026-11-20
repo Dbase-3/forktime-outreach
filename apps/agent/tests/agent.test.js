@@ -265,6 +265,26 @@ describe("the voice for a speaking speed", () => {
   });
 });
 
+describe("which voice company speaks", () => {
+  it("Fish Audio takes the speed itself, within normal to 1.2, on its best model", () => {
+    process.env.FISH_API_KEY = "fish-key";
+    const fish = config.voiceSetup({ provider: "fishaudio", voiceId: "abc", voiceSpeed: 1.1 });
+    expect(fish).toEqual({
+      provider: "fishaudio",
+      options: { apiKey: "fish-key", voiceId: "abc", model: "s2.1-pro", sampleRate: 16000, latencyMode: "low", speed: 1.1, temperature: 0.6, topP: 0.7 },
+    });
+    expect(config.voiceSetup({ provider: "fishaudio", voiceId: "abc", voiceSpeed: 3 }).options.speed).toBe(1.2);
+    expect(config.voiceSetup({ provider: "fishaudio", voiceId: "abc", voiceSpeed: 0.5 }).options.speed).toBe(1);
+  });
+
+  it("anything else is ElevenLabs, with its own model rules", () => {
+    const eleven = config.voiceSetup({ provider: undefined, voiceId: "xyz", voiceSpeed: 1.2 });
+    expect(eleven.provider).toBe("elevenlabs");
+    expect(eleven.options).toMatchObject({ voiceId: "xyz", model: "eleven_flash_v2_5" });
+    expect(eleven.options.voiceSettings.speed).toBe(1.2);
+  });
+});
+
 describe("small helpers", () => {
   it("Australian numbers go out on the Australian trunk when there is one", () => {
     expect(transfer.trunkFor("+61400000001", { standard: "T1", au: "T2" })).toBe("T2");

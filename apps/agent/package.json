@@ -16,6 +16,7 @@
     "@livekit/agents": "1.9.2",
     "@livekit/agents-plugin-anthropic": "1.9.2",
     "@livekit/agents-plugin-elevenlabs": "1.9.2",
+    "@livekit/agents-plugin-fishaudio": "1.9.2",
     "@livekit/agents-plugin-livekit": "1.9.2",
     "@livekit/agents-plugin-silero": "1.9.2",
     "@livekit/agents-plugin-soniox": "1.9.2",

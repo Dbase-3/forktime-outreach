@@ -4,6 +4,7 @@ import { collections } from "./db";
 import type { Outcome } from "./outcomes";
 import type { NumberEntry } from "./phone";
 import type { Call, CallJson, CallStage, TranscriptLine, TranscriptLineJson, TranscriptRole } from "./types";
+import { DEFAULT_WORKSPACE_ID, workspaceFilter } from "./workspaces";
 
 // Every read and write of calls and their transcripts.
 
@@ -26,14 +27,21 @@ export function toLineJson(line: TranscriptLine): TranscriptLineJson {
 }
 
 /** Add numbers to the end of the queue as one batch. */
-export async function addCalls(entries: NumberEntry[], fromNumber: string, now = new Date(), notBefore: Date | null = null): Promise<Call[]> {
+export async function addCalls(
+  entries: NumberEntry[],
+  fromNumber: string,
+  now = new Date(),
+  notBefore: Date | null = null,
+  workspaceId = DEFAULT_WORKSPACE_ID,
+): Promise<Call[]> {
   if (!entries.length) return [];
   const { calls } = await collections();
-  const last = await calls.find({}, { projection: { order: 1 } }).sort({ order: -1 }).limit(1).next();
+  const last = await calls.find(workspaceFilter(workspaceId), { projection: { order: 1 } }).sort({ order: -1 }).limit(1).next();
   const firstOrder = (last?.order ?? 0) + 1;
   const batchId = randomUUID();
   const docs: Call[] = entries.map((entry, index) => ({
     _id: randomUUID(),
+    workspaceId,
     batchId,
     phone: entry.phone,
     label: entry.label,
@@ -71,19 +79,19 @@ export async function addCalls(entries: NumberEntry[], fromNumber: string, now =
 }
 
 /** The calls for the screen: what is live first, then the queue in order, then the newest finished. */
-export async function listCalls(limit = 200): Promise<Call[]> {
+export async function listCalls(limit = 200, workspaceId = DEFAULT_WORKSPACE_ID): Promise<Call[]> {
   const { calls } = await collections();
   const [open, done] = await Promise.all([
-    calls.find({ status: { $in: ["dialing", "live", "queued"] } }).sort({ order: 1 }).limit(limit).toArray(),
-    calls.find({ status: { $in: ["ended", "cancelled"] } }).sort({ endedAt: -1 }).limit(limit).toArray(),
+    calls.find({ $and: [workspaceFilter(workspaceId), { status: { $in: ["dialing", "live", "queued"] } }] }).sort({ order: 1 }).limit(limit).toArray(),
+    calls.find({ $and: [workspaceFilter(workspaceId), { status: { $in: ["ended", "cancelled"] } }] }).sort({ endedAt: -1 }).limit(limit).toArray(),
   ]);
   const rank = (call: Call) => (call.status === "queued" ? 1 : 0);
   return [...open.sort((a, b) => rank(a) - rank(b) || a.order - b.order), ...done];
 }
 
-export async function getCall(id: string): Promise<Call | null> {
+export async function getCall(id: string, workspaceId?: string): Promise<Call | null> {
   const { calls } = await collections();
-  return calls.findOne({ _id: id });
+  return calls.findOne(workspaceId ? { $and: [{ _id: id }, workspaceFilter(workspaceId)] } : { _id: id });
 }
 
 export async function getTranscript(callId: string): Promise<TranscriptLine[]> {
@@ -91,14 +99,14 @@ export async function getTranscript(callId: string): Promise<TranscriptLine[]> {
   return transcripts.find({ callId }).sort({ seq: 1 }).toArray();
 }
 
-export async function getActiveCall(): Promise<Call | null> {
+export async function getActiveCall(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Call | null> {
   const { calls } = await collections();
-  return calls.findOne({ active: true });
+  return calls.findOne({ $and: [workspaceFilter(workspaceId), { active: true }] });
 }
 
-export async function getQueuedCalls(limit = 500): Promise<Call[]> {
+export async function getQueuedCalls(limit = 500, workspaceId = DEFAULT_WORKSPACE_ID): Promise<Call[]> {
   const { calls } = await collections();
-  return calls.find({ status: "queued" }).sort({ order: 1 }).limit(limit).toArray();
+  return calls.find({ $and: [workspaceFilter(workspaceId), { status: "queued" }] }).sort({ order: 1 }).limit(limit).toArray();
 }
 
 /**

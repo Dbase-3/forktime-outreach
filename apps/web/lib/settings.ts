@@ -3,6 +3,7 @@ import { collections } from "./db";
 import { toE164 } from "./phone";
 import { DEFAULT_WELCOME, welcomeProblem } from "./opening-line";
 import type { QueueState, Settings } from "./types";
+import { DEFAULT_WORKSPACE_ID } from "./workspaces";
 
 export const DEFAULT_SETTINGS: Settings = {
   agentName: "Sara",
@@ -105,9 +106,11 @@ export function validateSettings(input: unknown): { settings: Settings } | { err
   return errors.length ? { errors } : { settings };
 }
 
-export async function getSettings(): Promise<Settings> {
+export async function getSettings(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Settings> {
   const { settings } = await collections();
-  const stored = await settings.findOne({ _id: "app" });
+  // `app` is the pre-workspace Forktime document. Keeping it as a fallback
+  // means the production data keeps working until its first scoped save.
+  const stored = await settings.findOne({ _id: workspaceId }) ?? (workspaceId === DEFAULT_WORKSPACE_ID ? await settings.findOne({ _id: "app" }) : null);
   if (!stored) return { ...DEFAULT_SETTINGS };
   const { _id: _ignored, ...rest } = stored;
   // Settings saved before the voice company was a choice were all ElevenLabs.
@@ -115,21 +118,21 @@ export async function getSettings(): Promise<Settings> {
   return { ...DEFAULT_SETTINGS, ...rest, voiceProvider: saved.voiceProvider ?? "elevenlabs" };
 }
 
-export async function saveSettings(next: Settings): Promise<Settings> {
+export async function saveSettings(next: Settings, workspaceId = DEFAULT_WORKSPACE_ID): Promise<Settings> {
   const { settings } = await collections();
-  await settings.updateOne({ _id: "app" }, { $set: next }, { upsert: true });
+  await settings.updateOne({ _id: workspaceId }, { $set: { ...next, workspaceId } }, { upsert: true });
   return next;
 }
 
-export async function getQueueState(): Promise<QueueState> {
+export async function getQueueState(workspaceId = DEFAULT_WORKSPACE_ID): Promise<QueueState> {
   const { queue } = await collections();
-  const stored = await queue.findOne({ _id: "queue" });
-  return { running: stored?.running === true };
+  const stored = await queue.findOne({ _id: `queue:${workspaceId}` }) ?? (workspaceId === DEFAULT_WORKSPACE_ID ? await queue.findOne({ _id: "queue" }) : null);
+  return { workspaceId, running: stored?.running === true };
 }
 
-export async function setQueueRunning(running: boolean): Promise<void> {
+export async function setQueueRunning(running: boolean, workspaceId = DEFAULT_WORKSPACE_ID): Promise<void> {
   const { queue } = await collections();
-  await queue.updateOne({ _id: "queue" }, { $set: { running } }, { upsert: true });
+  await queue.updateOne({ _id: `queue:${workspaceId}` }, { $set: { workspaceId, running } }, { upsert: true });
 }
 
 /** What a real call still needs before the first number is dialled. */

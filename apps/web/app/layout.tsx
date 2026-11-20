@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Forktime Outreach",
-  description: "Calls restaurants, asks for the owner, and connects the interested ones.",
+  description: "Calls restaurants and follows up on booking and service enquiries.",
   robots: { index: false, follow: false },
 };
 

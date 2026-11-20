@@ -78,18 +78,20 @@ export function CallDetail({
   callId,
   repFirstName,
   agentName,
+  workspaceId,
   onSelect,
 }: {
   callId: string | null;
   repFirstName: string;
   agentName: string;
+  workspaceId: string | null;
   onSelect: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ["call", callId],
-    queryFn: () => client.call(callId as string),
-    enabled: !!callId,
+    queryKey: ["call", workspaceId, callId],
+    queryFn: () => client.call(workspaceId as string, callId as string),
+    enabled: !!callId && !!workspaceId,
     // A call on the line is re-read every second and a half; a finished one a few more times for its recording.
     refetchInterval: (query) => {
       const call = query.state.data?.call;
@@ -100,23 +102,23 @@ export function CallDetail({
   });
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["calls"] });
-    queryClient.invalidateQueries({ queryKey: ["queue"] });
-    queryClient.invalidateQueries({ queryKey: ["call", callId] });
+    queryClient.invalidateQueries({ queryKey: ["calls", workspaceId] });
+    queryClient.invalidateQueries({ queryKey: ["queue", workspaceId] });
+    queryClient.invalidateQueries({ queryKey: ["call", workspaceId, callId] });
   };
-  const cancel = useMutation({ mutationFn: () => client.cancelCall(callId as string), onSuccess: refresh });
+  const cancel = useMutation({ mutationFn: () => client.cancelCall(workspaceId as string, callId as string), onSuccess: refresh });
   const [recallAt, setRecallAt] = useState("");
   const [copied, setCopied] = useState(false);
   const again = useMutation({
-    mutationFn: (at?: string) => client.callAgain(callId as string, at),
+    mutationFn: (at?: string) => client.callAgain(workspaceId as string, callId as string, at),
     onSuccess: (result) => {
       refresh();
       onSelect(result.callId);
     },
   });
   const block = useMutation({
-    mutationFn: (phone: string) => client.addDnc(phone, "Added from a call"),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dnc"] }),
+    mutationFn: (phone: string) => client.addDnc(workspaceId as string, phone, "Added from a call"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dnc", workspaceId] }),
   });
 
   if (!callId) {

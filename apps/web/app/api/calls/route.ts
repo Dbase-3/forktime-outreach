@@ -4,12 +4,15 @@ import { addCalls, listCalls, toCallJson } from "@/lib/calls-repo";
 import { dncPhones } from "@/lib/dnc";
 import { parseNumberList } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
+import { workspaceFromRequest } from "@/lib/workspaces";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  return NextResponse.json({ calls: (await listCalls()).map(toCallJson) });
+export async function GET(request: Request) {
+  const workspaceId = await workspaceFromRequest(request);
+  if (!workspaceId) return NextResponse.json({ error: "No such workspace" }, { status: 404 });
+  return NextResponse.json({ calls: (await listCalls(200, workspaceId)).map(toCallJson) });
 }
 
 const body = z.object({ numbers: z.string().min(1).max(100_000) });
@@ -18,12 +21,14 @@ const body = z.object({ numbers: z.string().min(1).max(100_000) });
 export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Paste at least one phone number." }, { status: 400 });
+  const workspaceId = await workspaceFromRequest(request);
+  if (!workspaceId) return NextResponse.json({ error: "No such workspace" }, { status: 404 });
 
-  const settings = await getSettings();
+  const settings = await getSettings(workspaceId);
   const list = parseNumberList(parsed.data.numbers, settings.defaultCountry);
-  const blocked = await dncPhones();
+  const blocked = await dncPhones(workspaceId);
   const allowed = list.entries.filter((entry) => !blocked.has(entry.phone));
-  const added = await addCalls(allowed, settings.fromNumber);
+  const added = await addCalls(allowed, settings.fromNumber, new Date(), null, workspaceId);
 
   return NextResponse.json({
     added: added.length,

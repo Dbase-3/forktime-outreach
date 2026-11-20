@@ -4,6 +4,7 @@ import { callMetadata } from "./dialer";
 import { buildCallbackWelcome } from "./opening-line";
 import { getSettings } from "./settings";
 import type { Call, Settings } from "./types";
+import { DEFAULT_WORKSPACE_ID, workspaceFilter } from "./workspaces";
 
 // An owner (or anyone) ringing the call-back number. The agent asks the app
 // who this is: if we have spoken to the number before, it carries on from
@@ -31,14 +32,19 @@ export function previousNoteOf(call: Pick<Call, "summary" | "takesLargeBookings"
  * Open the record of an inbound call and say how the agent should take it.
  * An inbound call never takes the dialling line, so it never blocks the queue.
  */
-export async function startInboundCall(input: { phone: string; calledNumber: string; roomName: string }, now = new Date()) {
+export async function startInboundCall(
+  input: { phone: string; calledNumber: string; roomName: string; workspaceId?: string },
+  now = new Date(),
+) {
   const { calls } = await collections();
-  const settings = await getSettings();
-  const previous = await calls.find({ phone: input.phone, status: "ended" }).sort({ endedAt: -1 }).limit(1).next();
-  const last = await calls.find({}, { projection: { order: 1 } }).sort({ order: -1 }).limit(1).next();
+  const workspaceId = input.workspaceId ?? DEFAULT_WORKSPACE_ID;
+  const settings = await getSettings(workspaceId);
+  const previous = await calls.find({ $and: [workspaceFilter(workspaceId), { phone: input.phone, status: "ended" }] }).sort({ endedAt: -1 }).limit(1).next();
+  const last = await calls.find(workspaceFilter(workspaceId), { projection: { order: 1 } }).sort({ order: -1 }).limit(1).next();
 
   const call: Call = {
     _id: randomUUID(),
+    workspaceId,
     batchId: randomUUID(),
     phone: input.phone,
     label: previous?.label ?? "",

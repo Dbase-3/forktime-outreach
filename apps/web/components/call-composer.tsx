@@ -16,15 +16,15 @@ function resultLine(result: AddResult): string {
 }
 
 /** Paste numbers in, and see who the calls will come from and what the agent opens with. */
-export function CallComposer({ view }: { view: SettingsView | undefined }) {
+export function CallComposer({ view, workspaceId }: { view: SettingsView | undefined; workspaceId: string | null }) {
   const [numbers, setNumbers] = useState("");
   const queryClient = useQueryClient();
   const add = useMutation({
-    mutationFn: (text: string) => client.addNumbers(text),
+    mutationFn: (text: string) => client.addNumbers(workspaceId as string, text),
     onSuccess: (result) => {
       if (result.added) setNumbers(result.invalid.join("\n"));
-      queryClient.invalidateQueries({ queryKey: ["calls"] });
-      queryClient.invalidateQueries({ queryKey: ["queue"] });
+      queryClient.invalidateQueries({ queryKey: ["calls", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["queue", workspaceId] });
     },
   });
 
@@ -34,7 +34,7 @@ export function CallComposer({ view }: { view: SettingsView | undefined }) {
         className="card p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (numbers.trim()) add.mutate(numbers);
+          if (numbers.trim() && workspaceId) add.mutate(numbers);
         }}
       >
         <label htmlFor="numbers" className="text-sm font-medium text-gray-900">
@@ -49,7 +49,7 @@ export function CallComposer({ view }: { view: SettingsView | undefined }) {
           placeholder={"Rosie's Diner, 08 8941 1234\n+61 8 8941 5678"}
           className="field font-mono text-[13px]"
         />
-        <button type="submit" disabled={add.isPending || !numbers.trim()} className="btn-primary mt-3 w-full">
+        <button type="submit" disabled={add.isPending || !numbers.trim() || !workspaceId} className="btn-primary mt-3 w-full">
           <Plus className="h-4 w-4" />
           {add.isPending ? "Adding…" : "Add to queue"}
         </button>
@@ -79,7 +79,7 @@ export function CallComposer({ view }: { view: SettingsView | undefined }) {
               <dd className="text-right text-gray-900">{view.settings.fromNumber ? formatPhone(view.settings.fromNumber) : "Not set"}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-gray-500">Interested owners go to</dt>
+              <dt className="text-gray-500">Live requests go to</dt>
               <dd className="text-right text-gray-900">{view.settings.transferNumber ? formatPhone(view.settings.transferNumber) : "Not set"}</dd>
             </div>
             <div className="flex justify-between gap-3">

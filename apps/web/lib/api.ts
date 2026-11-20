@@ -28,6 +28,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 const post = <T>(path: string, body?: unknown) => api<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
+const scoped = (path: string, workspaceId: string) => `${path}${path.includes("?") ? "&" : "?"}workspace=${encodeURIComponent(workspaceId)}`;
 
 export type WaitReason = "paused" | "line_busy" | "empty" | "outside_window" | "retry_pending";
 
@@ -68,22 +69,30 @@ export interface VoiceOption {
 }
 
 export type DncEntryJson = Omit<DncEntry, "addedAt"> & { addedAt: string };
+export interface WorkspaceJson {
+  _id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const client = {
   login: (email: string, password: string) => post<{ ok: true }>("/api/auth/login", { email, password }),
   logout: () => post<{ ok: true }>("/api/auth/logout"),
-  queue: () => api<QueueSnapshot>("/api/queue"),
-  setQueue: (action: "start" | "pause") => post<QueueSnapshot>("/api/queue", { action }),
-  calls: () => api<{ calls: CallJson[] }>("/api/calls"),
-  addNumbers: (numbers: string) => post<AddResult>("/api/calls", { numbers }),
-  call: (id: string) => api<{ call: CallJson; transcript: TranscriptLineJson[] }>(`/api/calls/${id}`),
-  cancelCall: (id: string) => post<{ ok: true }>(`/api/calls/${id}/cancel`),
-  callAgain: (id: string, at?: string) => post<{ ok: true; callId: string }>(`/api/calls/${id}/retry`, at ? { at } : {}),
-  settings: () => api<SettingsView>("/api/settings"),
-  saveSettings: (settings: Settings) => api<SettingsView>("/api/settings", { method: "PUT", body: JSON.stringify(settings) }),
+  workspaces: () => api<{ workspaces: WorkspaceJson[] }>("/api/workspaces"),
+  createWorkspace: (name: string) => post<{ workspace: WorkspaceJson }>("/api/workspaces", { name }),
+  queue: (workspaceId: string) => api<QueueSnapshot>(scoped("/api/queue", workspaceId)),
+  setQueue: (workspaceId: string, action: "start" | "pause") => post<QueueSnapshot>(scoped("/api/queue", workspaceId), { action }),
+  calls: (workspaceId: string) => api<{ calls: CallJson[] }>(scoped("/api/calls", workspaceId)),
+  addNumbers: (workspaceId: string, numbers: string) => post<AddResult>(scoped("/api/calls", workspaceId), { numbers }),
+  call: (workspaceId: string, id: string) => api<{ call: CallJson; transcript: TranscriptLineJson[] }>(scoped(`/api/calls/${id}`, workspaceId)),
+  cancelCall: (workspaceId: string, id: string) => post<{ ok: true }>(scoped(`/api/calls/${id}/cancel`, workspaceId)),
+  callAgain: (workspaceId: string, id: string, at?: string) => post<{ ok: true; callId: string }>(scoped(`/api/calls/${id}/retry`, workspaceId), at ? { at } : {}),
+  settings: (workspaceId: string) => api<SettingsView>(scoped("/api/settings", workspaceId)),
+  saveSettings: (workspaceId: string, settings: Settings) => api<SettingsView>(scoped("/api/settings", workspaceId), { method: "PUT", body: JSON.stringify(settings) }),
   carrierNumbers: () => api<{ numbers: CarrierNumber[]; error: string | null }>("/api/telnyx/numbers"),
   voices: () => api<{ voices: VoiceOption[] }>("/api/voices"),
-  dnc: () => api<{ entries: DncEntryJson[] }>("/api/dnc"),
-  addDnc: (phone: string, reason?: string) => post<{ ok: true; phone: string }>("/api/dnc", { phone, reason }),
-  removeDnc: (phone: string) => api<{ ok: true }>("/api/dnc", { method: "DELETE", body: JSON.stringify({ phone }) }),
+  dnc: (workspaceId: string) => api<{ entries: DncEntryJson[] }>(scoped("/api/dnc", workspaceId)),
+  addDnc: (workspaceId: string, phone: string, reason?: string) => post<{ ok: true; phone: string }>(scoped("/api/dnc", workspaceId), { phone, reason }),
+  removeDnc: (workspaceId: string, phone: string) => api<{ ok: true }>(scoped("/api/dnc", workspaceId), { method: "DELETE", body: JSON.stringify({ phone }) }),
 };

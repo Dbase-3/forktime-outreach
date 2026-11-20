@@ -60,6 +60,8 @@ export interface CallRecording {
 
 export interface Call {
   _id: string;
+  /** The customer/workspace that owns this call and its follow-up data. */
+  workspaceId: string;
   batchId: string;
   phone: string;
   label: string;
@@ -114,15 +116,25 @@ export interface TranscriptLine {
 }
 
 export interface QueueState {
+  workspaceId: string;
   running: boolean;
 }
 
 export interface DncEntry {
   _id: string;
+  workspaceId: string;
   phone: string;
   reason: string;
   addedAt: Date;
   sourceCallId: string | null;
+}
+
+/** A separate outreach customer under the same administrator login. */
+export interface Workspace {
+  _id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /** JSON shape of a call as the API returns it (dates as ISO strings). */

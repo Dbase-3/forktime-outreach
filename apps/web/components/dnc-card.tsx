@@ -5,21 +5,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { client } from "@/lib/api";
 import { dayAndTime } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { useWorkspace } from "./workspace-provider";
 
 /** Numbers that are never dialled again, whoever adds them to the queue. */
 export function DncCard() {
   const queryClient = useQueryClient();
+  const { workspaceId } = useWorkspace();
   const [phone, setPhone] = useState("");
-  const list = useQuery({ queryKey: ["dnc"], queryFn: client.dnc });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["dnc"] });
+  const list = useQuery({ queryKey: ["dnc", workspaceId], queryFn: () => client.dnc(workspaceId as string), enabled: !!workspaceId });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["dnc", workspaceId] });
   const add = useMutation({
-    mutationFn: (value: string) => client.addDnc(value),
+    mutationFn: (value: string) => client.addDnc(workspaceId as string, value),
     onSuccess: () => {
       setPhone("");
       refresh();
     },
   });
-  const remove = useMutation({ mutationFn: (value: string) => client.removeDnc(value), onSuccess: refresh });
+  const remove = useMutation({ mutationFn: (value: string) => client.removeDnc(workspaceId as string, value), onSuccess: refresh });
   const entries = list.data?.entries ?? [];
 
   return (
@@ -32,11 +34,11 @@ export function DncCard() {
         className="mt-4 flex gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          if (phone.trim()) add.mutate(phone);
+          if (phone.trim() && workspaceId) add.mutate(phone);
         }}
       >
         <input className="field" placeholder="Phone number" aria-label="Phone number to never call" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        <button type="submit" className="btn-secondary whitespace-nowrap" disabled={add.isPending || !phone.trim()}>
+        <button type="submit" className="btn-secondary whitespace-nowrap" disabled={add.isPending || !phone.trim() || !workspaceId}>
           Add number
         </button>
       </form>

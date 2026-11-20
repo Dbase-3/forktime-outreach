@@ -61,6 +61,36 @@ const statuses = async () => {
 };
 
 describe("the queue, with real calls", () => {
+  it("keeps queues and call records isolated by workspace", async () => {
+    const { DEFAULT_SETTINGS, saveSettings, setQueueRunning } = await import("@/lib/settings");
+    const { addCalls, getActiveCall, listCalls } = await import("@/lib/calls-repo");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+
+    await setup();
+    await saveSettings(
+      {
+        ...DEFAULT_SETTINGS,
+        enforceWindow: false,
+        transferNumber: "+61400000011",
+        callbackNumber: "+61400000012",
+        fromNumber: "+61400000013",
+      },
+      "other-client",
+    );
+    await setQueueRunning(true, "other-client");
+    await addCalls([{ phone: "+61889410001", label: "Forktime venue" }], "+61400000003");
+    await addCalls([{ phone: "+61889410002", label: "Other venue" }], "+61400000013", new Date(), null, "other-client");
+
+    await advanceQueue();
+    await advanceQueue(new Date(), "other-client");
+
+    expect((await listCalls()).map((call) => call.label)).toEqual(["Forktime venue"]);
+    expect((await listCalls(200, "other-client")).map((call) => call.label)).toEqual(["Other venue"]);
+    expect((await getActiveCall())?.workspaceId).toBe("forktime");
+    expect((await getActiveCall("other-client"))?.workspaceId).toBe("other-client");
+    expect(placeCall).toHaveBeenCalledTimes(2);
+  });
+
   it("dials one number at a time, and the agent's ending starts the next", async () => {
     await setup();
     const [first, second] = await add("+61889410001", "+61889410002");

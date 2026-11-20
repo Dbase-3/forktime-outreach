@@ -77,7 +77,7 @@ export async function applyAgentEvent(event: AgentEvent, now = new Date()): Prom
       await setRecording(call._id, { url: event.url, durationSec: event.durationSec ?? null });
       return { ok: true };
     case "not_answered":
-      await finishCall(call._id, { outcome: "no_answer", error: event.detail ?? null }, await getSettings(), now);
+      await finishCall(call._id, { outcome: "no_answer", error: event.detail ?? null }, await getSettings(call.workspaceId), now, call.workspaceId);
       break;
     case "ended":
       await finishCall(
@@ -97,12 +97,13 @@ export async function applyAgentEvent(event: AgentEvent, now = new Date()): Prom
           interestedInSystem: event.interestedInSystem,
           error: event.error,
         },
-        await getSettings(),
+        await getSettings(call.workspaceId),
         now,
+        call.workspaceId,
       );
       break;
   }
   // The line is free: start the next number without waiting for the screen.
-  await advanceQueue(now);
+  await advanceQueue(now, call.workspaceId);
   return { ok: true };
 }

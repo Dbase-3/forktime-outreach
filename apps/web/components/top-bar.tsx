@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, PhoneOutgoing } from "lucide-react";
+import { LogOut, Plus, PhoneOutgoing } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { client } from "@/lib/api";
+import { useWorkspace } from "./workspace-provider";
 
 const LINKS = [
   { href: "/", label: "Calls" },
@@ -13,6 +15,15 @@ const LINKS = [
 
 export function TopBar() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const { workspaceId, workspaces, selectWorkspace } = useWorkspace();
+  const create = useMutation({
+    mutationFn: client.createWorkspace,
+    onSuccess: ({ workspace }) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      selectWorkspace(workspace._id);
+    },
+  });
   const signOut = async () => {
     await client.logout().catch(() => undefined);
     window.location.href = "/login";
@@ -41,7 +52,35 @@ export function TopBar() {
             </Link>
           ))}
         </nav>
-        <button type="button" onClick={signOut} className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
+        <div className="ml-auto flex items-center gap-1.5">
+          <select
+            aria-label="Active workspace"
+            value={workspaceId ?? ""}
+            onChange={(event) => selectWorkspace(event.target.value)}
+            className="h-8 max-w-48 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-800"
+          >
+            {!workspaceId && <option value="">Loading workspaces…</option>}
+            {workspaces.map((workspace) => (
+              <option key={workspace._id} value={workspace._id}>
+                {workspace.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+            title="Create workspace"
+            aria-label="Create workspace"
+            disabled={create.isPending}
+            onClick={() => {
+              const name = window.prompt("Name the new workspace");
+              if (name?.trim()) create.mutate(name);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+        <button type="button" onClick={signOut} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
           <LogOut className="h-4 w-4" />
           Sign out
         </button>

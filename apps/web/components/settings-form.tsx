@@ -7,6 +7,7 @@ import { describeWindow } from "@/lib/calling-window";
 import { DEFAULT_WELCOME, PLACEHOLDERS, WELCOME_LABELS, renderWelcome, type WelcomeKey } from "@/lib/opening-line";
 import { formatPhone } from "@/lib/phone";
 import type { Settings } from "@/lib/types";
+import { useWorkspace } from "./workspace-provider";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const COUNTRIES = [
@@ -122,7 +123,8 @@ function WelcomeField({
 
 export function SettingsForm() {
   const queryClient = useQueryClient();
-  const saved = useQuery({ queryKey: ["settings"], queryFn: client.settings });
+  const { workspaceId } = useWorkspace();
+  const saved = useQuery({ queryKey: ["settings", workspaceId], queryFn: () => client.settings(workspaceId as string), enabled: !!workspaceId });
   const numbers = useQuery({ queryKey: ["carrier-numbers"], queryFn: client.carrierNumbers, staleTime: 60_000 });
   const voices = useQuery({ queryKey: ["voices"], queryFn: client.voices, staleTime: 60_000 });
 
@@ -130,11 +132,12 @@ export function SettingsForm() {
   useEffect(() => {
     if (saved.data && !form) setForm(saved.data.settings);
   }, [saved.data, form]);
+  useEffect(() => setForm(null), [workspaceId]);
 
   const save = useMutation({
-    mutationFn: (settings: Settings) => client.saveSettings(settings),
+    mutationFn: (settings: Settings) => client.saveSettings(workspaceId as string, settings),
     onSuccess: (view) => {
-      queryClient.setQueryData(["settings"], view);
+      queryClient.setQueryData(["settings", workspaceId], view);
       setForm(view.settings);
     },
   });
@@ -168,11 +171,11 @@ export function SettingsForm() {
         save.mutate(form);
       }}
     >
-      <Section title="Who is calling" intro="The agent says all of this in its first breath: that it is an AI, who it is calling for, and why.">
+      <Section title="Who is calling" intro="This identity belongs to this workspace. The agent opens with the booking enquiry and explains the AI service only after speaking with the owner or manager.">
         <Field label="Agent's name" error={fieldErrors.agentName}>
           <input className="field" value={form.agentName} onChange={(e) => set("agentName", e.target.value)} />
         </Field>
-        <Field label="Calling for" hint="The person an interested owner is connected to." error={fieldErrors.repName}>
+        <Field label="Follow-up contact" hint="The person available if an owner specifically asks to speak with someone now." error={fieldErrors.repName}>
           <input className="field" value={form.repName} onChange={(e) => set("repName", e.target.value)} />
         </Field>
         <Field label="Company" error={fieldErrors.company}>
@@ -186,7 +189,7 @@ export function SettingsForm() {
       <Section
         id="welcome-messages"
         title="What the agent says first"
-        intro="Three messages, for the three ways a call starts. Change the wording freely; the agent says them word for word. Every message must say it is an AI and who it calls for ({rep})."
+        intro="Three messages, for the three ways a call starts. Change the wording freely; the agent says them word for word. Keep the opening focused on the booking enquiry."
       >
         {(Object.keys(WELCOME_LABELS) as WelcomeKey[]).map((key) => (
           <WelcomeField
@@ -241,7 +244,7 @@ export function SettingsForm() {
             ))}
           </select>
         </Field>
-        <Field label="Connect an interested owner to" hint="This phone rings when an owner clearly wants to talk to the rep." error={fieldErrors.transferNumber}>
+        <Field label="Live-conversation number" hint="This phone rings only when an owner specifically asks to speak to someone now." error={fieldErrors.transferNumber}>
           <input className="field" placeholder="+61 412 345 678" value={form.transferNumber} onChange={(e) => set("transferNumber", e.target.value)} />
         </Field>
         <Field label="Call-back number" hint="The number restaurants call back. It must reach this agent (see the README), or they get another agent." error={fieldErrors.callbackNumber}>

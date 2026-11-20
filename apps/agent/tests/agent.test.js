@@ -78,15 +78,17 @@ describe("the agent's instructions", () => {
     );
   });
 
-  it("captures the owner's name, asks the three questions, then makes the Forktime mention", () => {
+  it("captures the owner's name, asks the three questions, then gets a yes or no before a follow-up", () => {
     expect(text).toContain('First ask their name, once: "May I ask who I\'m speaking with?"');
     expect(text).toContain("Save their answer as contactName");
     expect(text).toContain('"Do you take large bookings?"');
     expect(text).toContain('"Roughly how many people can you seat?"');
     expect(text).toContain('"And do you have vegetarian or vegan options?"');
     expect(text).toContain("outcome not_a_fit");
-    expect(text).toContain("I'm an AI assistant from Forktime");
-    expect(text).toContain("Clearly yes, or they ask to talk to someone from Forktime: call transfer_to_rep");
+    expect(text).toContain("I'm an AI assistant calling from Fork Time");
+    expect(text).toContain("I'll have someone give you a call");
+    expect(text).toContain("Clearly yes, but no immediate conversation request: end the call with outcome owner_callback");
+    expect(text).toContain("If they specifically ask to speak to someone now");
   });
 
   it("asks for a callback to the caller ID without reading any digits", () => {

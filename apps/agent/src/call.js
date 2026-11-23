@@ -79,6 +79,7 @@ class OutreachCall {
     this.calleeSpokeAfterOpening = false;
     this.awaitingPhone = false;
     this.phoneFragments = [];
+    this.interruptedForCommand = false;
     this.timers = new Set();
   }
 
@@ -242,7 +243,9 @@ class OutreachCall {
     });
     this.session.on(Events.AgentStateChanged, (event) => {
       this.agentState = event.newState;
+      if (event.newState === "speaking") this.interruptedForCommand = false;
     });
+    this.session.on(Events.UserInputTranscribed, (event) => this.onCallerInput(event.transcript));
     this.session.on(Events.FunctionToolsExecuted, () => this.runPending());
     this.session.on(Events.Error, (event) => this.log.warn(`[Call] session error: ${event.error && event.error.message}`));
     this.session.on(Events.Close, (event) => {
@@ -277,6 +280,20 @@ class OutreachCall {
     this.emitter.line(role, text);
   }
 
+  /** A one-word request to stop or wait can cut in without the usual two-word minimum. */
+  onCallerInput(transcript) {
+    if (this.ended || this.transferred || this.agentState !== "speaking") return;
+    const words = transcript?.trim() || "";
+    if (!/^(?:please\s+)?(?:stop|wait|hold on|one (?:second|moment|sec))(?:[.!?,]|\s|$)/i.test(words)) return;
+    if (this.interruptedForCommand) return;
+    this.interruptedForCommand = true;
+    try {
+      this.session.interrupt().await.catch((err) => this.log.warn(`[Call] could not yield to caller: ${err.message}`));
+    } catch (err) {
+      this.log.warn(`[Call] could not yield to caller: ${err.message}`);
+    }
+  }
+
   setAwaitingPhone(enabled) {
     if (this.awaitingPhone === enabled) return;
     this.awaitingPhone = enabled;
@@ -288,9 +305,15 @@ class OutreachCall {
   acceptCallerTurn(message) {
     if (!this.awaitingPhone) return true;
     const text = message.textContent.trim();
-    const combined = [...this.phoneFragments, text].join(" ").trim();
+    const pause = text.match(/\b(?:wait (?:a |one )?(?:second|sec|moment)|give me (?:a |one )?(?:second|sec|moment)|hold on)\b/i);
+    const answer = pause ? text.replace(pause[0], "").trim() : text;
+    if (pause && !/\d|\b(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/i.test(answer)) {
+      this.onItem({ role: "user", textContent: text });
+      return false;
+    }
+    const combined = [...this.phoneFragments, answer].join(" ").trim();
     if (isIncompletePhoneReply(combined)) {
-      if (text) this.phoneFragments.push(text);
+      if (answer) this.phoneFragments.push(answer);
       return false;
     }
     if (this.phoneFragments.length) message.content = [combined];

@@ -418,6 +418,7 @@ describe("the agent's tools and call details", () => {
     call.emitter = { line: vi.fn() };
     call.onItem({ role: "assistant", textContent: "Is this the best number to reach you?" });
     expect(call.session.updateOptions).toHaveBeenCalledWith({ turnHandling: { endpointing: config.VOICE.phoneEndpointing } });
+    expect(call.acceptCallerTurn({ textContent: "This is this number. Wait a second, let me share you a number." })).toBe(false);
     expect(call.acceptCallerTurn({ textContent: "Um, his number is" })).toBe(false);
     expect(call.acceptCallerTurn({ textContent: "+92" })).toBe(false);
     expect(call.acceptCallerTurn({ textContent: "313" })).toBe(false);
@@ -425,6 +426,18 @@ describe("the agent's tools and call details", () => {
     expect(call.acceptCallerTurn(lastGroup)).toBe(true);
     expect(lastGroup.content).toEqual(["Um, his number is +92 313 1083 726"]);
     expect(call.session.updateOptions).toHaveBeenLastCalledWith({ turnHandling: { endpointing: config.VOICE.endpointing } });
+  });
+
+  it("requires speech evidence for native interruption and honors explicit one-word commands", () => {
+    expect(config.VOICE.interruption.minWords).toBe(2);
+    const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+    call.agentState = "speaking";
+    call.session = { interrupt: vi.fn(() => ({ await: Promise.resolve() })) };
+    for (const noise of ["", "[cough]", "Uh", "Yeah"]) call.onCallerInput(noise);
+    expect(call.session.interrupt).not.toHaveBeenCalled();
+    call.onCallerInput("Wait.");
+    call.onCallerInput("Wait a second.");
+    expect(call.session.interrupt).toHaveBeenCalledTimes(1);
   });
 
   it("holds the opener and silence nudge while the caller is speaking", async () => {

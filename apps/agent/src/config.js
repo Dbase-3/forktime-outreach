@@ -69,8 +69,9 @@ const VOICE = {
   interruption: {
     enabled: true,
     mode: "vad",
-    minDuration: 300,
-    minWords: 0,
+    minDuration: 400,
+    // A brief noise can trigger VAD. Require speech evidence before pausing playout.
+    minWords: 2,
     discardAudioIfUninterruptible: false,
     resumeFalseInterruption: true,
   },

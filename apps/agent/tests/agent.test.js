@@ -82,9 +82,19 @@ describe("the agent's instructions", () => {
     expect(text).toContain("a group of around 15 people next week, including guests who need vegetarian and gluten-free options.");
     expect(text).toContain("Would you be interested in getting more booking inquiries or having an AI assistant handle your reservation calls?");
     expect(text).toContain("I can have someone from our team give you a quick call to explain how it works. Would that be okay?");
-    expect(text).toContain("May I have your name, and what’s the best number and time to reach you?");
+    expect(text).toContain("What’s the best number to reach you?");
     expect(text).toContain("Interest alone does not qualify for that outcome.");
     expect(text).not.toContain("transfer_to_rep");
+  });
+
+  it("asks for the owner’s name before booking questions and collects callback details after consent", () => {
+    const nameAsk = text.indexOf("Thanks, who am I speaking with?");
+    const bookingAsk = text.indexOf("a group of around 15 people next week");
+    expect(nameAsk).toBeGreaterThan(-1);
+    expect(nameAsk).toBeLessThan(bookingAsk);
+    expect(text).toContain("If they already gave their name, use it. Ask only once");
+    expect(text).toContain('If they explicitly agree to the callback: "Perfect. What’s the best number to reach you?"');
+    expect(wrapup.wrapUpPrompt([], meta)).toContain("even if they hung up before the pitch or callback offer");
   });
 
   it("asks for a callback to the caller ID without reading any digits", () => {

@@ -208,7 +208,7 @@ export function CallDetail({
                 onClick={() => again.mutate(new Date(recallAt).toISOString())}
               >
                 <CalendarClock className="h-4 w-4" />
-                Schedule
+                Queue callback
               </button>
             </span>
           )}
@@ -219,6 +219,11 @@ export function CallDetail({
             </button>
           )}
         </div>
+        {call.status === "ended" && (call.callbackTime || call.callbackNumber) && (
+          <p className="mt-2 text-xs text-gray-500">
+            Set a time to queue the callback to {formatPhone(call.callbackNumber || call.phone)}. The queue must be running during calling hours.
+          </p>
+        )}
         {failure && (
           <p role="alert" className="mt-2 text-xs text-red-700">
             {(failure as Error).message}

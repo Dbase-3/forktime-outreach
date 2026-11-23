@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { addCalls, getCall } from "@/lib/calls-repo";
 import { dncPhones } from "@/lib/dnc";
+import { toE164 } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import { workspaceFromRequest } from "@/lib/workspaces";
 
@@ -11,7 +12,7 @@ const body = z.object({ at: z.string().datetime({ offset: true }).optional() });
 
 /**
  * Queue a finished number again, as a new call, so the earlier one keeps its
- * record. With `at`, it is not dialled before that moment (the owner's time).
+ * record. A scheduled callback uses the confirmed callback number if one was provided.
  */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const parsed = body.safeParse(await request.json().catch(() => ({})));
@@ -25,10 +26,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (call.status !== "ended" && call.status !== "cancelled") {
     return NextResponse.json({ error: "This call has not finished yet." }, { status: 409 });
   }
-  if ((await dncPhones(workspaceId)).has(call.phone)) {
+  const settings = await getSettings(workspaceId);
+  const phone = at && call.callbackNumber ? toE164(call.callbackNumber, settings.defaultCountry) : call.phone;
+  if (!phone) return NextResponse.json({ error: "The recorded callback number is invalid. Check the transcript before queuing a callback." }, { status: 400 });
+
+  const blocked = await dncPhones(workspaceId);
+  if (blocked.has(call.phone) || blocked.has(phone)) {
     return NextResponse.json({ error: "This number is on the do-not-call list." }, { status: 409 });
   }
-  const settings = await getSettings(workspaceId);
-  const [added] = await addCalls([{ phone: call.phone, label: call.label }], settings.fromNumber, new Date(), at, workspaceId);
+  const [added] = await addCalls([{ phone, label: call.label }], settings.fromNumber, new Date(), at, workspaceId);
   return NextResponse.json({ ok: true, callId: added._id });
 }

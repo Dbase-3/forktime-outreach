@@ -64,14 +64,15 @@ const VOICE = {
   fish: { model: "s2.1-pro" },
   vad: { activationThreshold: 0.5 },
   // Milliseconds.
-  endpointing: { mode: "fixed", minDelay: 600, maxDelay: 1000 },
+  endpointing: { mode: "fixed", minDelay: 750, maxDelay: 1500 },
+  phoneEndpointing: { minDelay: 2400, maxDelay: 3000 },
   interruption: {
     enabled: true,
     mode: "vad",
-    minDuration: 500,
-    minWords: 2,
-    discardAudioIfUninterruptible: true,
-    resumeFalseInterruption: false,
+    minDuration: 300,
+    minWords: 0,
+    discardAudioIfUninterruptible: false,
+    resumeFalseInterruption: true,
   },
   session: {
     maxToolSteps: 2,
@@ -88,8 +89,6 @@ const TIMING = {
    * Any longer and the person hears a dead line and starts saying "hello? hello?".
    */
   openingWaitMs: 900,
-  /** If they are still talking then, the longest the opening line waits for them to finish. */
-  openingHardCapMs: 6000,
   /** An inbound caller is already on the line: the welcome starts after this short beat. */
   inboundWelcomeMs: 500,
   /** After the agent's last words, how long before the line is closed, so the words are not cut off. */
@@ -158,8 +157,11 @@ const env = {
   }),
   outboundTrunkId: () => required("SIP_OUTBOUND_TRUNK_ID"),
   outboundTrunkIdAu: () => process.env.SIP_OUTBOUND_TRUNK_ID_AU || "",
-  /** "stt" (the speech-to-text's own end-of-turn) or "multilingual" (LiveKit's model, as the phone agent uses). */
-  turnDetector: () => (process.env.TURN_DETECTOR === "multilingual" ? "multilingual" : "stt"),
+  /** Use LiveKit's audio turn detector by default. The older detectors remain available as overrides. */
+  turnDetector: () => {
+    const detector = process.env.TURN_DETECTOR;
+    return detector === "multilingual" || detector === "stt" ? detector : "audio";
+  },
   recording: () => ({
     bucket: process.env.EGRESS_S3_BUCKET || "",
     accessKey: process.env.EGRESS_S3_ACCESS_KEY || "",

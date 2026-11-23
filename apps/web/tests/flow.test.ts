@@ -88,6 +88,21 @@ describe("the queue, with real calls", () => {
     }));
     expect(response.status).toBe(200);
     expect(await getCall(call._id)).toMatchObject({ label: "Raj's Restaurant", outcome: "owner_callback", ...details });
+
+    const { POST: queueCallback } = await import("@/app/api/calls/[id]/retry/route");
+    const { addDnc } = await import("@/lib/dnc");
+    const at = new Date(Date.now() + 60_000);
+    const queue = () => queueCallback(new Request("http://x/api/calls/retry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ at: at.toISOString() }),
+    }), { params: { id: call._id } });
+    const confirmed = await queue();
+    expect(confirmed.status).toBe(200);
+    const { callId } = await confirmed.json();
+    expect(await getCall(callId)).toMatchObject({ status: "queued", phone: details.callbackNumber, notBefore: at });
+    await addDnc(details.callbackNumber, "Asked not to be called");
+    expect((await queue()).status).toBe(409);
   });
 
   it("keeps queues and call records isolated by workspace", async () => {

@@ -89,7 +89,7 @@ describe("the agent's instructions", () => {
 
   it("asks for a callback to the caller ID without reading any digits", () => {
     expect(text).toContain("Is this the best number, or does he have a direct business number?");
-    expect(text).toContain('say "this number" instead of reading the caller ID');
+    expect(text).toContain('If they confirm "this number", acknowledge it once without reading the digits');
     expect(text).not.toContain("I'll say it slowly");
   });
 
@@ -409,7 +409,33 @@ describe("the agent's tools and call details", () => {
     // The opening line is said once, however many times they say hello.
     expect(call.session.say).toHaveBeenCalledTimes(1);
     expect(call.session.say.mock.calls[0][0]).toBe(meta.openingLine);
-    expect(call.session.say.mock.calls[0][1]).toMatchObject({ allowInterruptions: false, addToChatCtx: true });
+    expect(call.session.say.mock.calls[0][1]).toMatchObject({ allowInterruptions: true, addToChatCtx: true });
+  });
+
+  it("holds the turn across digit groups, then gives the model the complete reply", () => {
+    const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+    call.session = { updateOptions: vi.fn() };
+    call.emitter = { line: vi.fn() };
+    call.onItem({ role: "assistant", textContent: "Is this the best number to reach you?" });
+    expect(call.session.updateOptions).toHaveBeenCalledWith({ turnHandling: { endpointing: config.VOICE.phoneEndpointing } });
+    expect(call.acceptCallerTurn({ textContent: "Um, his number is" })).toBe(false);
+    expect(call.acceptCallerTurn({ textContent: "+92" })).toBe(false);
+    expect(call.acceptCallerTurn({ textContent: "313" })).toBe(false);
+    const lastGroup = { textContent: "1083 726", content: ["1083 726"] };
+    expect(call.acceptCallerTurn(lastGroup)).toBe(true);
+    expect(lastGroup.content).toEqual(["Um, his number is +92 313 1083 726"]);
+    expect(call.session.updateOptions).toHaveBeenLastCalledWith({ turnHandling: { endpointing: config.VOICE.endpointing } });
+  });
+
+  it("holds the opener and silence nudge while the caller is speaking", async () => {
+    const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
+    call.session = { say: vi.fn(), generateReply: vi.fn() };
+    call.userState = "speaking";
+    call.sayOpening();
+    expect(call.session.say).not.toHaveBeenCalled();
+    call.openingSaid = true;
+    await call.onSilence();
+    expect(call.session.generateReply).not.toHaveBeenCalled();
   });
 
   it("an inbound caller is told apart from the dialled phone by who leaves", () => {

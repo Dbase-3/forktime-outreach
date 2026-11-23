@@ -1,6 +1,6 @@
 "use strict";
 
-const { voice, llm } = require("@livekit/agents");
+const { voice, llm, inference } = require("@livekit/agents");
 const anthropic = require("@livekit/agents-plugin-anthropic");
 const elevenlabs = require("@livekit/agents-plugin-elevenlabs");
 const fishaudio = require("@livekit/agents-plugin-fishaudio");
@@ -14,6 +14,7 @@ const { createEmitter } = require("./events");
 const { classifyLine } = require("./lineCheck");
 const { firstName, resolveOpeningLine } = require("./opening");
 const { AGENT_OUTCOMES, filedOutcome } = require("./outcomes");
+const { asksForPhoneNumber, isIncompletePhoneReply } = require("./phone-input");
 const { buildInstructions } = require("./prompt");
 const { startRecording, stopRecording } = require("./recording");
 const { dialRep, closeRoom, REP_IDENTITY } = require("./transfer");
@@ -45,9 +46,11 @@ class OutreachAgent extends voice.Agent {
    * the call keeps the words itself.
    */
   async onUserTurnCompleted(_chatCtx, newMessage) {
-    if (this.call.openingDone) return;
-    this.call.onEarlyWords(newMessage && newMessage.textContent);
-    throw new voice.StopResponse();
+    if (!this.call.openingDone) {
+      this.call.onEarlyWords(newMessage && newMessage.textContent);
+      throw new voice.StopResponse();
+    }
+    if (!this.call.acceptCallerTurn(newMessage)) throw new voice.StopResponse();
   }
 }
 
@@ -74,6 +77,8 @@ class OutreachCall {
     this.calleeIdentity = CALLEE_IDENTITY;
     this.lineKind = null;
     this.calleeSpokeAfterOpening = false;
+    this.awaitingPhone = false;
+    this.phoneFragments = [];
     this.timers = new Set();
   }
 
@@ -164,7 +169,7 @@ class OutreachCall {
               "refused: staff would not help, or said the restaurant is not interested. voicemail, phone_menu, wrong_number: no person to talk to. " +
               "do_not_call: they asked not to be called again. other: anything else.",
           ),
-          summary: z.string().describe("Two short factual sentences: who you spoke to and what was agreed. Only what was said."),
+          summary: z.string().describe("Two short factual sentences: who you spoke to and what was agreed. Describe callbacks as requested or agreed, since this tool only records the details."),
           ownerReached: z.boolean().describe("True if you spoke to the owner, or to a manager who says they make the decisions (\"I'm the manager, I make the calls\"). False for staff such as waiters or hosts."),
           restaurantName: z.string().max(160).optional().describe("Restaurant name, if stated or already on the call record."),
           contactName: z.string().optional().describe("Their name, or the owner's name, if someone gave it."),
@@ -172,13 +177,13 @@ class OutreachCall {
           callbackTime: z.string().optional().describe("The requested callback date and time, or when the owner is free, in their words."),
           callbackPermission: z.boolean().optional().describe("True only if the owner or manager explicitly agreed to a callback. False when they declined. Omit if unknown."),
           takesLargeBookings: z.boolean().optional().describe("Whether they take large bookings. Leave out if not asked or not said."),
-          takesCatering: z.boolean().optional().describe("Whether they handle catering. Omit if unknown."),
+          takesCatering: z.boolean().optional().describe("Whether they confirmed or declined catering specifically. A general yes to catering or group bookings is ambiguous. Omit if unknown."),
           seats: z.number().int().optional().describe("How many people they can seat, as a whole number, whenever they gave any figure (\"about twelve\" is 12). Leave out only if they gave none."),
           capacityNote: z.string().optional().describe("Their capacity answer in their own words, if it was not a plain number."),
           dietaryOptions: z.string().max(200).optional().describe("The dietary accommodations they confirmed, including vegetarian or gluten-free options."),
           bookingSystem: z.string().max(120).optional().describe("The reservation system they said they currently use."),
-          interestedInBookingInquiries: z.boolean().optional().describe("Whether the owner wants more reservation or catering inquiries. Omit if unclear."),
-          interestedInSystem: z.boolean().optional().describe("Whether the owner wants to hear about the AI phone assistant. Leave out if not asked."),
+          interestedInBookingInquiries: z.boolean().optional().describe("Whether the owner explicitly expressed interest in more reservation or catering inquiries. Omit if unclear."),
+          interestedInSystem: z.boolean().optional().describe("Whether the owner explicitly expressed interest in the AI phone assistant. Omit if unclear."),
           interested: z.boolean().optional().describe("Whether the owner expressed interest in either Fork Time service. Omit if unclear."),
         }),
         execute: async ({ goodbye, ...filed }) => {
@@ -194,10 +199,18 @@ class OutreachCall {
   async startSession() {
     const { meta } = this;
     this.llm = new anthropic.LLM({ ...VOICE.llm, apiKey: process.env.ANTHROPIC_API_KEY });
-    const turnDetection =
-      env.turnDetector() === "multilingual"
-        ? new (require("@livekit/agents-plugin-livekit").turnDetector.MultilingualModel)(0.15)
-        : "stt";
+    const detector = env.turnDetector();
+    let turnDetection = "stt";
+    if (detector === "audio") {
+      try {
+        turnDetection = new inference.TurnDetector({ version: "v1" });
+      } catch (err) {
+        this.log.warn(`[Call] audio turn detector unavailable: ${err.message}`);
+        turnDetection = new inference.TurnDetector({ version: "v1-mini" });
+      }
+    } else if (detector === "multilingual") {
+      turnDetection = new (require("@livekit/agents-plugin-livekit").turnDetector.MultilingualModel)(0.15);
+    }
 
     this.session = new voice.AgentSession({
       vad: this.vad,
@@ -222,6 +235,7 @@ class OutreachCall {
     this.session.on(Events.ConversationItemAdded, (event) => this.onItem(event.item));
     this.session.on(Events.UserStateChanged, (event) => {
       this.userState = event.newState;
+      if (event.newState === "speaking") this.silences = 0;
       // They stopped talking ("Hello?"): answer at once, without waiting for the words to be transcribed.
       if (event.oldState === "speaking" && event.newState === "listening") this.sayOpening();
       if (event.newState === "away") this.onSilence();
@@ -257,17 +271,37 @@ class OutreachCall {
     if (!role || !text) return;
     // Whether the agent has spoken since they last did: a goodbye already said is not said twice.
     this.agentSpokeLast = role === "agent";
+    if (role === "agent" && asksForPhoneNumber(text)) this.setAwaitingPhone(true);
     if (role === "callee" && this.openingDone) this.calleeSpokeAfterOpening = true;
     this.lines.push({ role, text });
     this.emitter.line(role, text);
   }
 
-  /** Speak first if they say nothing; if they are mid-greeting, wait for them (up to a cap). */
+  setAwaitingPhone(enabled) {
+    if (this.awaitingPhone === enabled) return;
+    this.awaitingPhone = enabled;
+    const endpointing = enabled ? VOICE.phoneEndpointing : VOICE.endpointing;
+    this.session.updateOptions({ turnHandling: { endpointing } });
+  }
+
+  /** Keep listening if a pause split a phone number into separate SDK turns. */
+  acceptCallerTurn(message) {
+    if (!this.awaitingPhone) return true;
+    const text = message.textContent.trim();
+    const combined = [...this.phoneFragments, text].join(" ").trim();
+    if (isIncompletePhoneReply(combined)) {
+      if (text) this.phoneFragments.push(text);
+      return false;
+    }
+    if (this.phoneFragments.length) message.content = [combined];
+    this.phoneFragments = [];
+    this.setAwaitingPhone(false);
+    return true;
+  }
+
+  /** Speak first if they say nothing. If they are mid-greeting, the listening event starts the opener. */
   armOpening() {
-    this.after(TIMING.openingWaitMs, () => {
-      if (this.userState !== "speaking") return this.sayOpening();
-      this.after(TIMING.openingHardCapMs - TIMING.openingWaitMs, () => this.sayOpening());
-    });
+    this.after(TIMING.openingWaitMs, () => this.sayOpening());
   }
 
   /**
@@ -310,10 +344,9 @@ class OutreachCall {
   }
 
   sayOpening() {
-    if (this.openingSaid || this.ended || !this.session) return;
+    if (this.openingSaid || this.ended || this.userState === "speaking" || !this.session) return;
     this.openingSaid = true;
-    // Let the person hear the opening question and any recording notice.
-    const options = { allowInterruptions: false, addToChatCtx: true };
+    const options = { allowInterruptions: true, addToChatCtx: true };
     const frames = this.openingFrames;
     if (frames) {
       options.audio = new ReadableStream({
@@ -340,7 +373,7 @@ class OutreachCall {
    */
   async handleQuietLine() {
     const kind = this.lineKind || (this.lineCheck ? await this.lineCheck : "person");
-    if (kind === "person" || this.ended || this.pending) return false;
+    if (kind === "person" || this.ended || this.pending || this.userState === "speaking") return false;
     const { meta } = this;
     const voicemail = kind === "voicemail";
     this.filed = {
@@ -367,14 +400,31 @@ class OutreachCall {
     action.running = true;
     await sleep(200);
     for (let waited = 0; this.agentState === "speaking" && waited < 10_000; waited += 100) await sleep(100);
+    if (this.ended) return;
+    if (this.userState === "speaking") {
+      this.pending = null;
+      this.filed = null;
+      return;
+    }
     if (action.type === "transfer") {
       return this.transfer(action.note).catch((err) => this.log.error(`[Call] transfer crashed: ${err.stack || err}`));
     }
     if (action.goodbye && !this.agentSpokeLast) {
-      await this.session.say(action.goodbye, { allowInterruptions: false }).waitForPlayout().catch(() => undefined);
+      const goodbye = this.session.say(action.goodbye, { allowInterruptions: true });
+      await goodbye.waitForPlayout().catch(() => undefined);
+      if (goodbye.interrupted) {
+        this.pending = null;
+        this.filed = null;
+        return;
+      }
     }
     // Let the last words finish on the phone before the line is closed: the audio is still in transit.
     await sleep(TIMING.hangupDelayMs);
+    if (this.userState === "speaking") {
+      this.pending = null;
+      this.filed = null;
+      return;
+    }
     return this.finalize("agent_ended");
   }
 
@@ -425,16 +475,22 @@ class OutreachCall {
 
   /** Nobody has spoken for a while: check the line once, then let go. */
   async onSilence() {
-    if (this.ended || this.pending || this.transferred || !this.openingSaid) return;
+    if (this.ended || this.pending || this.transferred || !this.openingSaid || this.userState === "speaking") return;
     this.silences += 1;
     if (this.silences >= 2) return this.finalize("agent_ended");
     if (!this.calleeSpokeAfterOpening && (await this.handleQuietLine())) return this.runPending();
-    if (!this.ended && !this.pending) this.session.generateReply({ instructions: NUDGES.stillThere });
+    if (this.ended || this.pending || this.userState === "speaking") return;
+    if (this.awaitingPhone) {
+      this.phoneFragments = [];
+      this.session.generateReply({ instructions: "Ask once for the full callback number. Then wait for the answer." });
+    } else {
+      this.session.generateReply({ instructions: NUDGES.stillThere });
+    }
   }
 
   onTimeLimit() {
     if (this.ended || this.transferred) return;
-    this.session.generateReply({ instructions: NUDGES.timeLimit });
+    if (this.userState !== "speaking") this.session.generateReply({ instructions: NUDGES.timeLimit });
     this.after(TIMING.timeLimitGraceMs, () => this.finalize("time_limit"));
   }
 
@@ -445,6 +501,11 @@ class OutreachCall {
     for (const timer of this.timers) clearTimeout(timer);
     const { meta, ctx } = this;
     const roomName = ctx.room.name;
+    if (this.phoneFragments.length && this.emitter) {
+      const text = this.phoneFragments.join(" ");
+      this.lines.push({ role: "callee", text });
+      this.emitter.line("callee", text);
+    }
 
     const egressId = await Promise.resolve(this.recording).catch(() => null);
     let filed = this.filed;

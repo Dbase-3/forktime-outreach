@@ -39,7 +39,7 @@ export const OUTCOME_INFO: Record<Outcome, { label: string; tone: Tone }> = {
   message_left: { label: "Message left for owner", tone: "neutral" },
   call_back_later: { label: "Call back at a better time", tone: "neutral" },
   not_interested: { label: "Not interested", tone: "warn" },
-  not_a_fit: { label: "Too small / no large bookings", tone: "neutral" },
+  not_a_fit: { label: "Booking unavailable", tone: "neutral" },
   refused: { label: "Staff would not pass it on", tone: "warn" },
   voicemail: { label: "Voicemail", tone: "neutral" },
   phone_menu: { label: "Phone menu or AI answered", tone: "neutral" },

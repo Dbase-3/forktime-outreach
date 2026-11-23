@@ -13,17 +13,26 @@ import { DEFAULT_WORKSPACE_ID, workspaceFilter } from "./workspaces";
 const yes = (v: boolean | null) => (v == null ? null : v ? "yes" : "no");
 
 /** What was noted on an earlier call, as one paragraph for the agent. Pure. */
-export function previousNoteOf(call: Pick<Call, "summary" | "takesLargeBookings" | "seats" | "capacityNote" | "vegetarianVegan" | "interestedInSystem" | "callbackTime" | "contactName" | "ownerReached" | "label" | "endedAt">): string {
+export function previousNoteOf(call: Pick<Call,
+  "summary" | "takesLargeBookings" | "takesCatering" | "seats" | "capacityNote" | "vegetarianVegan" | "dietaryOptions" |
+  "interestedInBookingInquiries" | "interestedInSystem" | "callbackNumber" | "callbackTime" | "callbackPermission" |
+  "contactName" | "ownerReached" | "label" | "endedAt"
+>): string {
   const parts: string[] = [];
   if (call.label) parts.push(`the restaurant is ${call.label}`);
-  if (call.contactName) parts.push(`you spoke to ${call.contactName}`);
+  if (call.contactName) parts.push(`owner or manager name recorded: ${call.contactName}`);
   if (call.ownerReached != null) parts.push(call.ownerReached ? "you reached the owner or manager" : "you only reached staff");
   if (call.takesLargeBookings != null) parts.push(`takes large bookings: ${yes(call.takesLargeBookings)}`);
+  if (call.takesCatering != null) parts.push(`handles catering: ${yes(call.takesCatering)}`);
   if (call.seats != null) parts.push(`seats: ${call.seats}`);
   else if (call.capacityNote) parts.push(`capacity: ${call.capacityNote}`);
-  if (call.vegetarianVegan) parts.push(`vegetarian/vegan: ${call.vegetarianVegan}`);
+  const dietaryOptions = call.dietaryOptions || call.vegetarianVegan;
+  if (dietaryOptions) parts.push(`dietary accommodations: ${dietaryOptions}`);
+  if (call.interestedInBookingInquiries != null) parts.push(`wants more reservation or catering inquiries: ${yes(call.interestedInBookingInquiries)}`);
   if (call.interestedInSystem != null) parts.push(`wants to hear about the AI phone assistant: ${yes(call.interestedInSystem)}`);
   if (call.callbackTime) parts.push(`the owner is free: ${call.callbackTime}`);
+  if (call.callbackNumber) parts.push(`best callback number: ${call.callbackNumber}`);
+  if (call.callbackPermission != null) parts.push(`owner agreed to a team callback: ${yes(call.callbackPermission)}`);
   if (call.summary) parts.push(`summary: ${call.summary}`);
   return parts.join("; ");
 }

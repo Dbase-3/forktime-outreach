@@ -129,6 +129,21 @@ export function CallDetail({
   const { call, transcript } = data;
   const open = isOpen(call);
   const failure = cancel.error || again.error || block.error;
+  const facts: [string, string | null][] = [
+    ["Spoke to the owner", yesNo(call.ownerReached)],
+    ["Interested", yesNo(call.interested)],
+    ["Takes large bookings", yesNo(call.takesLargeBookings)],
+    ["Handles catering", yesNo(call.takesCatering ?? null)],
+    ["Capacity", call.seats != null ? `${call.seats} seats${call.capacityNote ? ` (${call.capacityNote})` : ""}` : call.capacityNote],
+    ["Dietary accommodations", call.dietaryOptions ?? call.vegetarianVegan],
+    ["Wants more reservation or catering inquiries", yesNo(call.interestedInBookingInquiries ?? null)],
+    ["Wants to hear about the AI phone assistant", yesNo(call.interestedInSystem)],
+    ["Name", call.contactName],
+    ["Best callback number", call.callbackNumber ? formatPhone(call.callbackNumber) : null],
+    ["Best callback date and time", call.callbackTime],
+    ["Agreed to a callback", yesNo(call.callbackPermission ?? null)],
+    ["Booking system", call.bookingSystem],
+  ];
   const copyTranscript = async () => {
     await navigator.clipboard.writeText(transcriptText(call, transcript, agentName));
     setCopied(true);
@@ -211,23 +226,12 @@ export function CallDetail({
         )}
       </header>
 
-      {(call.summary || call.error || call.contactName || call.callbackTime || call.bookingSystem || call.ownerReached != null || call.takesLargeBookings != null || call.seats != null || call.interestedInSystem != null) && (
+      {(call.summary || call.error || facts.some(([, value]) => value)) && (
         <section className="border-b border-gray-100 p-4">
           {call.summary && <p className="text-sm leading-relaxed text-gray-800">{call.summary}</p>}
           {call.error && <p className="text-sm text-red-700">{call.error}</p>}
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 empty:hidden">
-            <Fact label="Spoke to the owner" value={yesNo(call.ownerReached)} />
-            <Fact label="Interested" value={yesNo(call.interested)} />
-            <Fact label="Takes large bookings" value={yesNo(call.takesLargeBookings)} />
-            <Fact
-              label="Capacity"
-              value={call.seats != null ? `${call.seats} seats${call.capacityNote ? ` (${call.capacityNote})` : ""}` : call.capacityNote}
-            />
-            <Fact label="Vegetarian / vegan" value={call.vegetarianVegan} />
-            <Fact label="Wants to hear about the AI phone assistant" value={yesNo(call.interestedInSystem)} />
-            <Fact label="Name" value={call.contactName} />
-            <Fact label="Owner is free" value={call.callbackTime} />
-            <Fact label="Booking system" value={call.bookingSystem} />
+            {facts.map(([label, value]) => <Fact key={label} label={label} value={value} />)}
           </dl>
         </section>
       )}

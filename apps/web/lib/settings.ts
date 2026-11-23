@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { collections } from "./db";
 import { toE164 } from "./phone";
-import { DEFAULT_WELCOME, welcomeProblem } from "./opening-line";
+import { DEFAULT_WELCOME, PREVIOUS_OUTBOUND_WELCOME, welcomeProblem } from "./opening-line";
 import type { QueueState, Settings } from "./types";
 import { DEFAULT_WORKSPACE_ID } from "./workspaces";
 
@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a large-party booking for around 12 to 14 people",
+  topic: "potential group reservations and catering inquiries",
   transferNumber: "",
   callbackNumber: "",
   ...DEFAULT_WELCOME,
@@ -115,7 +115,15 @@ export async function getSettings(workspaceId = DEFAULT_WORKSPACE_ID): Promise<S
   const { _id: _ignored, ...rest } = stored;
   // Settings saved before the voice company was a choice were all ElevenLabs.
   const saved: Partial<Settings> = rest;
-  return { ...DEFAULT_SETTINGS, ...rest, voiceProvider: saved.voiceProvider ?? "elevenlabs" };
+  return {
+    ...DEFAULT_SETTINGS,
+    ...rest,
+    topic: saved.topic === "a large-party booking for around 12 to 14 people" ? DEFAULT_SETTINGS.topic : saved.topic ?? DEFAULT_SETTINGS.topic,
+    welcomeOutbound: saved.welcomeOutbound === PREVIOUS_OUTBOUND_WELCOME
+      ? DEFAULT_WELCOME.welcomeOutbound
+      : saved.welcomeOutbound ?? DEFAULT_WELCOME.welcomeOutbound,
+    voiceProvider: saved.voiceProvider ?? "elevenlabs",
+  };
 }
 
 export async function saveSettings(next: Settings, workspaceId = DEFAULT_WORKSPACE_ID): Promise<Settings> {
@@ -138,7 +146,6 @@ export async function setQueueRunning(running: boolean, workspaceId = DEFAULT_WO
 /** What a real call still needs before the first number is dialled. */
 export function missingForCalls(settings: Settings): string[] {
   const missing: string[] = [];
-  if (!settings.transferNumber) missing.push("the number to connect an interested owner to");
   if (!settings.callbackNumber) missing.push("the number staff and owners are asked to call back");
   if (!settings.fromNumber) missing.push("the number calls are made from");
   return missing;

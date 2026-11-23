@@ -27,11 +27,13 @@ export type WelcomeKey =
   | "welcomeCallbackKnown"
   | "welcomeCallbackNew";
 
+export const PREVIOUS_OUTBOUND_WELCOME = "Hi, this is {agent} calling about {topic}. {recorded} Is the owner or manager around?";
+
 /** The wording the app ships with: used until someone edits a message, and by "Reset". */
 export const DEFAULT_WELCOME: Record<WelcomeKey, string> = {
   // We rang them.
   welcomeOutbound:
-    "Hi, this is {agent} calling about {topic}. {recorded} Is the owner or manager around?",
+    "Hi, quick question. Are you currently accepting more reservations or large-party bookings? {recorded}",
   // They rang back, and we have spoken to that number before.
   welcomeCallbackKnown:
     "Hi, thanks for calling back. This is {agent}. I called earlier about {topic}. {recorded} May I ask who I'm speaking with?",

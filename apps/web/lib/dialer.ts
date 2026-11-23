@@ -35,7 +35,7 @@ export function callMetadata(call: Call, settings: Settings) {
     repName: settings.repName,
     company: settings.company,
     topic: settings.topic,
-    transferNumber: settings.transferNumber,
+    transferNumber: call.direction === "inbound" ? settings.transferNumber : "",
     callbackNumber: settings.callbackNumber,
     /** The call-back number as words, so the voice reads it digit by digit. */
     callbackNumberSpoken: settings.callbackNumber ? spokenPhone(settings.callbackNumber) : "",
@@ -45,6 +45,7 @@ export function callMetadata(call: Call, settings: Settings) {
     ringTimeoutSec: settings.ringTimeoutSec,
     maxCallMinutes: settings.maxCallMinutes,
     recordCalls: settings.recordCalls,
+    recordingNotice: settings.recordingNotice,
   };
 }
 

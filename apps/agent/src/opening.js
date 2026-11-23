@@ -19,8 +19,8 @@ function hasDisclosure(_line, _repFirstName) {
 
 /** Fallback only used if the app handed nothing. */
 function builtInOpeningLine(meta) {
-  const notice = meta.recordCalls ? " This call is recorded." : "";
-  return `Hi, this is ${meta.agentName} calling about a large-party booking for around twelve to fourteen people.${notice} Is the owner or manager around?`;
+  const notice = meta.recordCalls && meta.recordingNotice !== false ? " This call is recorded." : "";
+  return `Hi, quick question. Are you currently accepting more reservations or large-party bookings?${notice}`;
 }
 
 /** The line to speak: always the one from the app when present. */

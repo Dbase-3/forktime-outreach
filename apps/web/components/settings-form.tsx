@@ -175,7 +175,7 @@ export function SettingsForm() {
         <Field label="Agent's name" error={fieldErrors.agentName}>
           <input className="field" value={form.agentName} onChange={(e) => set("agentName", e.target.value)} />
         </Field>
-        <Field label="Follow-up contact" hint="The person available if an owner specifically asks to speak with someone now." error={fieldErrors.repName}>
+        <Field label="Follow-up contact" hint="The person available for live requests on inbound calls." error={fieldErrors.repName}>
           <input className="field" value={form.repName} onChange={(e) => set("repName", e.target.value)} />
         </Field>
         <Field label="Company" error={fieldErrors.company}>
@@ -244,7 +244,7 @@ export function SettingsForm() {
             ))}
           </select>
         </Field>
-        <Field label="Live-conversation number" hint="This phone rings only when an owner specifically asks to speak to someone now." error={fieldErrors.transferNumber}>
+        <Field label="Inbound transfer number" hint="This phone rings when a restaurant calls back and the owner asks to speak to someone now." error={fieldErrors.transferNumber}>
           <input className="field" placeholder="+61 412 345 678" value={form.transferNumber} onChange={(e) => set("transferNumber", e.target.value)} />
         </Field>
         <Field label="Call-back number" hint="The number restaurants call back. It must reach this agent (see the README), or they get another agent." error={fieldErrors.callbackNumber}>

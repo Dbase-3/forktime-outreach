@@ -13,15 +13,14 @@ const { waitForCallAnswer } = require("./callAnswer");
 const { createEmitter } = require("./events");
 const { classifyLine } = require("./lineCheck");
 const { firstName, resolveOpeningLine } = require("./opening");
-const { AGENT_OUTCOMES } = require("./outcomes");
+const { AGENT_OUTCOMES, filedOutcome } = require("./outcomes");
 const { buildInstructions } = require("./prompt");
 const { startRecording, stopRecording } = require("./recording");
 const { dialRep, closeRoom, REP_IDENTITY } = require("./transfer");
 const { wrapUp } = require("./wrapup");
 
 // One outbound call, start to finish: wait for the pickup, say the opening
-// line, let the model talk, connect the owner to the rep when asked, then file
-// the call with the app.
+// line, let the model talk, then file the call with the app.
 
 const CALLEE_IDENTITY = "callee";
 
@@ -138,9 +137,9 @@ class OutreachCall {
   }
 
   buildTools() {
-    const { rep } = this;
+    const { meta, rep } = this;
     return {
-      transfer_to_rep: llm.tool({
+      ...(meta.direction === "inbound" && meta.transferNumber ? { transfer_to_rep: llm.tool({
         description:
           `Connect the person on the line to ${rep} right now. Use it only when they are the owner or the manager who decides ` +
           `AND they have just agreed to talk to ${rep}. Never for staff, and never to get past someone who said no.`,
@@ -151,7 +150,7 @@ class OutreachCall {
           this.pending = { type: "transfer", note };
           return undefined;
         },
-      }),
+      }) } : {}),
       end_call: llm.tool({
         description:
           "End the call and file it. Use it when the conversation is over, for a voicemail or phone menu, a wrong number, " +
@@ -159,30 +158,31 @@ class OutreachCall {
         parameters: z.object({
           goodbye: z.string().describe("Your last words before hanging up: one short, warm sentence. For voicemail or a phone menu, the call-back message."),
           outcome: z.enum(AGENT_OUTCOMES).describe(
-            "owner_callback: the owner wants a follow-up later (a call back at a time, or an email). not_interested: the owner said no. " +
-              "not_a_fit: the owner does not take large bookings or seats under about 20. " +
+            "owner_callback: the owner explicitly agreed to a callback. not_interested: the owner said no. " +
+              "not_a_fit: the restaurant cannot accommodate the group. " +
               "message_left: the owner was not there and staff could not say when they will be. call_back_later: staff gave a time (or the owner's usual hours) to call back. " +
               "refused: staff would not help, or said the restaurant is not interested. voicemail, phone_menu, wrong_number: no person to talk to. " +
               "do_not_call: they asked not to be called again. other: anything else.",
           ),
           summary: z.string().describe("Two short factual sentences: who you spoke to and what was agreed. Only what was said."),
           ownerReached: z.boolean().describe("True if you spoke to the owner, or to a manager who says they make the decisions (\"I'm the manager, I make the calls\"). False for staff such as waiters or hosts."),
+          restaurantName: z.string().max(160).optional().describe("Restaurant name, if stated or already on the call record."),
           contactName: z.string().optional().describe("Their name, or the owner's name, if someone gave it."),
-          callbackTime: z.string().optional().describe("When to call back, or when the owner is free, in their words."),
+          callbackNumber: z.string().max(80).optional().describe("Direct business phone number or the number they confirmed for a callback."),
+          callbackTime: z.string().optional().describe("The requested callback date and time, or when the owner is free, in their words."),
+          callbackPermission: z.boolean().optional().describe("True only if the owner or manager explicitly agreed to a callback. False when they declined. Omit if unknown."),
           takesLargeBookings: z.boolean().optional().describe("Whether they take large bookings. Leave out if not asked or not said."),
+          takesCatering: z.boolean().optional().describe("Whether they handle catering. Omit if unknown."),
           seats: z.number().int().optional().describe("How many people they can seat, as a whole number, whenever they gave any figure (\"about twelve\" is 12). Leave out only if they gave none."),
           capacityNote: z.string().optional().describe("Their capacity answer in their own words, if it was not a plain number."),
-          vegetarianVegan: z.string().optional().describe("What they said about vegetarian or vegan food. Leave out if not asked."),
+          dietaryOptions: z.string().max(200).optional().describe("The dietary accommodations they confirmed, including vegetarian or gluten-free options."),
+          bookingSystem: z.string().max(120).optional().describe("The reservation system they said they currently use."),
+          interestedInBookingInquiries: z.boolean().optional().describe("Whether the owner wants more reservation or catering inquiries. Omit if unclear."),
           interestedInSystem: z.boolean().optional().describe("Whether the owner wants to hear about the AI phone assistant. Leave out if not asked."),
-          interested: z.boolean().optional().describe("Whether the owner clearly wants to talk to the rep. Leave out if you did not speak to the owner."),
+          interested: z.boolean().optional().describe("Whether the owner expressed interest in either Fork Time service. Omit if unclear."),
         }),
         execute: async ({ goodbye, ...filed }) => {
-          // "Not interested" from someone who is not the owner is staff turning the call away.
-          if (filed.outcome === "not_interested" && filed.ownerReached === false) filed.outcome = "refused";
-          // "The owner wants a follow-up" is only true if an owner was reached; from staff it is a better time to call.
-          if (filed.outcome === "owner_callback" && filed.ownerReached === false) filed.outcome = "call_back_later";
-          // And the other way round: a better time from the owner themselves is the owner's callback.
-          if (filed.outcome === "call_back_later" && filed.ownerReached === true) filed.outcome = "owner_callback";
+          filed.outcome = filedOutcome(filed);
           this.filed = filed;
           this.pending = { type: "end", goodbye };
           return undefined;
@@ -312,7 +312,7 @@ class OutreachCall {
   sayOpening() {
     if (this.openingSaid || this.ended || !this.session) return;
     this.openingSaid = true;
-    // Not interruptible: the person must hear that this is an AI, who it calls for and why.
+    // Let the person hear the opening question and any recording notice.
     const options = { allowInterruptions: false, addToChatCtx: true };
     const frames = this.openingFrames;
     if (frames) {
@@ -329,7 +329,7 @@ class OutreachCall {
       .catch(() => undefined)
       .then(() => {
         this.openingDone = true;
-        // A recording says nothing back. A person answers "is the owner around?" within a few seconds.
+        // A recording says nothing back. A person usually answers the opening question.
         this.after(TIMING.recordingSilenceMs, () => this.onQuietAfterOpening());
       });
   }
@@ -349,7 +349,7 @@ class OutreachCall {
       ownerReached: false,
     };
     // A menu is not listening; a voicemail is, so it hears who called and why (no number: the team calls again).
-    const message = voicemail ? `This is ${meta.agentName} calling about a large-party booking for around twelve to fourteen people. Please call us back when you can. Thank you.` : null;
+    const message = voicemail ? `This is ${meta.agentName} calling about potential group reservations and catering inquiries. Please call us back when you can. Thank you.` : null;
     this.pending = { type: "end", goodbye: message };
     this.agentSpokeLast = false;
     return true;
@@ -397,8 +397,8 @@ class OutreachCall {
       this.noteLine(`${rep} did not pick up.`);
       this.session.generateReply({
         instructions:
-          `${rep} did not pick up just now. Tell them so in one short sentence, say ${rep} will call them back, and ask what time suits. ` +
-          `After they answer, end the call with outcome owner_callback.`,
+          `${rep} did not pick up just now. Tell them so in one short sentence and ask if the team may call them back. ` +
+          `If they agree, ask what time suits and file their callback permission.`,
       });
       return;
     }
@@ -456,15 +456,21 @@ class OutreachCall {
     this.emitter.emit("ended", {
       endReason: this.transferred ? "transferred" : endReason,
       transferred: this.transferred || undefined,
-      outcome: filed.outcome || null,
+      outcome: filedOutcome(filed),
       summary: filed.summary || null,
       ownerReached: this.transferred ? true : (filed.ownerReached ?? null),
+      restaurantName: filed.restaurantName || null,
       contactName: filed.contactName || null,
+      callbackNumber: filed.callbackNumber || null,
       callbackTime: filed.callbackTime || null,
+      callbackPermission: filed.ownerReached === true ? (filed.callbackPermission ?? null) : null,
       takesLargeBookings: filed.takesLargeBookings ?? null,
+      takesCatering: filed.takesCatering ?? null,
       seats: filed.seats ?? null,
       capacityNote: filed.capacityNote || null,
-      vegetarianVegan: filed.vegetarianVegan || null,
+      dietaryOptions: filed.dietaryOptions || null,
+      bookingSystem: filed.bookingSystem || null,
+      interestedInBookingInquiries: filed.interestedInBookingInquiries ?? null,
       interestedInSystem: filed.interestedInSystem ?? null,
       interested: this.transferred ? true : (filed.interested ?? null),
     });

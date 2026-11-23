@@ -17,4 +17,12 @@ const AGENT_OUTCOMES = [
   "other",
 ];
 
-module.exports = { AGENT_OUTCOMES };
+function filedOutcome({ outcome, ownerReached, callbackPermission }) {
+  if (outcome === "not_interested" && ownerReached === false) return "refused";
+  if (outcome !== "owner_callback" && outcome !== "call_back_later") return outcome || null;
+  if (ownerReached === false) return "call_back_later";
+  if (ownerReached === true && callbackPermission === true) return "owner_callback";
+  return "other";
+}
+
+module.exports = { AGENT_OUTCOMES, filedOutcome };

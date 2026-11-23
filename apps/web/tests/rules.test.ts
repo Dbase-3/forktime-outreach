@@ -107,8 +107,7 @@ describe("the opening line", () => {
 
   it("opens with the booking enquiry before it asks for anyone", () => {
     expect(buildOpeningLine(settings)).toBe(
-      "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. " +
-        "This call is recorded. Is the owner or manager around?",
+      "Hi, quick question. Are you currently accepting more reservations or large-party bookings? This call is recorded.",
     );
   });
 
@@ -133,7 +132,7 @@ describe("the editable welcome messages", () => {
 
   it("the shipped wording leads with the booking enquiry", () => {
     expect(buildOpeningLine(settings)).toBe(
-      "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. This call is recorded. Is the owner or manager around?",
+      "Hi, quick question. Are you currently accepting more reservations or large-party bookings? This call is recorded.",
     );
     expect(buildCallbackWelcome(settings, true)).toBe(
       "Hi, thanks for calling back. This is Sara. I called earlier about a large-party booking for around 12 to 14 people. This call is recorded. May I ask who I'm speaking with?",

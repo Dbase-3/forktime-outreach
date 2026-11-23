@@ -155,14 +155,20 @@ export interface CallEnding {
   outcome: Outcome;
   summary?: string | null;
   ownerReached?: boolean | null;
+  restaurantName?: string | null;
   contactName?: string | null;
+  callbackNumber?: string | null;
   callbackTime?: string | null;
+  callbackPermission?: boolean | null;
   bookingSystem?: string | null;
   interested?: boolean | null;
   takesLargeBookings?: boolean | null;
+  takesCatering?: boolean | null;
   seats?: number | null;
   capacityNote?: string | null;
   vegetarianVegan?: string | null;
+  dietaryOptions?: string | null;
+  interestedInBookingInquiries?: boolean | null;
   interestedInSystem?: boolean | null;
   error?: string | null;
 }
@@ -184,14 +190,20 @@ export async function endCall(id: string, ending: CallEnding, now = new Date()):
         durationSec: talkedFrom ? Math.max(0, Math.round((now.getTime() - talkedFrom.getTime()) / 1000)) : null,
         summary: ending.summary ?? null,
         ownerReached: ending.ownerReached ?? null,
+        label: ending.restaurantName || open.label,
         contactName: ending.contactName ?? null,
+        callbackNumber: ending.callbackNumber ?? null,
         callbackTime: ending.callbackTime ?? null,
+        callbackPermission: ending.callbackPermission ?? null,
         bookingSystem: ending.bookingSystem ?? null,
         interested: ending.interested ?? null,
         takesLargeBookings: ending.takesLargeBookings ?? null,
+        takesCatering: ending.takesCatering ?? null,
         seats: ending.seats ?? null,
         capacityNote: ending.capacityNote ?? null,
         vegetarianVegan: ending.vegetarianVegan ?? null,
+        dietaryOptions: ending.dietaryOptions ?? null,
+        interestedInBookingInquiries: ending.interestedInBookingInquiries ?? null,
         interestedInSystem: ending.interestedInSystem ?? null,
         error: ending.error ?? null,
       },

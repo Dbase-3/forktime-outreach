@@ -1,5 +1,5 @@
-import { appendTranscript, endCall, markAnswered, setSimStep, setStage, type CallEnding } from "./calls-repo";
-import { buildOpeningLine, firstName } from "./opening-line";
+import { appendTranscript, endCall, markAnswered, setSimStep, type CallEnding } from "./calls-repo";
+import { buildOpeningLine } from "./opening-line";
 import type { Call, Settings, TranscriptRole } from "./types";
 
 // Dry run: with DIAL_MODE unset no phone rings. The app acts a call out on
@@ -9,13 +9,11 @@ import type { Call, Settings, TranscriptRole } from "./types";
 type Step =
   | { kind: "answer" }
   | { kind: "line"; role: TranscriptRole; text: string }
-  | { kind: "stage"; stage: "transferring" | "with_rep" }
   | { kind: "end"; ending: CallEnding };
 
 const STEP_SECONDS = 2.5;
 
 function scripts(settings: Settings, call: Call): Step[][] {
-  const rep = firstName(settings.repName);
   const place = call.label || "the restaurant";
   const opening = buildOpeningLine(settings);
   const say = (role: TranscriptRole, text: string): Step => ({ kind: "line", role, text });
@@ -24,8 +22,14 @@ function scripts(settings: Settings, call: Call): Step[][] {
       { kind: "answer" },
       say("callee", `Good afternoon, ${place}.`),
       say("agent", opening),
-      say("callee", "She's not in at the moment. Can I take a message?"),
-      say("agent", "Thanks. Please ask her to call us back on the number this call came from. When is a good time to catch her?"),
+      say("callee", "Yes, we are."),
+      say("agent", "Great. Do you also handle catering or group bookings for around 15 to 20 people?"),
+      say("callee", "Yes."),
+      say("agent", "Perfect. Is the owner or manager available? I’d like to discuss some potential booking opportunities and confirm a few details with them."),
+      say("callee", "She's not in at the moment."),
+      say("agent", "No problem. Would it be better for me to call her again, or could she give us a call when she’s available?"),
+      say("callee", "You can call back."),
+      say("agent", "Sure. When would be the best time to reach her?"),
       say("callee", "Try after three tomorrow."),
       say("agent", "After three tomorrow, got it. Thanks for your help. Bye."),
       {
@@ -42,16 +46,33 @@ function scripts(settings: Settings, call: Call): Step[][] {
       { kind: "answer" },
       say("callee", `${place}, hello?`),
       say("agent", opening),
-      say("callee", "Speaking, I'm the owner. An AI, really? What's this about?"),
-      say("agent", `Really. ${rep}'s team built me to answer restaurant phones and take bookings. Want me to put ${rep} on now? It takes two minutes.`),
-      say("callee", "Sure, go on then."),
-      say("agent", `Great, connecting you to ${rep} now.`),
-      { kind: "stage", stage: "transferring" },
-      { kind: "stage", stage: "with_rep" },
-      say("system", `Connected to ${settings.repName}.`),
+      say("callee", "Yes, you're speaking with the owner."),
+      say("agent", "Hi! I was checking whether you could accommodate a group of around 15 people next week, including guests who need vegetarian and gluten-free options."),
+      say("callee", "Yes, we can."),
+      say("agent", "Perfect. And you handle catering inquiries for larger groups as well?"),
+      say("callee", "Yes. Who is this, by the way?"),
+      say("agent", `I’m ${settings.agentName}, an AI assistant from ${settings.company}. We help restaurants capture more reservations and catering inquiries through various websites. We also answer restaurant phone calls and take reservations automatically.`),
+      say("agent", "Would you be interested in getting more booking inquiries or having an AI assistant handle your reservation calls?"),
+      say("callee", "Yes, the AI phone answering sounds interesting."),
+      say("agent", "Great! I can have someone from our team give you a quick call to explain how it works. Would that be okay?"),
+      say("callee", "Sure. I'm Raj. Call this number tomorrow around 2 PM."),
+      say("agent", "Wonderful, Raj. I’ll pass that along to our team. Thanks for your time!"),
       {
         kind: "end",
-        ending: { outcome: "transferred", summary: `The owner answered and agreed to speak with ${rep}.`, ownerReached: true, interested: true },
+        ending: {
+          outcome: "owner_callback",
+          summary: "Raj was interested in AI phone answering and agreed to a callback tomorrow around 2 PM.",
+          ownerReached: true,
+          contactName: "Raj",
+          callbackNumber: call.phone,
+          callbackTime: "Tomorrow around 2 PM",
+          callbackPermission: true,
+          takesCatering: true,
+          takesLargeBookings: true,
+          dietaryOptions: "Vegetarian and gluten-free options available",
+          interested: true,
+          interestedInSystem: true,
+        },
       },
     ],
     [
@@ -83,7 +104,6 @@ export async function advanceSimulation(call: Call, settings: Settings, now = ne
     const current = script[step];
     if (current.kind === "answer") await markAnswered(call._id, now);
     else if (current.kind === "line") await appendTranscript(call._id, { seq: step + 1, role: current.role, text: current.text, at: now });
-    else if (current.kind === "stage") await setStage(call._id, current.stage);
     else {
       await endCall(call._id, current.ending, now);
       return true;

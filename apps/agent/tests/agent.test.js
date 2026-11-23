@@ -20,12 +20,12 @@ const meta = {
   agentName: "Sara",
   repName: "Adil Khan",
   company: "Forktime",
-  topic: "a large-party booking for around 12 to 14 people",
+  topic: "potential group reservations and catering inquiries",
   transferNumber: "+61400000001",
   callbackNumberSpoken: "oh four one two, three four five, six seven eight",
   recordCalls: true,
   openingLine:
-    "Hi, this is Sara calling about a large-party booking for around 12 to 14 people. This call is recorded. Is the owner or manager around?",
+    "Hi, quick question. Are you currently accepting more reservations or large-party bookings? This call is recorded.",
 };
 
 describe("the opening line", () => {
@@ -39,7 +39,7 @@ describe("the opening line", () => {
       expect(spoken).toBe(line);
     }
     expect(opening.resolveOpeningLine({ ...meta, openingLine: "" })).toBe(
-      "Hi, this is Sara calling about a large-party booking for around twelve to fourteen people. This call is recorded. Is the owner or manager around?",
+      meta.openingLine,
     );
   });
 });
@@ -48,27 +48,26 @@ describe("the agent's instructions", () => {
   const text = prompt.buildInstructions(meta, meta.openingLine);
 
   it("keeps the customer unnamed and knows the opening line is already said", () => {
-    expect(text).toContain("The enquiry is for an unnamed customer.");
+    expect(text).toContain("Do not share customer names or details.");
     expect(text).not.toContain("on behalf of Adil Khan");
     expect(text).toContain(`You have already said, word for word: "${meta.openingLine}"`);
-    expect(text).toContain("You are talking to: Rosie's Diner.");
+    expect(text).toContain(`The restaurant on the call record is ${JSON.stringify(meta.label)}.`);
   });
 
   it("keeps customer details confidential, and answers directly when asked about AI", () => {
-    expect(text).toContain("group is around twelve to fourteen people");
-    expect(text).toContain("customer's details are confidential");
-    expect(text).toContain("I'm an AI assistant with Forktime");
-    expect(text).not.toContain("Adil is looking for");
+    expect(text).toContain("I don’t have a confirmed reservation to place right now.");
+    expect(text).toContain("Never invent a confirmed customer booking.");
+    expect(text).toContain("I’m Sara, an AI assistant from Fork Time.");
   });
 
   it("teach it to say goodbye through the tool, and what to do with a machine that talks back", () => {
-    expect(text).toContain("Another AI assistant or a phone system that answers for the restaurant");
+    expect(text).toContain("If a phone system or another AI assistant answers, use phone_menu.");
     expect(text).toContain("Your last words go in its goodbye field");
   });
 
   it("take a no, and a busy owner, at their word", () => {
-    expect(text).toContain("Never ask again after a no.");
-    expect(text).toContain("never offer to connect anyone now");
+    expect(text).toContain("End the call without pushing further.");
+    expect(text).toContain("Would later today or tomorrow be better for a quick callback?");
   });
 
   it("carry what they said at pickup, when it is known", () => {
@@ -78,28 +77,25 @@ describe("the agent's instructions", () => {
     );
   });
 
-  it("captures the owner's name, asks the three questions, then gets a yes or no before a follow-up", () => {
-    expect(text).toContain('First ask their name, once: "May I ask who I\'m speaking with?"');
-    expect(text).toContain("Save their answer as contactName");
-    expect(text).toContain('"Do you take large bookings?"');
-    expect(text).toContain('"Roughly how many people can you seat?"');
-    expect(text).toContain('"And do you have vegetarian or vegan options?"');
-    expect(text).toContain("outcome not_a_fit");
-    expect(text).toContain("I'm an AI assistant calling from Fork Time");
-    expect(text).toContain("I'll have someone give you a call");
-    expect(text).toContain("Clearly yes, but no immediate conversation request: end the call with outcome owner_callback");
-    expect(text).toContain("If they specifically ask to speak to someone now");
+  it("keeps the staff question, owner scenario and callback permission as written", () => {
+    expect(text).toContain("Do you also handle catering or group bookings for around 15 to 20 people?");
+    expect(text).toContain("a group of around 15 people next week, including guests who need vegetarian and gluten-free options.");
+    expect(text).toContain("Would you be interested in getting more booking inquiries or having an AI assistant handle your reservation calls?");
+    expect(text).toContain("I can have someone from our team give you a quick call to explain how it works. Would that be okay?");
+    expect(text).toContain("May I have your name, and what’s the best number and time to reach you?");
+    expect(text).toContain("Interest alone does not qualify for that outcome.");
+    expect(text).not.toContain("transfer_to_rep");
   });
 
   it("asks for a callback to the caller ID without reading any digits", () => {
-    expect(text).toContain("Please ask them to call us back on the number this call came from.");
-    expect(text).toContain("Never say, read, spell, or repeat the phone number aloud.");
+    expect(text).toContain("Is this the best number, or does he have a direct business number?");
+    expect(text).toContain('say "this number" instead of reading the caller ID');
     expect(text).not.toContain("I'll say it slowly");
   });
 
   it("an inbound call-back says so, confirms who it is, and carries what was noted before", () => {
     const inbound = prompt.buildInstructions({ ...meta, direction: "inbound" }, "Thanks for calling back.", { previous: "Owner of Rosie's seats 40 and takes large bookings." });
-    expect(inbound).toContain("Someone is calling back about a previous booking enquiry");
+    expect(inbound).toContain("Someone is calling back.");
     expect(inbound).toContain('Confirm it: "Am I speaking with the owner?"');
     expect(inbound).toContain("Owner of Rosie's seats 40 and takes large bookings.");
     expect(inbound).toContain("Do not ask again anything already answered");
@@ -214,11 +210,17 @@ describe("filing a call that ended on its own", () => {
       outcome: "call_back_later",
       summary: "Staff answered.",
       ownerReached: false,
+      restaurantName: null,
       contactName: null,
+      callbackNumber: null,
       callbackTime: "After 3 PM tomorrow",
+      callbackPermission: null,
       takesLargeBookings: null,
+      takesCatering: null,
       seats: null,
-      vegetarianVegan: null,
+      dietaryOptions: null,
+      bookingSystem: null,
+      interestedInBookingInquiries: null,
       interestedInSystem: null,
       interested: null,
     });
@@ -374,10 +376,11 @@ describe("the agent's tools and call details", () => {
   it("a tool returns nothing, so the model does not speak again after it; the action waits for the sentence to finish", async () => {
     const call = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
     const tools = call.buildTools();
-    expect(Object.keys(tools)).toEqual(["transfer_to_rep", "end_call"]);
+    expect(Object.keys(tools)).toEqual(["end_call"]);
 
-    expect(await tools.transfer_to_rep.execute({ note: "Owner, uses a paper diary." }, {})).toBeUndefined();
-    expect(call.pending).toEqual({ type: "transfer", note: "Owner, uses a paper diary." });
+    const inbound = new OutreachCall({ ctx: { room: { name: "room" } }, meta: { ...meta, direction: "inbound" }, vad: null });
+    expect(await inbound.buildTools().transfer_to_rep.execute({ note: "Owner, uses a paper diary." }, {})).toBeUndefined();
+    expect(inbound.pending).toEqual({ type: "transfer", note: "Owner, uses a paper diary." });
 
     const filed = { outcome: "not_interested", summary: "The owner said no.", ownerReached: true };
     expect(await tools.end_call.execute({ goodbye: "No worries, thanks for your time.", ...filed }, {})).toBeUndefined();
@@ -445,9 +448,12 @@ describe("the agent's tools and call details", () => {
       return call.filed.outcome;
     };
     expect(await file(false)).toBe("call_back_later");
-    expect(await file(true)).toBe("owner_callback");
+    expect(await file(true)).toBe("other");
     const later = new OutreachCall({ ctx: { room: { name: "room" } }, meta, vad: null });
     await later.buildTools().end_call.execute({ goodbye: "Thanks.", outcome: "call_back_later", summary: "x", ownerReached: true }, {});
+    expect(later.filed.outcome).toBe("other");
+
+    await later.buildTools().end_call.execute({ goodbye: "Thanks.", outcome: "call_back_later", summary: "The owner agreed to a callback.", callbackPermission: true, ownerReached: true }, {});
     expect(later.filed.outcome).toBe("owner_callback");
   });
 
@@ -460,7 +466,7 @@ describe("the agent's tools and call details", () => {
     const voicemail = await quiet("voicemail");
     expect(voicemail.handled).toBe(true);
     expect(voicemail.call.filed.outcome).toBe("voicemail");
-    expect(voicemail.call.pending.goodbye).toBe("This is Sara calling about a large-party booking for around twelve to fourteen people. Please call us back when you can. Thank you.");
+    expect(voicemail.call.pending.goodbye).toBe("This is Sara calling about potential group reservations and catering inquiries. Please call us back when you can. Thank you.");
 
     const menu = await quiet("menu");
     expect(menu.call.filed.outcome).toBe("phone_menu");

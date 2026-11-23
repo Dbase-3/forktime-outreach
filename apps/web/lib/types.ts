@@ -84,15 +84,20 @@ export interface Call {
   summary: string | null;
   ownerReached: boolean | null;
   contactName: string | null;
+  callbackNumber?: string | null;
   callbackTime: string | null;
+  callbackPermission?: boolean | null;
   bookingSystem: string | null;
   interested: boolean | null;
   /** What the owner said about large bookings, capacity and food. null = not asked or not said. */
   takesLargeBookings: boolean | null;
+  takesCatering?: boolean | null;
   /** Seats, as a number, when they gave one. */
   seats: number | null;
   capacityNote: string | null;
   vegetarianVegan: string | null;
+  dietaryOptions?: string | null;
+  interestedInBookingInquiries?: boolean | null;
   /** Would the owner like to hear about the AI phone assistant. */
   interestedInSystem: boolean | null;
   /** "inbound": the owner rang us back. */

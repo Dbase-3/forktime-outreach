@@ -61,6 +61,35 @@ const statuses = async () => {
 };
 
 describe("the queue, with real calls", () => {
+  it("stores the outbound callback details and each service preference from the agent webhook", async () => {
+    await setup();
+    const [call] = await add("+61889410001");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { POST } = await import("@/app/api/agent/events/route");
+    const { getCall } = await import("@/lib/calls-repo");
+    await advanceQueue();
+    const details = {
+      ownerReached: true,
+      contactName: "Raj",
+      callbackNumber: "+61889410002",
+      callbackTime: "Tomorrow around 2 PM",
+      callbackPermission: true,
+      takesLargeBookings: true,
+      takesCatering: true,
+      dietaryOptions: "Vegetarian and gluten-free",
+      interestedInBookingInquiries: false,
+      interestedInSystem: true,
+      bookingSystem: "OpenTable",
+    };
+    const response = await POST(new Request("http://x/api/agent/events", {
+      method: "POST",
+      headers: { "x-agent-key": "test-agent-key", "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "ended", endReason: "agent_ended", callId: call._id, outcome: "owner_callback", restaurantName: "Raj's Restaurant", ...details }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await getCall(call._id)).toMatchObject({ label: "Raj's Restaurant", outcome: "owner_callback", ...details });
+  });
+
   it("keeps queues and call records isolated by workspace", async () => {
     const { DEFAULT_SETTINGS, saveSettings, setQueueRunning } = await import("@/lib/settings");
     const { addCalls, getActiveCall, listCalls } = await import("@/lib/calls-repo");
@@ -267,7 +296,8 @@ describe("the queue, as a dry run", () => {
     for (let s = 10; s <= 120; s += 5) await advanceQueue(at(s));
     const done = await listCalls();
     expect(done.every((c) => c.status === "ended")).toBe(true);
-    expect(done.map((c) => c.outcome).sort()).toEqual(["transferred", "voicemail"]);
+    expect(done.map((c) => c.outcome).sort()).toEqual(["owner_callback", "voicemail"]);
+    expect(done.find((c) => c.outcome === "owner_callback")).toMatchObject({ callbackPermission: true, contactName: "Raj" });
     expect(placeCall).not.toHaveBeenCalled();
   });
 });
@@ -322,7 +352,7 @@ describe("an owner ringing the call-back number", () => {
   it("the earlier answers are carried: large bookings, seats, food, interest", async () => {
     const { previousNoteOf } = await import("@/lib/inbound");
     const note = previousNoteOf({ summary: "Spoke to the owner.", takesLargeBookings: true, seats: 60, capacityNote: null, vegetarianVegan: "plenty", interestedInSystem: true, callbackTime: null, contactName: "Anne", ownerReached: true, label: "Rosie's", endedAt: null });
-    expect(note).toBe("the restaurant is Rosie's; you spoke to Anne; you reached the owner or manager; takes large bookings: yes; seats: 60; vegetarian/vegan: plenty; wants to hear about the AI phone assistant: yes; summary: Spoke to the owner.");
+    expect(note).toBe("the restaurant is Rosie's; owner or manager name recorded: Anne; you reached the owner or manager; takes large bookings: yes; seats: 60; dietary accommodations: plenty; wants to hear about the AI phone assistant: yes; summary: Spoke to the owner.");
   });
 
   it("the agent's door for it needs the agent key", async () => {
@@ -354,7 +384,7 @@ describe("settings", () => {
     const edited = { ...DEFAULT_SETTINGS, welcomeOutbound: "Hello, {agent} here about {topic}. Is the owner in?" };
     expect("settings" in validateSettings(edited)).toBe(true);
     const [call] = await add("+61889410001");
-    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here about a large-party booking for around 12 to 14 people. Is the owner in?");
+    expect(callMetadata(call, edited).openingLine).toBe("Hello, Sara here about potential group reservations and catering inquiries. Is the owner in?");
   });
 
   it("settings saved before a field existed read back with that field's default", async () => {
@@ -365,9 +395,18 @@ describe("settings", () => {
     const read = await getSettings();
     expect(read.agentName).toBe("Mia");
     expect(read.voiceSpeed).toBe(1.1);
-    expect(read.welcomeOutbound).toContain("calling about {topic}");
+    expect(read.welcomeOutbound).toBe(DEFAULT_SETTINGS.welcomeOutbound);
     // Saved before the voice company was a choice: it was ElevenLabs, and stays so.
     expect(read.voiceProvider).toBe("elevenlabs");
+  });
+
+  it("replaces the legacy default opener on saved workspaces and keeps custom wording", async () => {
+    const { PREVIOUS_OUTBOUND_WELCOME } = await import("@/lib/opening-line");
+    const { DEFAULT_SETTINGS, getSettings, saveSettings } = await import("@/lib/settings");
+    await saveSettings({ ...DEFAULT_SETTINGS, welcomeOutbound: PREVIOUS_OUTBOUND_WELCOME }, "other-client");
+    expect((await getSettings("other-client")).welcomeOutbound).toBe(DEFAULT_SETTINGS.welcomeOutbound);
+    await saveSettings({ ...DEFAULT_SETTINGS, welcomeOutbound: "Hello, how are you?" }, "other-client");
+    expect((await getSettings("other-client")).welcomeOutbound).toBe("Hello, how are you?");
   });
 });
 

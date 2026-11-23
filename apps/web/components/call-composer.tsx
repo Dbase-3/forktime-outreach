@@ -155,10 +155,6 @@ export function CallComposer({ view, workspaceId }: { view: SettingsView | undef
               <dd className="text-right text-gray-900">{view.settings.fromNumber ? formatPhone(view.settings.fromNumber) : "Not set"}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-gray-500">Live requests go to</dt>
-              <dd className="text-right text-gray-900">{view.settings.transferNumber ? formatPhone(view.settings.transferNumber) : "Not set"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
               <dt className="shrink-0 whitespace-nowrap text-gray-500">Calling hours</dt>
               <dd className="text-right text-gray-900">{view.settings.enforceWindow ? view.window : "Any time"}</dd>
             </div>

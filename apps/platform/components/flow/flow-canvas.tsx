@@ -42,7 +42,7 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
     // Fit the width (never below 70%, never above 100%); tall flows scroll down.
     const z = Math.max(0.7, Math.min(1, (el.clientWidth - 64) / layout.width));
     setView({ z, x: (el.clientWidth - layout.width * z) / 2, y: 32 });
-  }, [layout.width, layout.height]);
+  }, [layout.width]);
 
   useEffect(() => {
     if (fitted.current) return;

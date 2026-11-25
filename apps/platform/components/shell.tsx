@@ -36,7 +36,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
   {
     title: "Build",
     items: [
-      { href: "/flows", label: "Flows", icon: Workflow, tab: true },
+      { href: "/agents", label: "Agents", icon: Workflow, tab: true },
       { href: "/automations", label: "Automations", icon: CalendarClock, tab: true },
       { href: "/campaigns", label: "Campaigns", icon: Megaphone, tab: false },
       { href: "/knowledge", label: "Knowledge", icon: BookOpen, tab: false },
@@ -53,7 +53,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
 ];
 
 const NAV = NAV_GROUPS.flatMap((group) => group.items);
-const TABS = ["/", "/flows", "/automations", "/calls"].map((href) => NAV.find((item) => item.href === href) as NavItem);
+const TABS = ["/", "/agents", "/automations", "/calls"].map((href) => NAV.find((item) => item.href === href) as NavItem);
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -64,12 +64,14 @@ export function Shell({ children }: { children: ReactNode }) {
   const mounted = useMounted();
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useCommandPalette();
+  // The agent editor is a full-screen workspace (split screen), not a page.
+  const fullBleed = /^\/agents\/[^/]+/.test(pathname);
   return (
     <div className="min-h-dvh lg:pl-60">
       <Sidebar onSearch={() => setSearchOpen(true)} />
       <MobileTopBar onSearch={() => setSearchOpen(true)} />
       {mounted && <Breadcrumbs />}
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-8">{mounted ? children : <SkeletonFor pathname={pathname} />}</main>
+      <main className={fullBleed ? "w-full" : "mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-8"}>{mounted ? children : <SkeletonFor pathname={pathname} />}</main>
       <BottomTabs />
       {mounted && <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} pages={NAV} />}
     </div>
@@ -197,13 +199,13 @@ function WorkspaceCard() {
 
 const SECTION_LABELS: Record<string, string> = Object.fromEntries(NAV.map((n) => [n.href.slice(1), n.label]));
 
-export function crumbsFor(pathname: string, app: Pick<AppState, "flows" | "automations" | "settings">): { label: string; href?: string }[] {
+export function crumbsFor(pathname: string, app: Pick<AppState, "flows" | "campaigns" | "settings">): { label: string; href?: string }[] {
   const [section, id] = pathname.split("/").filter(Boolean);
   const crumbs: { label: string; href?: string }[] = [{ label: app.settings.businessName, href: "/" }];
   if (!section) return [...crumbs, { label: "Overview" }];
   crumbs.push({ label: SECTION_LABELS[section] ?? section, href: id ? `/${section}` : undefined });
   if (!id) return crumbs;
-  const name = section === "flows" ? app.flows.find((f) => f.id === id)?.name : app.automations.find((a) => a.id === id)?.name;
+  const name = section === "agents" ? app.flows.find((f) => f.id === id)?.name : section === "campaigns" ? app.campaigns.find((c) => c.id === id)?.name : undefined;
   return [...crumbs, { label: name ?? "Not found" }];
 }
 

@@ -13,6 +13,7 @@ export interface StepListContext {
   defs: FieldDef[];
   questions: Record<string, string>; // saved field → the question that asks it
   selectedId: string | null;
+  activeId?: string | null; // the step a test call is on
   issueIds: Set<string>;
   onAdd: (container: Container, index: number) => void;
   onSelect: (id: string) => void;
@@ -60,6 +61,7 @@ export function StepCard({ step, ctx }: { step: Step; ctx: StepListContext }) {
       className={clsx(
         "card group flex w-full items-start gap-3 p-3 text-left transition-colors hover:border-line-strong hover:bg-subtle/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/25",
         ctx.selectedId === step.id && "border-accent/60 ring-[3px] ring-accent/10",
+        ctx.activeId === step.id && "border-emerald-500/70 ring-[3px] ring-emerald-500/20",
         hasIssue && "border-amber-500/40",
       )}
     >

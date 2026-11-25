@@ -98,7 +98,7 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
   return (
     <div
       ref={box}
-      className="relative h-[calc(100dvh-260px)] min-h-[520px] touch-none select-none overflow-hidden rounded-xl border border-line bg-surface [background-image:radial-gradient(rgb(var(--line-strong))_1px,transparent_1px)] [background-size:18px_18px]"
+      className="relative h-full min-h-[420px] touch-none select-none overflow-hidden bg-surface [background-image:radial-gradient(rgb(var(--line-strong))_1px,transparent_1px)] [background-size:18px_18px]"
       style={{ backgroundPosition: `${view.x}px ${view.y}px`, cursor: drag.current ? "grabbing" : "grab" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -235,7 +235,7 @@ function NodeBox({ node, greeting, ctx, onEditGreeting, onAddAt }: { node: Layou
       onClick={() => ctx.onSelect(step.id)}
       className={clsx(
         "group absolute flex flex-col rounded-lg border bg-surface p-3 text-left shadow-pop transition-colors hover:border-line-strong",
-        ctx.selectedId === step.id ? "border-accent/60 ring-[3px] ring-accent/10" : hasIssue ? "border-amber-500/50" : "border-line",
+        ctx.activeId === step.id ? "border-emerald-500/70 ring-[3px] ring-emerald-500/20" : ctx.selectedId === step.id ? "border-accent/60 ring-[3px] ring-accent/10" : hasIssue ? "border-amber-500/50" : "border-line",
       )}
       style={style}
     >

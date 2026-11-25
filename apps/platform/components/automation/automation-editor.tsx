@@ -111,7 +111,7 @@ function FlowPicker({ automation, app, onChange }: { automation: Automation; app
         ))}
       </select>
       {flow && (
-        <Link href={`/flows/${flow.id}`} className="inline-block text-sm text-accent hover:underline">
+        <Link href={`/agents/${flow.id}`} className="inline-block text-sm text-accent hover:underline">
           Open {flow.name}
         </Link>
       )}

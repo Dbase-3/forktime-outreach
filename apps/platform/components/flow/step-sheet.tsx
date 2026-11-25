@@ -4,9 +4,10 @@
 
 import clsx from "clsx";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import { OP_LABELS, VALUELESS_OPS, fieldLabel } from "@/lib/automation";
-import { toFieldKey } from "@/lib/flow-tree";
-import type { ActionKind, Condition, FieldDef, Step, StepKind } from "@/lib/types";
+import { fitOp } from "@/lib/conditions";
+import { allSteps, toFieldKey } from "@/lib/flow-tree";
+import type { ActionKind, FieldDef, Step, StepKind } from "@/lib/types";
+import { RuleRow } from "../rules-editor";
 import { Field, Sheet, useLastPresent } from "../ui";
 import { ACTION_META, ANSWER_TYPES, STEP_META, metaOf } from "./meta";
 
@@ -55,15 +56,14 @@ export function AddStepSheet({ open, onClose, onPick }: { open: boolean; onClose
 
 interface EditProps {
   step: Step | null;
-  defs: FieldDef[];
-  askedFields: string[];
+  fields: FieldDef[];
   onChange: (patch: Partial<Step>) => void;
   onMove: (delta: -1 | 1) => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-export function StepSheet({ step: current, defs, askedFields, onChange, onMove, onDelete, onClose }: EditProps) {
+export function StepSheet({ step: current, fields, onChange, onMove, onDelete, onClose }: EditProps) {
   const step = useLastPresent(current);
   const title = step ? metaOf(step).label : "";
   return (
@@ -88,14 +88,23 @@ export function StepSheet({ step: current, defs, askedFields, onChange, onMove, 
         </div>
       }
     >
-      {step && <StepForm step={step} defs={defs} askedFields={askedFields} onChange={onChange} />}
+      {step && <StepForm step={step} fields={fields} onChange={onChange} />}
     </Sheet>
   );
 }
 
 const PLACEHOLDER_HINT = "Use {first_name} or any contact field in curly brackets.";
 
-function StepForm({ step, defs, askedFields, onChange }: { step: Step; defs: FieldDef[]; askedFields: string[]; onChange: (patch: Partial<Step>) => void }) {
+/** The fields a decision can check: this call's answers (typed by their question) and the contact's own fields. */
+export function decisionFields(steps: Step[], defs: FieldDef[]): FieldDef[] {
+  const asked = allSteps(steps).flatMap((s) => (s.kind === "ask" && s.field ? [{ key: s.field, label: `Answer: ${s.field.replace(/_/g, " ")}`, type: ANSWER_FIELD[s.answerType], choices: s.choices }] : []));
+  const unique = asked.filter((f, i) => asked.findIndex((x) => x.key === f.key) === i);
+  return [...unique, ...defs.filter((d) => !unique.some((u) => u.key === d.key))];
+}
+
+const ANSWER_FIELD = { text: "text", yesno: "yesno", number: "number", date: "date", choice: "choice" } as const;
+
+export function StepForm({ step, fields, onChange }: { step: Step; fields: FieldDef[]; onChange: (patch: Partial<Step>) => void }) {
   if (step.kind === "say") {
     return (
       <Field label="The agent says" hint={PLACEHOLDER_HINT}>
@@ -104,7 +113,7 @@ function StepForm({ step, defs, askedFields, onChange }: { step: Step; defs: Fie
     );
   }
   if (step.kind === "ask") return <AskForm step={step} onChange={onChange} />;
-  if (step.kind === "branch") return <BranchForm step={step} defs={defs} askedFields={askedFields} onChange={onChange} />;
+  if (step.kind === "branch") return <BranchForm step={step} fields={fields} onChange={onChange} />;
   if (step.kind === "action") return <ActionForm step={step} onChange={onChange} />;
   return (
     <div className="space-y-4">
@@ -160,44 +169,17 @@ function AskForm({ step, onChange }: { step: Extract<Step, { kind: "ask" }>; onC
   );
 }
 
-function BranchForm({ step, defs, askedFields, onChange }: { step: Extract<Step, { kind: "branch" }>; defs: FieldDef[]; askedFields: string[]; onChange: (patch: Partial<Step>) => void }) {
-  const setCondition = (patch: Partial<Condition>) => onChange({ condition: { ...step.condition, ...patch } });
-  const options = [...new Set([...askedFields, ...defs.map((d) => d.key)])];
-  const needsValue = !VALUELESS_OPS.includes(step.condition.op);
+function BranchForm({ step, fields, onChange }: { step: Extract<Step, { kind: "branch" }>; fields: FieldDef[]; onChange: (patch: Partial<Step>) => void }) {
+  const known = fields.some((f) => f.key === step.condition.field);
+  const list = known || !step.condition.field ? fields : [{ key: step.condition.field, label: step.condition.field, type: "text" as const }, ...fields];
   return (
     <div className="space-y-4">
       <p className="text-sm text-fg-3">The call goes down &ldquo;If yes&rdquo; when this is true, and &ldquo;Otherwise&rdquo; when it isn&rsquo;t.</p>
-      <Field label="Check">
-        <select className="field" value={step.condition.field} onChange={(e) => setCondition({ field: e.target.value })}>
-          <option value="">Pick an answer or contact field</option>
-          {askedFields.length > 0 && (
-            <optgroup label="Answers from this call">
-              {askedFields.map((key) => (
-                <option key={key} value={key}>{key}</option>
-              ))}
-            </optgroup>
-          )}
-          <optgroup label="Contact fields">
-            {options.filter((key) => !askedFields.includes(key)).map((key) => (
-              <option key={key} value={key}>{fieldLabel(key, defs)}</option>
-            ))}
-          </optgroup>
-        </select>
-      </Field>
-      <div className={clsx("grid gap-3", needsValue && "grid-cols-2")}>
-        <Field label="Rule">
-          <select className="field" value={step.condition.op} onChange={(e) => setCondition({ op: e.target.value as Condition["op"] })}>
-            {Object.entries(OP_LABELS).map(([op, label]) => (
-              <option key={op} value={op}>{label}</option>
-            ))}
-          </select>
-        </Field>
-        {needsValue && (
-          <Field label="Value">
-            <input className="field" value={step.condition.value ?? ""} onChange={(e) => setCondition({ value: e.target.value })} />
-          </Field>
-        )}
-      </div>
+      {list.length === 0 ? (
+        <p className="text-sm text-amber-700 dark:text-amber-400">Add an Ask step before this, or a contact field, to have something to check.</p>
+      ) : (
+        <RuleRow rule={step.condition.field ? step.condition : { field: list[0].key, op: fitOp(step.condition.op, list[0].type) }} fields={list} onChange={(condition) => onChange({ condition })} />
+      )}
     </div>
   );
 }

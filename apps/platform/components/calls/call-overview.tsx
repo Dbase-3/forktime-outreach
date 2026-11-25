@@ -52,7 +52,7 @@ export function CallOverview({ call, app }: { call: Call; app: AppState }) {
         <Fact label="How it ended">{call.live ? "Still on the call" : call.endReason ? END_REASONS[call.endReason] : "—"}</Fact>
         <Fact label="Number"><span className="font-mono">{contact?.phone ?? "Unknown"}</span></Fact>
         <Fact label="When">{new Date(call.startedAt).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</Fact>
-        <Fact label="Flow">{flow ? <Link href={`/flows/${flow.id}`} className="text-accent hover:underline">{flow.name}</Link> : "—"}</Fact>
+        <Fact label="Flow">{flow ? <Link href={`/agents/${flow.id}`} className="text-accent hover:underline">{flow.name}</Link> : "—"}</Fact>
       </dl>
 
       {Object.keys(call.saved).length > 0 && (

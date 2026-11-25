@@ -17,6 +17,7 @@ export interface PracticeState {
   lines: PracticeLine[];
   waitingFor: Extract<Step, { kind: "ask" }> | null;
   outcome: string | null;
+  currentId: string | null; // the step the call is on (a question waiting, or the ending it reached)
 }
 
 export interface PracticeContext {
@@ -28,7 +29,7 @@ export interface PracticeContext {
 export function startPractice(flow: Pick<Flow, "greeting" | "steps">, ctx: PracticeContext): PracticeState {
   const values = { ...ctx.contactFields, agent: ctx.agentName, business: ctx.business };
   const greeting: PracticeLine = { who: "agent", text: fill(flow.greeting, values) };
-  return run({ queue: [...flow.steps], values, lines: [greeting], waitingFor: null, outcome: null });
+  return run({ queue: [...flow.steps], values, lines: [greeting], waitingFor: null, outcome: null, currentId: null });
 }
 
 export function answerPractice(state: PracticeState, answer: string): PracticeState {
@@ -49,15 +50,15 @@ function run(state: PracticeState): PracticeState {
     if (step.kind === "branch") queue.unshift(...(conditionHolds(step.condition, values) ? step.yes : step.no));
     if (step.kind === "ask") {
       lines.push({ who: "agent", text: fill(step.question, values) });
-      return { queue, values, lines, waitingFor: step, outcome: null };
+      return { queue, values, lines, waitingFor: step, outcome: null, currentId: step.id };
     }
     if (step.kind === "end") {
       lines.push({ who: "agent", text: fill(step.text, values) });
-      return { queue: [], values, lines, waitingFor: null, outcome: step.outcome || "done" };
+      return { queue: [], values, lines, waitingFor: null, outcome: step.outcome || "done", currentId: step.id };
     }
   }
   lines.push({ who: "system", text: "The flow ran out of steps without an ending. Add an \"End call\" step." });
-  return { queue: [], values, lines, waitingFor: null, outcome: "no_ending" };
+  return { queue: [], values, lines, waitingFor: null, outcome: "no_ending", currentId: null };
 }
 
 /** Replaces {field} with its value; an unknown field stays visible as {field}. */

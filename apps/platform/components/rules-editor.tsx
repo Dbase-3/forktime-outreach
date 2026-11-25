@@ -42,7 +42,7 @@ export function RulesEditor({ group, fields, onChange, addLabel = "Add a rule", 
   );
 }
 
-function RuleRow({ rule, fields, onChange, compact }: { rule: Condition; fields: FieldDef[]; onChange: (r: Condition) => void; compact?: boolean }) {
+export function RuleRow({ rule, fields, onChange, compact }: { rule: Condition; fields: FieldDef[]; onChange: (r: Condition) => void; compact?: boolean }) {
   const field = fields.find((f) => f.key === rule.field) ?? fields[0];
   const type = field?.type ?? "text";
   const input = OPS[rule.op].input;

@@ -149,6 +149,9 @@ export function flowFromTemplate(template: FlowTemplate | null, now = new Date()
     agent: { ...DEFAULT_AGENT },
     updatedAt: now.toISOString(),
     knowledgeIds: [],
+    dataFields: [],
+    askRequired: {},
+    checks: [],
     ...body,
   };
 }

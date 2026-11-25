@@ -44,7 +44,7 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
   const items = useMemo<Item[]>(
     () => [
       ...pages.map((p) => ({ id: `page-${p.href}`, label: p.label, hint: "Page", href: p.href, icon: p.icon, group: "Go to" })),
-      ...app.flows.map((f) => ({ id: f.id, label: f.name, hint: `${f.agent.name} · ${f.status === "live" ? "Live" : "Draft"}`, href: `/flows/${f.id}`, icon: Workflow, group: "Agents" })),
+      ...app.flows.map((f) => ({ id: f.id, label: f.name, hint: `${f.agent.name} · ${f.status === "live" ? "Live" : "Draft"}`, href: `/agents/${f.id}`, icon: Workflow, group: "Agents" })),
       ...app.automations.map((a) => ({ id: a.id, label: a.name, hint: a.enabled ? "On" : "Off", href: `/automations/${a.id}`, icon: CalendarClock, group: "Automations" })),
       ...app.contacts.map((c) => ({ id: c.id, label: c.name, hint: c.phone, href: `/contacts?open=${c.id}`, icon: User, group: "Contacts" })),
     ],

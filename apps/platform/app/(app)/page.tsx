@@ -68,7 +68,7 @@ function StatusStrip({ app, now }: { app: AppState; now: Date }) {
 // ---- Shortcuts: a few plain things people come here to do ----
 
 const ACTIONS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/flows?new=1", label: "Create an agent", icon: Plus },
+  { href: "/agents?new=1", label: "Create an agent", icon: Plus },
   { href: "/contacts", label: "Add contacts", icon: Users },
   { href: "/automations", label: "Call people automatically", icon: CalendarClock },
   { href: "/integrations", label: "Connect your calendar", icon: CalendarCheck },
@@ -93,7 +93,7 @@ function Agents({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Ca
   const flows = [...app.flows].sort((a, b) => Number(b.status === "live") - Number(a.status === "live"));
   return (
     <section>
-      <SectionHead title="Your agents" action={<Link href="/flows" className="btn-secondary h-7 px-2.5 text-xs">All flows</Link>} />
+      <SectionHead title="Your agents" action={<Link href="/agents" className="btn-secondary h-7 px-2.5 text-xs">All agents</Link>} />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {flows.map((flow) => (
           <AgentCard key={flow.id} flow={flow} app={app} now={now} onOpen={onOpen} />
@@ -111,7 +111,7 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
   const isLive = flow.status === "live";
   return (
     <div className="card flex flex-col overflow-hidden transition-colors hover:border-line-strong">
-      <Link href={`/flows/${flow.id}`} className="block p-4 pb-3">
+      <Link href={`/agents/${flow.id}`} className="block p-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate font-medium text-fg">{flow.name}</div>

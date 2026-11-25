@@ -6,7 +6,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 6;
+export const SEED_VERSION = 7;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -16,7 +16,21 @@ function isoDay(now: Date, offsetDays: number): string {
 
 export function seedState(now = new Date()): AppState {
   const template = (id: string) => TEMPLATES.find((t) => t.id === id) ?? null;
-  const service = { ...flowFromTemplate(template("service_check"), now), id: "f_service", status: "live" as const, knowledgeIds: ["k_service"] };
+  const service = {
+    ...flowFromTemplate(template("service_check"), now),
+    id: "f_service",
+    status: "live" as const,
+    knowledgeIds: ["k_service"],
+    askRequired: { problem: false },
+    dataFields: [
+      { key: "callback_time", label: "Callback time", type: "text" as const, description: "When they'd like us to call back, if they mention it", required: false, fallback: "Anytime" },
+      { key: "km_now", label: "Kilometres now", type: "number" as const, description: "The car's kilometres, if they say", required: false },
+    ],
+    checks: [
+      { id: "chk_booked", label: "Booked or set a follow-up", description: "Passed when a service was booked or they asked to be called later" },
+      { id: "chk_happy", label: "Customer is happy", description: "Passed when they say the car is running well" },
+    ],
+  };
   const lead = { ...flowFromTemplate(template("lead_follow_up"), now), id: "f_lead", status: "live" as const, agent: { name: "Noah", voiceId: "v_noah", personality: "professional" as const, speed: 1.05, language: "English" } };
   const desk = { ...flowFromTemplate(template("front_desk"), now), id: "f_desk", status: "live" as const, knowledgeIds: ["k_service", "k_warranty"], agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
 
@@ -82,6 +96,7 @@ export function seedState(now = new Date()): AppState {
       endReason: "agent_ended",
       actions: ["booked", "texted"],
       mood: [0.12, 0.05, 0.08, 0.04],
+      checkResults: { chk_booked: "success", chk_happy: "success" },
       transcript: [
         { who: "agent", at: 0.6, text: "Hi Priya, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
         { who: "caller", at: 8.4, text: "Yeah sure, what's up?" },
@@ -111,6 +126,7 @@ export function seedState(now = new Date()): AppState {
       endReason: "agent_ended",
       actions: [],
       mood: [0.32, 0.18, 0.41],
+      checkResults: { chk_booked: "success", chk_happy: "success" },
       transcript: [
         { who: "agent", at: 0.6, text: "Hi Noah, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
         { who: "caller", at: 7.9, text: "Quickly, yeah." },

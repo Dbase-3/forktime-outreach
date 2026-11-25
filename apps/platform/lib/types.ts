@@ -47,6 +47,25 @@ export interface AgentVoice {
   language: string;
 }
 
+/** Something the agent pulls out of the call, beyond what its Ask steps save. */
+export interface DataField {
+  key: string;
+  label: string;
+  type: FieldType;
+  description: string; // what to listen for, in plain words
+  required: boolean;
+  fallback?: string; // used when the call didn't cover it (fields that aren't required)
+  choices?: string[];
+}
+
+/** Did the call do its job? Judged after every call: success, failure or unknown. */
+export interface SuccessCheck {
+  id: string;
+  label: string;
+  description: string;
+}
+
+/** An agent (the UI says Agent; the code keeps the name Flow). */
 export interface Flow {
   id: string;
   name: string;
@@ -57,6 +76,9 @@ export interface Flow {
   greeting: string;
   steps: Step[];
   knowledgeIds: string[]; // documents attached to this agent (plus every "available to all" one)
+  dataFields: DataField[]; // extra things to collect; Ask steps add theirs automatically
+  askRequired: Record<string, boolean>; // per Ask field: must the call get it? (default yes)
+  checks: SuccessCheck[];
   updatedAt: string;
 }
 
@@ -196,6 +218,7 @@ export interface Call {
   actions?: string[]; // what the call did: booked, transferred, texted, crm, message
   mood?: number[]; // 0..1 per caller line, in order: how upset they sounded
   feedback?: CallFeedback | null;
+  checkResults?: Record<string, "success" | "failure" | "unknown">;
   live?: boolean; // the call is happening right now
 }
 

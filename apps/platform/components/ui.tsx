@@ -137,7 +137,7 @@ export function Sheet({ open, onClose, title, children, footer, wide, size, subh
           </div>
           {subheader && <div className="shrink-0 border-b border-line bg-subtle/60 px-4 pt-4 sm:px-6">{subheader}</div>}
           <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">{children}</div>
-          {footer && <div className="pb-safe shrink-0 border-t border-line bg-surface px-4 py-3 sm:px-6">{footer}</div>}
+          {footer && <div className="shrink-0 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

@@ -14,6 +14,9 @@ export const AGENT_OUTCOMES = [
   "wrong_number",
   "do_not_call",
   "other",
+  // The Forkmate line (inbound callers we never rang).
+  "forkmate_booking",
+  "forkmate_venue",
 ] as const;
 
 export const SYSTEM_OUTCOMES = [
@@ -46,6 +49,8 @@ export const OUTCOME_INFO: Record<Outcome, { label: string; tone: Tone }> = {
   wrong_number: { label: "Wrong number", tone: "warn" },
   do_not_call: { label: "Asked not to be called", tone: "bad" },
   other: { label: "Other", tone: "neutral" },
+  forkmate_booking: { label: "Forkmate booking request", tone: "good" },
+  forkmate_venue: { label: "Forkmate venue listing", tone: "good" },
   no_answer: { label: "No answer", tone: "neutral" },
   hung_up: { label: "Hung up early", tone: "warn" },
   failed: { label: "Call failed", tone: "bad" },

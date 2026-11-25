@@ -158,6 +158,10 @@ const env = {
   }),
   outboundTrunkId: () => required("SIP_OUTBOUND_TRUNK_ID"),
   outboundTrunkIdAu: () => process.env.SIP_OUTBOUND_TRUNK_ID_AU || "",
+  /** The Forktime API that saves Forkmate requests taken on the phone. */
+  forkmateApiUrl: () => (process.env.FORKMATE_API_URL || "https://api.forktime.ai").replace(/\/$/, ""),
+  /** Shared with the Forktime backend's FORKMATE_PHONE_KEY. Unset: Forkmate requests can't be saved. */
+  forkmatePhoneKey: () => process.env.FORKMATE_PHONE_KEY || "",
   /** Use LiveKit's audio turn detector by default. The older detectors remain available as overrides. */
   turnDetector: () => {
     const detector = process.env.TURN_DETECTOR;

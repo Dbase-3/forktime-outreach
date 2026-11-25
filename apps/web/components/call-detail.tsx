@@ -167,7 +167,7 @@ export function CallDetail({
             call.startedAt ? `Started ${dayAndTime(call.startedAt)}` : `Added ${dayAndTime(call.queuedAt)}`,
             call.durationSec != null ? `talked ${duration(call.durationSec)}` : null,
             call.attempt > 1 ? `try ${call.attempt}` : null,
-            call.direction === "inbound" ? "they called us back" : null,
+            call.direction === "inbound" ? (call.inboundMode === "forkmate" ? "they called the Forkmate line" : "they called us back") : null,
             call.simulated ? "acted out, no phone rang" : null,
           ]
             .filter(Boolean)

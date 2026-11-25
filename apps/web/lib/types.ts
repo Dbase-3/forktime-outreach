@@ -102,6 +102,12 @@ export interface Call {
   interestedInSystem: boolean | null;
   /** "inbound": the owner rang us back. */
   direction: "outbound" | "inbound";
+  /**
+   * How an inbound call was taken: "callback" = a number we rang before (Sara's
+   * script); "forkmate" = anyone else (the Forkmate booking/venue line).
+   * Absent on outbound calls and on inbound calls from before Forkmate.
+   */
+  inboundMode?: "callback" | "forkmate";
   recording: CallRecording | null;
   error: string | null;
   /** A dry-run call is acted out by the app; nothing is dialled. */

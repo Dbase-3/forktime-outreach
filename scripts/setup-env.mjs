@@ -117,6 +117,8 @@ writeEnv(agentFile, prod ? "Forktime Outreach: the voice agent, in production" :
   ["EGRESS_S3_ENDPOINT", () => from("EGRESS_S3_ENDPOINT", "agent")],
   ["EGRESS_S3_REGION", () => from("EGRESS_S3_REGION", "agent") || "auto"],
   ["EGRESS_S3_PUBLIC_URL", () => from("EGRESS_S3_PUBLIC_URL", "agent")],
+  ["FORKMATE_API_URL", () => (prod ? "https://api.forktime.ai" : "https://staging-api.forktime.ai"), "The Forktime API that saves Forkmate requests taken on the phone (inbound callers we never rang)."],
+  ["FORKMATE_PHONE_KEY", () => secret(32), "Must equal FORKMATE_PHONE_KEY in the Forktime backend's env for that API. Empty: Forkmate calls can't save."],
 ]);
 
 console.log(

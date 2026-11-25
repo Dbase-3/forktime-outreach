@@ -55,8 +55,8 @@ export const WELCOME_LABELS: Record<
     when: "Said first when someone rings the call-back number from a number we already called.",
   },
   welcomeCallbackNew: {
-    title: "When someone calls the call-back number and we don't know them",
-    when: "Said first when the caller's number is new or hidden.",
+    title: "When a number we rang calls back with no notes yet",
+    when: "Rarely used: callers we never rang (and hidden numbers) reach the Forkmate line, whose greeting is fixed in the agent.",
   },
 };
 

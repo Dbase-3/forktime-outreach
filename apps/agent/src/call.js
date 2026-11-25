@@ -19,6 +19,8 @@ const { buildInstructions } = require("./prompt");
 const { startRecording, stopRecording } = require("./recording");
 const { dialRep, closeRoom, REP_IDENTITY } = require("./transfer");
 const { wrapUp } = require("./wrapup");
+const { buildForkmateInstructions, forkmateGreeting } = require("./forkmate/script");
+const { buildForkmateTools } = require("./forkmate/tools");
 
 // One outbound call, start to finish: wait for the pickup, say the opening
 // line, let the model talk, then file the call with the app.
@@ -61,7 +63,9 @@ class OutreachCall {
     this.vad = vad;
     this.log = log;
     this.rep = firstName(meta.repName);
-    this.openingLine = resolveOpeningLine(meta);
+    // A caller we never rang gets the Forkmate line (the app decides: meta.mode).
+    this.forkmate = meta.mode === "forkmate";
+    this.openingLine = this.forkmate ? forkmateGreeting(meta) : resolveOpeningLine(meta);
     this.lines = [];
     this.openingSaid = false;
     this.userState = "listening";
@@ -142,7 +146,15 @@ class OutreachCall {
     return timer;
   }
 
+  /** The model's instructions for this call: the Forkmate script or Sara's. */
+  instructionsFor(extra = {}) {
+    return this.forkmate
+      ? buildForkmateInstructions(this.meta, this.openingLine, extra)
+      : buildInstructions(this.meta, this.openingLine, { ...extra, previous: this.previousNote });
+  }
+
   buildTools() {
+    if (this.forkmate) return buildForkmateTools(this, { conn: { baseUrl: env.forkmateApiUrl(), key: env.forkmatePhoneKey() } });
     const { meta, rep } = this;
     return {
       ...(meta.direction === "inbound" && meta.transferNumber ? { transfer_to_rep: llm.tool({
@@ -220,7 +232,7 @@ class OutreachCall {
         apiKey: process.env.SONIOX_API_KEY,
         context: {
           general: [{ key: "domain", value: "A phone call to a restaurant" }],
-          terms: [...BOOKING_TERMS, meta.company, meta.repName, meta.label].filter(Boolean),
+          terms: [...BOOKING_TERMS, ...(this.forkmate ? ["Forkmate"] : [meta.company, meta.repName, meta.label])].filter(Boolean),
         },
       }),
       tts: this.tts,
@@ -252,7 +264,7 @@ class OutreachCall {
       if (!this.transferred) this.finalize(event.error ? "error" : "agent_ended");
     });
 
-    this.agent = new OutreachAgent(this, { instructions: buildInstructions(meta, this.openingLine, { previous: this.previousNote }), tools: this.buildTools() });
+    this.agent = new OutreachAgent(this, { instructions: this.instructionsFor(), tools: this.buildTools() });
     await this.session.start({
       agent: this.agent,
       room: this.ctx.room,
@@ -358,7 +370,7 @@ class OutreachCall {
         return kind;
       });
       if (this.agent) {
-        Promise.resolve(this.agent.updateInstructions(buildInstructions(this.meta, this.openingLine, { firstHeard: heard, previous: this.previousNote }))).catch((err) =>
+        Promise.resolve(this.agent.updateInstructions(this.instructionsFor({ firstHeard: heard }))).catch((err) =>
           this.log.warn(`[Call] could not add their first words to the instructions: ${err.message}`),
         );
       }
@@ -505,7 +517,7 @@ class OutreachCall {
     if (this.ended || this.pending || this.userState === "speaking") return;
     if (this.awaitingPhone) {
       this.phoneFragments = [];
-      this.session.generateReply({ instructions: "Ask once for the full callback number. Then wait for the answer." });
+      this.session.generateReply({ instructions: this.forkmate ? "Ask once for the full phone number. Then wait for the answer." : "Ask once for the full callback number. Then wait for the answer." });
     } else {
       this.session.generateReply({ instructions: NUDGES.stillThere });
     }

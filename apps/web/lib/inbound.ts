@@ -6,9 +6,11 @@ import { getSettings } from "./settings";
 import type { Call, Settings } from "./types";
 import { DEFAULT_WORKSPACE_ID, workspaceFilter } from "./workspaces";
 
-// An owner (or anyone) ringing the call-back number. The agent asks the app
-// who this is: if we have spoken to the number before, it carries on from
-// what was noted; either way it opens differently from an outbound call.
+// Someone ringing one of our numbers. The agent asks the app who this is.
+// A number we have rung before is a restaurant calling Sara back: it carries
+// on from what was noted (Sara's script). Anyone else reaches the Forkmate
+// line (owner, 2026-11-25): a group booking request or a venue that wants to
+// join, saved through the Forktime API. The agent holds the Forkmate wording.
 
 const yes = (v: boolean | null) => (v == null ? null : v ? "yes" : "no");
 
@@ -48,7 +50,20 @@ export async function startInboundCall(
   const { calls } = await collections();
   const workspaceId = input.workspaceId ?? DEFAULT_WORKSPACE_ID;
   const settings = await getSettings(workspaceId);
-  const previous = await calls.find({ $and: [workspaceFilter(workspaceId), { phone: input.phone, status: "ended" }] }).sort({ endedAt: -1 }).limit(1).next();
+  // Only a number we actually dialled makes this a call-back; an earlier Forkmate call doesn't.
+  // A missed call is queued again with startedAt cleared and the attempt counted, hence the $or.
+  const rangBefore = await calls.findOne({
+    $and: [
+      workspaceFilter(workspaceId),
+      { phone: input.phone, direction: { $ne: "inbound" } },
+      { $or: [{ startedAt: { $ne: null } }, { attempt: { $gt: 1 } }, { status: "ended" }] },
+    ],
+  });
+  const mode: "callback" | "forkmate" = rangBefore ? "callback" : "forkmate";
+  const previous =
+    mode === "callback"
+      ? await calls.find({ $and: [workspaceFilter(workspaceId), { phone: input.phone, status: "ended" }] }).sort({ endedAt: -1 }).limit(1).next()
+      : null;
   const last = await calls.find(workspaceFilter(workspaceId), { projection: { order: 1 } }).sort({ order: -1 }).limit(1).next();
 
   const call: Call = {
@@ -82,6 +97,7 @@ export async function startInboundCall(
     vegetarianVegan: null,
     interestedInSystem: null,
     direction: "inbound",
+    inboundMode: mode,
     recording: null,
     error: null,
     simulated: false,
@@ -90,7 +106,9 @@ export async function startInboundCall(
 
   const meta = {
     ...callMetadata(call, settings),
-    openingLine: buildCallbackWelcome(settings, !!previous),
+    mode,
+    // The Forkmate greeting is the agent's (apps/agent/src/forkmate/script.js).
+    openingLine: mode === "forkmate" ? "" : buildCallbackWelcome(settings, !!previous),
     previousNote: previous ? previousNoteOf(previous) : null,
   };
   return { callId: call._id, meta };

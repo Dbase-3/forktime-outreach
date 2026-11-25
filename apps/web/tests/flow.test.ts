@@ -330,18 +330,41 @@ describe("the queue, as a dry run, outside calling hours", () => {
 });
 
 describe("an owner ringing the call-back number", () => {
-  it("with no earlier call, it is a fresh inbound call with the general welcome, and it never takes the dialling line", async () => {
+  it("a number we never rang reaches the Forkmate line, and it never takes the dialling line", async () => {
     await setup();
     const { startInboundCall } = await import("@/lib/inbound");
     const { getActiveCall, getCall } = await import("@/lib/calls-repo");
     const { callId, meta } = await startInboundCall({ phone: "+61889419999", calledNumber: "+14184313732", roomName: "room-1" });
     expect(meta.direction).toBe("inbound");
+    expect(meta.mode).toBe("forkmate");
     expect(meta.previousNote).toBeNull();
-    expect(meta.openingLine).toContain("you've reached Forktime");
-    expect(meta.openingLine).toContain("How can I help?");
+    // The agent holds the Forkmate greeting.
+    expect(meta.openingLine).toBe("");
     const call = await getCall(callId);
-    expect(call).toMatchObject({ direction: "inbound", status: "live", phone: "+61889419999", roomName: "room-1" });
+    expect(call).toMatchObject({ direction: "inbound", inboundMode: "forkmate", status: "live", phone: "+61889419999", roomName: "room-1" });
     expect(await getActiveCall()).toBeNull();
+  });
+
+  it("calling the Forkmate line again is still Forkmate: only a number we dialled is a call-back", async () => {
+    await setup();
+    const { startInboundCall } = await import("@/lib/inbound");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    const first = await startInboundCall({ phone: "+61889418888", calledNumber: "+14184313732", roomName: "room-a" });
+    await applyAgentEvent({ type: "ended", callId: first.callId, attempt: 1, outcome: "forkmate_booking", endReason: "agent_ended", summary: "Sarah asked for a birthday venue." });
+    const again = await startInboundCall({ phone: "+61889418888", calledNumber: "+14184313732", roomName: "room-b" });
+    expect(again.meta.mode).toBe("forkmate");
+  });
+
+  it("a restaurant Sara rang and missed is a call-back, even when nobody answered", async () => {
+    await setup();
+    const [first] = await add("+61889417777");
+    const { advanceQueue } = await import("@/lib/queue-runner");
+    const { applyAgentEvent } = await import("@/lib/agent-events");
+    await advanceQueue();
+    await applyAgentEvent({ type: "not_answered", callId: first._id, attempt: 1, detail: "It rang out." });
+    const { startInboundCall } = await import("@/lib/inbound");
+    const { meta } = await startInboundCall({ phone: "+61889417777", calledNumber: "+14184313732", roomName: "room-c" });
+    expect(meta.mode).toBe("callback");
   });
 
   it("after an earlier call to that number, it is told what was noted and welcomes them back", async () => {
@@ -357,6 +380,7 @@ describe("an owner ringing the call-back number", () => {
     });
     const { startInboundCall } = await import("@/lib/inbound");
     const { meta } = await startInboundCall({ phone: "+61889410001", calledNumber: "+14184313732", roomName: "room-2" });
+    expect(meta.mode).toBe("callback");
     expect(meta.openingLine).toContain("thanks for calling back");
     expect(meta.openingLine).toContain("I called earlier");
     expect(meta.previousNote).toContain("you only reached staff");

@@ -15,6 +15,9 @@ const AGENT_OUTCOMES = [
   "wrong_number",
   "do_not_call",
   "other",
+  // The Forkmate line (inbound callers we never rang): src/forkmate/tools.js.
+  "forkmate_booking",
+  "forkmate_venue",
 ];
 
 function filedOutcome({ outcome, ownerReached, callbackPermission }) {

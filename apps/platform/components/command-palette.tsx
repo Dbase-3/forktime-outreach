@@ -45,7 +45,7 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
     () => [
       ...pages.map((p) => ({ id: `page-${p.href}`, label: p.label, hint: "Page", href: p.href, icon: p.icon, group: "Go to" })),
       ...app.flows.map((f) => ({ id: f.id, label: f.name, hint: `${f.agent.name} · ${f.status === "live" ? "Live" : "Draft"}`, href: `/agents/${f.id}`, icon: Workflow, group: "Agents" })),
-      ...app.automations.map((a) => ({ id: a.id, label: a.name, hint: a.enabled ? "On" : "Off", href: `/automations/${a.id}`, icon: CalendarClock, group: "Automations" })),
+      ...app.campaigns.map((c) => ({ id: c.id, label: c.name, hint: c.status === "running" ? "Running" : c.status === "paused" ? "Paused" : "Draft", href: `/campaigns/${c.id}`, icon: CalendarClock, group: "Campaigns" })),
       ...app.contacts.map((c) => ({ id: c.id, label: c.name, hint: c.phone, href: `/contacts?open=${c.id}`, icon: User, group: "Contacts" })),
     ],
     [app, pages],
@@ -89,7 +89,7 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
           <Dialog.Title className="sr-only">Search</Dialog.Title>
           <div className="flex items-center gap-2.5 border-b border-line px-4">
             <Search size={15} className="text-fg-4" />
-            <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search agents, automations, contacts…" className="h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-fg-4 sm:text-sm" />
+            <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search agents, campaigns, contacts…" className="h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-fg-4 sm:text-sm" />
             <kbd className="kbd">esc</kbd>
           </div>
           <div className="max-h-[52vh] overflow-y-auto p-1.5">

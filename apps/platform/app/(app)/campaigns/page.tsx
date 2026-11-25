@@ -1,155 +1,93 @@
 "use client";
 
-import clsx from "clsx";
-import { Megaphone, Pause, Play, Plus } from "lucide-react";
-import { useState } from "react";
-import { newId } from "@/lib/flow-tree";
-import { WEEKDAYS, hourLabel } from "@/lib/format";
-import { nowIso, update, useApp } from "@/lib/store";
+import { Megaphone, Pause, Play, Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { audienceOf, campaignIssues, defaultCampaign, describeTrigger } from "@/lib/campaign";
+import { update, useApp } from "@/lib/store";
 import type { Campaign } from "@/lib/types";
-import { Badge, EmptyState, Field, PageHeader, Sheet, type Tone } from "@/components/ui";
-
-const STATUS: Record<Campaign["status"], { label: string; tone: Tone }> = {
-  draft: { label: "Draft", tone: "gray" },
-  running: { label: "Running", tone: "green" },
-  paused: { label: "Paused", tone: "amber" },
-  done: { label: "Done", tone: "brand" },
-};
+import { STATUS } from "@/components/campaign/campaign-editor";
+import { Badge, EmptyState, PageHeader } from "@/components/ui";
 
 export default function CampaignsPage() {
   const app = useApp();
-  const [creating, setCreating] = useState(false);
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  const create = () => {
+    const agent = app.flows.find((f) => f.status === "live") ?? app.flows[0];
+    const campaign = defaultCampaign(agent?.id ?? "");
+    update((s) => ({ ...s, campaigns: [campaign, ...s.campaigns] }));
+    router.push(`/campaigns/${campaign.id}`);
+  };
+  // Home's "Start a campaign" links here with ?new=1. Once only: effects run twice in development.
+  const handled = useRef(false);
+  useEffect(() => {
+    if (handled.current || new URLSearchParams(window.location.search).get("new") !== "1") return;
+    handled.current = true;
+    create();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setStatus = (id: string, status: Campaign["status"]) => update((s) => ({ ...s, campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, status } : c)) }));
-  const newButton = (
-    <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
-      <Plus size={16} /> New campaign
-    </button>
-  );
+  const q = query.trim().toLowerCase();
+  const shown = app.campaigns.filter((c) => !q || c.name.toLowerCase().includes(q));
+  const newButton = <button type="button" className="btn-primary" onClick={create}><Plus size={15} /> New campaign</button>;
 
   return (
     <div>
-      <PageHeader title="Campaigns" subtitle="Call a whole list once, inside your calling hours." actions={newButton} />
+      <PageHeader title="Campaigns" subtitle="Pick an agent, who to call and when. Calls can go out once, or keep going as people qualify." actions={newButton} />
       {app.campaigns.length === 0 ? (
-        <EmptyState icon={<Megaphone size={22} />} title="No campaigns yet" body="Pick a list and a flow, and the calls go out one after another." action={newButton} />
+        <EmptyState icon={<Megaphone size={20} />} title="No campaigns yet" body="A campaign is an agent, a list of people and calling hours. Everything else is up to you." action={newButton} />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {app.campaigns.map((campaign) => {
-            const flow = app.flows.find((f) => f.id === campaign.flowId);
-            const pct = campaign.total ? Math.round((campaign.called / campaign.total) * 100) : 0;
-            const status = STATUS[campaign.status];
-            return (
-              <div key={campaign.id} className="card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate font-semibold">{campaign.name}</h3>
-                    <p className="truncate text-sm text-fg-3">{campaign.group} · {flow?.name}</p>
-                  </div>
-                  <Badge tone={status.tone} dot>{status.label}</Badge>
-                </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-fg-3">
-                  <span>{campaign.called} of {campaign.total} called · {campaign.answered} answered</span>
-                  <span>{pct}%</span>
-                </div>
-                <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
-                  <span className="text-xs text-fg-4">
-                    {campaign.days.map((d) => WEEKDAYS[d]).join(" ")} · {hourLabel(campaign.startHour)}–{hourLabel(campaign.endHour)}
-                  </span>
-                  {campaign.status === "running" && (
-                    <button type="button" className="btn-secondary h-8 px-3 text-xs" onClick={() => setStatus(campaign.id, "paused")}><Pause size={14} /> Pause</button>
-                  )}
-                  {(campaign.status === "paused" || campaign.status === "draft") && (
-                    <button type="button" className="btn-primary h-8 px-3 text-xs" onClick={() => setStatus(campaign.id, "running")}><Play size={14} /> {campaign.status === "draft" ? "Start" : "Resume"}</button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <>
+          <div className="relative mb-3 sm:w-72">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-4" />
+            <input className="field pl-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search campaigns" />
+          </div>
+          <div className="card overflow-hidden">
+            <table className="w-full table-fixed text-sm">
+              <thead className="bg-subtle/60 text-left">
+                <tr>
+                  <th className="metric-label px-4 py-2.5 font-normal">Campaign</th>
+                  <th className="metric-label hidden w-56 px-4 py-2.5 font-normal lg:table-cell">Calls</th>
+                  <th className="metric-label hidden w-32 px-4 py-2.5 font-normal md:table-cell">Audience</th>
+                  <th className="metric-label hidden w-32 px-4 py-2.5 font-normal sm:table-cell">Answered</th>
+                  <th className="metric-label w-40 px-4 py-2.5 text-right font-normal">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {shown.map((c) => {
+                  const agent = app.flows.find((f) => f.id === c.agentId);
+                  const blocked = campaignIssues(c, app.flows)[0];
+                  return (
+                    <tr key={c.id} onClick={() => router.push(`/campaigns/${c.id}`)} className="cursor-pointer transition-colors hover:bg-subtle">
+                      <td className="px-4 py-3">
+                        <Link href={`/campaigns/${c.id}`} onClick={(e) => e.stopPropagation()} className="block truncate font-medium">{c.name}</Link>
+                        <span className="block truncate text-xs text-fg-3">{agent?.name ?? "No agent"} · {c.audience.list ?? "All contacts"}</span>
+                      </td>
+                      <td className="hidden truncate px-4 py-3 text-fg-2 lg:table-cell">{c.mode === "always" ? describeTrigger(c.trigger, app.fieldDefs) : "Everyone once"}</td>
+                      <td className="hidden px-4 py-3 font-mono text-xs md:table-cell">{audienceOf(c, app.contacts).length}</td>
+                      <td className="hidden px-4 py-3 font-mono text-xs sm:table-cell">{c.answered} / {c.called}</td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <span className="inline-flex items-center gap-2">
+                          <Badge tone={STATUS[c.status].tone} dot>{STATUS[c.status].label}</Badge>
+                          {c.status === "running" ? (
+                            <button type="button" className="btn-icon h-7 w-7" onClick={() => setStatus(c.id, "paused")} aria-label="Pause"><Pause size={14} /></button>
+                          ) : (
+                            <button type="button" className="btn-icon h-7 w-7" disabled={Boolean(blocked)} title={blocked} onClick={() => setStatus(c.id, "running")} aria-label="Start"><Play size={14} /></button>
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
-      <NewCampaignSheet open={creating} onClose={() => setCreating(false)} />
     </div>
-  );
-}
-
-function NewCampaignSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const app = useApp();
-  const groups = [...new Set(app.contacts.flatMap((c) => c.groups))];
-  const flows = app.flows.filter((f) => f.direction !== "inbound");
-  const [draft, setDraft] = useState({ name: "", flowId: flows[0]?.id ?? "", group: groups[0] ?? "", days: app.settings.callingDays, startHour: app.settings.callingStart, endHour: app.settings.callingEnd, retries: 1 });
-  const size = app.contacts.filter((c) => c.groups.includes(draft.group)).length;
-  const ready = draft.name.trim() && draft.flowId && draft.group && draft.days.length > 0 && draft.endHour > draft.startHour;
-  const save = (status: Campaign["status"]) => {
-    if (!ready) return;
-    const campaign: Campaign = { id: newId("cmp"), name: draft.name.trim(), flowId: draft.flowId, group: draft.group, status, days: draft.days, startHour: draft.startHour, endHour: draft.endHour, retries: draft.retries, total: size, called: 0, answered: 0, createdAt: nowIso() };
-    update((s) => ({ ...s, campaigns: [campaign, ...s.campaigns] }));
-    onClose();
-  };
-  const toggleDay = (d: number) => setDraft({ ...draft, days: draft.days.includes(d) ? draft.days.filter((x) => x !== d) : [...draft.days, d].sort() });
-  const hours = Array.from({ length: 24 }, (_, h) => h);
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="New campaign"
-      wide
-      footer={
-        <div className="flex gap-2">
-          <button type="button" className="btn-secondary flex-1" disabled={!ready} onClick={() => save("draft")}>Save draft</button>
-          <button type="button" className="btn-primary flex-1" disabled={!ready} onClick={() => save("running")}>Start calling {size > 0 && `${size} people`}</button>
-        </div>
-      }
-    >
-      <div className="space-y-5">
-        <Field label="Name"><input className="field" autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Winter service offer" /></Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Who to call">
-            <select className="field" value={draft.group} onChange={(e) => setDraft({ ...draft, group: e.target.value })}>
-              {groups.map((g) => <option key={g}>{g}</option>)}
-            </select>
-          </Field>
-          <Field label="Flow">
-            <select className="field" value={draft.flowId} onChange={(e) => setDraft({ ...draft, flowId: e.target.value })}>
-              {flows.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </select>
-          </Field>
-        </div>
-        <div>
-          <span className="label">Days</span>
-          <div className="flex flex-wrap gap-1.5">
-            {WEEKDAYS.map((day, d) => (
-              <button key={day} type="button" onClick={() => toggleDay(d)} className={clsx("h-9 w-11 rounded-lg border text-sm font-medium transition", draft.days.includes(d) ? "border-accent bg-accent/10 text-accent" : "border-line text-fg-3 hover:bg-subtle")}>
-                {day}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Field label="From">
-            <select className="field" value={draft.startHour} onChange={(e) => setDraft({ ...draft, startHour: Number(e.target.value) })}>
-              {hours.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
-            </select>
-          </Field>
-          <Field label="Until">
-            <select className="field" value={draft.endHour} onChange={(e) => setDraft({ ...draft, endHour: Number(e.target.value) })}>
-              {hours.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
-            </select>
-          </Field>
-          <div className="col-span-2 sm:col-span-1">
-            <Field label="No answer? Try again">
-              <select className="field" value={draft.retries} onChange={(e) => setDraft({ ...draft, retries: Number(e.target.value) })}>
-                {[0, 1, 2, 3].map((n) => <option key={n} value={n}>{n === 0 ? "Don't retry" : `${n} more ${n === 1 ? "time" : "times"}`}</option>)}
-              </select>
-            </Field>
-          </div>
-        </div>
-        <p className="rounded-lg bg-subtle p-3 text-xs leading-relaxed text-fg-3">
-          Hours are each person&rsquo;s own local time. Numbers on your do-not-call list are skipped, and anyone who says &ldquo;don&rsquo;t call me&rdquo; is added to it automatically.
-        </p>
-      </div>
-    </Sheet>
   );
 }

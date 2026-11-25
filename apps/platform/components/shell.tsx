@@ -5,7 +5,7 @@
 
 import clsx from "clsx";
 import {
-  AudioLines, BookOpen, CalendarClock, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
+  AudioLines, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -37,8 +37,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
     title: "Build",
     items: [
       { href: "/agents", label: "Agents", icon: Workflow, tab: true },
-      { href: "/automations", label: "Automations", icon: CalendarClock, tab: true },
-      { href: "/campaigns", label: "Campaigns", icon: Megaphone, tab: false },
+      { href: "/campaigns", label: "Campaigns", icon: Megaphone, tab: true },
       { href: "/knowledge", label: "Knowledge", icon: BookOpen, tab: false },
     ],
   },
@@ -53,7 +52,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
 ];
 
 const NAV = NAV_GROUPS.flatMap((group) => group.items);
-const TABS = ["/", "/agents", "/automations", "/calls"].map((href) => NAV.find((item) => item.href === href) as NavItem);
+const TABS = ["/", "/agents", "/campaigns", "/calls"].map((href) => NAV.find((item) => item.href === href) as NavItem);
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";

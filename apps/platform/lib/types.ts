@@ -138,45 +138,52 @@ export interface DataSource {
   status: "synced" | "syncing" | "error";
 }
 
-// ---- Automations: when a call happens on its own ----
+// ---- Campaigns: who to call, with which agent, when, and what happens after ----
 
+/** What starts a call in a campaign that keeps running ("always on"). */
 export type Trigger =
-  | { kind: "date_field"; field: string; offsetDays: number; when: "after" | "before" }
+  | { kind: "added" } // a contact joins the audience (new CRM record, import, added by hand)
+  | { kind: "date_field"; field: string; offsetDays: number; when: "after" | "before" | "on" }
   | { kind: "field_change"; field: string; becomes: string }
-  | { kind: "new_contact"; group?: string }
-  | { kind: "schedule"; every: "day" | "week" | "month"; time: string }
-  | { kind: "call_outcome"; flowId: string; outcome: string };
+  | { kind: "schedule"; every: "day" | "week" | "month"; time: string };
 
 export interface FollowUp {
-  outcome: string; // when the call ends with this outcome…
-  thenDays: number; // …call again after this many days (0 = no follow-up)
-}
-
-export interface Automation {
   id: string;
-  name: string;
-  enabled: boolean;
-  trigger: Trigger;
-  conditions: Condition[];
-  flowId: string;
-  followUps: FollowUp[];
-  maxCallsPerWeek: number;
-  updatedAt: string;
+  outcome: string; // when a call ends with this outcome…
+  action: "call" | "text";
+  afterDays: number;
+  agentId?: string; // call: which agent (default: the campaign's)
+  text?: string; // text: the message
 }
 
-// ---- Campaigns: a one-off batch ----
+export interface WriteBack {
+  from: string; // a key the agent collects
+  to: string; // a contact field key
+}
 
 export interface Campaign {
   id: string;
   name: string;
-  flowId: string;
-  group: string;
+  agentId: string;
   status: "draft" | "running" | "paused" | "done";
+  mode: "once" | "always"; // call the audience once, or keep calling as contacts qualify
+  audience: { list: string | null; filter: ConditionGroup };
+  trigger: Trigger; // used when mode is "always"
+  startAt: string | null; // once: null = as soon as it's started
   days: number[]; // 0 = Sunday
   startHour: number;
   endHour: number;
-  retries: number;
-  total: number;
+  contactTimezone: boolean; // hours in each contact's own time zone
+  concurrent: number; // calls at the same time
+  attempts: number; // tries per contact when nobody answers
+  retryHours: number;
+  voicemail: "hang_up" | "leave_message";
+  voicemailText: string;
+  maxPerWeek: number; // calls per contact per week, across this campaign
+  followUps: FollowUp[];
+  writeBacks: WriteBack[];
+  logTo: string[]; // integration ids that get each call (CRM log, Slack…)
+  webhook: string;
   called: number;
   answered: number;
   createdAt: string;
@@ -247,7 +254,6 @@ export interface AppState {
   version: number;
   flows: Flow[];
   knowledge: KnowledgeDoc[];
-  automations: Automation[];
   contacts: Contact[];
   fieldDefs: FieldDef[];
   sources: DataSource[];

@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Plus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
-import { upcomingCalls } from "@/lib/automation";
+import { upcomingCalls } from "@/lib/campaign";
 import { dayLabel, duration, humanize, relativeTime } from "@/lib/format";
 import { agentStats, answered, callsPerDay, isWin, totals } from "@/lib/stats";
 import { useApp } from "@/lib/store";
@@ -70,7 +70,7 @@ function StatusStrip({ app, now }: { app: AppState; now: Date }) {
 const ACTIONS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/agents?new=1", label: "Create an agent", icon: Plus },
   { href: "/contacts", label: "Add contacts", icon: Users },
-  { href: "/automations", label: "Call people automatically", icon: CalendarClock },
+  { href: "/campaigns?new=1", label: "Start a campaign", icon: CalendarClock },
   { href: "/integrations", label: "Connect your calendar", icon: CalendarCheck },
 ];
 
@@ -274,13 +274,13 @@ function Outcomes({ calls }: { calls: Call[] }) {
 }
 
 function NextUp({ app, now }: { app: AppState; now: Date }) {
-  const upcoming = app.automations
-    .filter((a) => a.enabled)
-    .flatMap((a) => upcomingCalls(a, app.contacts, now, 30).map((p) => ({ ...p, automation: a })))
+  const upcoming = app.campaigns
+    .filter((c) => c.status === "running")
+    .flatMap((c) => upcomingCalls(c, app.contacts, now, 30).map((p) => ({ ...p, automation: c })))
     .sort((a, b) => a.due.getTime() - b.due.getTime())
     .slice(0, 5);
   return (
-    <Panel title="Next up" href="/automations">
+    <Panel title="Next up" href="/campaigns">
       <div className="divide-y divide-line">
         {upcoming.length === 0 && <p className="px-4 py-3 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
         {upcoming.map(({ contact, due, automation }) => (

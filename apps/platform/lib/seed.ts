@@ -1,12 +1,13 @@
 // A sample workspace so every page has something real-looking to show.
 // Dates are relative to "now" so the automation preview always has upcoming calls.
 
+import { defaultCampaign } from "./campaign";
 import { outcomesOf } from "./flow-tree";
 import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 7;
+export const SEED_VERSION = 8;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -225,30 +226,6 @@ export function seedState(now = new Date()): AppState {
         updatedAt: isoDay(now, -8),
       },
     ],
-    automations: [
-      {
-        id: "a_service",
-        name: "One-month service check",
-        enabled: true,
-        trigger: { kind: "date_field", field: "purchase_date", offsetDays: 30, when: "after" },
-        conditions: [],
-        flowId: service.id,
-        followUps: [{ outcome: "not_now", thenDays: 90 }],
-        maxCallsPerWeek: 1,
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: "a_lead",
-        name: "Call new web leads",
-        enabled: false,
-        trigger: { kind: "new_contact", group: "Web leads" },
-        conditions: [],
-        flowId: lead.id,
-        followUps: [{ outcome: "needs_decision_maker", thenDays: 2 }],
-        maxCallsPerWeek: 2,
-        updatedAt: now.toISOString(),
-      },
-    ],
     contacts,
     fieldDefs: [
       { key: "first_name", label: "First name", type: "text", source: "src_hubspot" },
@@ -266,18 +243,50 @@ export function seedState(now = new Date()): AppState {
     ],
     campaigns: [
       {
-        id: "cmp_1",
-        name: "Spring service offer",
-        flowId: service.id,
-        group: "Buyers 2026",
-        status: "paused",
-        days: [1, 2, 3, 4, 5],
+        ...defaultCampaign(service.id, now),
+        id: "cmp_service",
+        name: "One-month service check",
+        status: "running",
+        mode: "always",
+        audience: { list: "Buyers 2026", filter: { match: "all", rules: [] } },
+        trigger: { kind: "date_field", field: "purchase_date", offsetDays: 30, when: "after" },
+        days: [1, 2, 3, 4, 5, 6],
         startHour: 9,
-        endHour: 18,
-        retries: 2,
-        total: 8,
-        called: 5,
-        answered: 3,
+        endHour: 19,
+        followUps: [{ id: "fu_1", outcome: "not_now", action: "call", afterDays: 90 }],
+        writeBacks: [{ from: "wants_service", to: "wants_service" }],
+        logTo: ["hubspot", "slack"],
+        called: 41,
+        answered: 33,
+        createdAt: isoDay(now, -30),
+      },
+      {
+        ...defaultCampaign(lead.id, now),
+        id: "cmp_leads",
+        name: "Call new web leads",
+        status: "paused",
+        mode: "always",
+        audience: { list: "Web leads", filter: { match: "all", rules: [] } },
+        trigger: { kind: "added" },
+        days: [0, 1, 2, 3, 4, 5, 6],
+        startHour: 8,
+        endHour: 20,
+        concurrent: 3,
+        followUps: [{ id: "fu_2", outcome: "needs_decision_maker", action: "call", afterDays: 2 }],
+        logTo: ["hubspot"],
+        called: 12,
+        answered: 9,
+        createdAt: isoDay(now, -12),
+      },
+      {
+        ...defaultCampaign(service.id, now),
+        id: "cmp_spring",
+        name: "Spring service offer",
+        status: "running",
+        mode: "once",
+        audience: { list: "Buyers 2026", filter: { match: "all", rules: [{ field: "tier", op: "any_of", value: "Gold, Platinum" }] } },
+        called: 14,
+        answered: 10,
         createdAt: isoDay(now, -6),
       },
     ],

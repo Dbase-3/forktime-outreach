@@ -15,6 +15,9 @@
   --fg-3: 113 113 122;
   --fg-4: 161 161 170;
   --accent: 94 106 210;
+  /* Chart series (validated light pair: dataviz palette slots 1-2). */
+  --series-1: 42 120 214;
+  --series-2: 235 104 52;
   color-scheme: light;
 }
 
@@ -30,6 +33,8 @@
   --fg-3: 139 139 148;
   --fg-4: 92 92 101;
   --accent: 129 140 248;
+  --series-1: 57 135 229;
+  --series-2: 217 89 38;
   color-scheme: dark;
 }
 
@@ -84,8 +89,28 @@ body {
     @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-line bg-subtle px-1 font-mono text-2xs text-fg-3;
   }
   .eyebrow {
-    @apply text-2xs font-medium uppercase tracking-[0.08em] text-fg-4;
+    @apply font-mono text-2xs font-medium uppercase tracking-[0.08em] text-fg-4;
   }
+  /* LiveKit-style metric label: small, mono, upper case. */
+  .metric-label {
+    @apply font-mono text-2xs uppercase tracking-[0.08em] text-fg-3;
+  }
+}
+
+/* Loading placeholder: a soft sweep across a muted bar. */
+.skeleton {
+  background: linear-gradient(90deg, rgb(var(--muted)) 0%, rgb(var(--subtle)) 50%, rgb(var(--muted)) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 /* Room for the phone's home bar under the bottom tabs. */

@@ -52,8 +52,8 @@ export default function CallsPage() {
                   <span className="mt-0.5 block text-xs text-fg-4">{flow?.name} · {duration(call.durationSec)}</span>
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-1.5">
-                  <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>
-                  <span className="text-xs text-fg-4">{relativeTime(call.startedAt)}</span>
+                  {call.live ? <Badge tone="green" dot>Live</Badge> : <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>}
+                  <span className="text-xs text-fg-4">{call.live ? "Now" : relativeTime(call.startedAt)}</span>
                 </span>
               </button>
             );

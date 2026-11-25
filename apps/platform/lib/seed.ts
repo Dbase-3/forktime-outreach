@@ -1,8 +1,12 @@
 // A sample workspace so every page has something real-looking to show.
 // Dates are relative to "now" so the automation preview always has upcoming calls.
 
+import { outcomesOf } from "./flow-tree";
 import { TEMPLATES, flowFromTemplate } from "./templates";
-import type { AppState, Call, Contact } from "./types";
+import type { AppState, Call, Contact, Flow } from "./types";
+
+/** Bump when the sample changes shape, so saved browsers pick up the new one. */
+export const SEED_VERSION = 2;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -99,8 +103,27 @@ export function seedState(now = new Date()): AppState {
     },
   ];
 
+  const live: Call = {
+    id: "call_live",
+    contactId: "c_2",
+    flowId: service.id,
+    direction: "outbound",
+    startedAt: new Date(now.getTime() - 41 * 1000).toISOString(),
+    durationSec: 41,
+    outcome: "in_progress",
+    summary: "On the call now: checking in on James's RAV4.",
+    saved: { all_good: "yes" },
+    transcript: [
+      { who: "agent", text: "Hi James, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
+      { who: "caller", text: "Yep, go ahead." },
+      { who: "agent", text: "It's been about a month since you picked up your RAV4, so we're checking in. Is everything running well so far?" },
+      { who: "caller", text: "Yeah, all good." },
+    ],
+    live: true,
+  };
+
   return {
-    version: 1,
+    version: SEED_VERSION,
     flows: [service, lead, desk],
     automations: [
       {
@@ -149,7 +172,7 @@ export function seedState(now = new Date()): AppState {
         createdAt: isoDay(now, -6),
       },
     ],
-    calls,
+    calls: [live, ...calls, ...sampleHistory(now, [service, lead, desk], contacts)],
     integrations: [
       { id: "hubspot", connected: false },
       { id: "gohighlevel", connected: false },
@@ -169,4 +192,54 @@ export function seedState(now = new Date()): AppState {
       doNotCall: [],
     },
   };
+}
+
+// ---- Two weeks of earlier calls, for the charts and agent cards ----
+
+const SUMMARIES: Record<string, string> = {
+  service_booked: "Happy with the car and booked a first service.",
+  not_now: "All fine, no service yet. Follow-up scheduled.",
+  meeting_booked: "Qualified and booked a call with sales.",
+  needs_decision_maker: "Interested, but someone else decides. Follow-up set.",
+  transferred: "Asked for a person and was put through.",
+  message_taken: "Left a message for the team.",
+};
+
+/** A small, fixed pseudo-random sequence so the sample is the same on every load. */
+function sequence(seed: number): () => number {
+  let x = seed;
+  return () => {
+    x = (x * 1103515245 + 12345) % 2147483648;
+    return x / 2147483648;
+  };
+}
+
+function sampleHistory(now: Date, flows: Flow[], contacts: Contact[]): Call[] {
+  const rand = sequence(7);
+  const calls: Call[] = [];
+  for (let day = 13; day >= 1; day--) {
+    const weekend = new Date(now.getTime() - day * DAY).getDay() % 6 === 0;
+    const count = Math.round((weekend ? 3 : 7) + rand() * 7);
+    for (let i = 0; i < count; i++) {
+      const flow = flows[Math.floor(rand() * flows.length)];
+      const outcomes = outcomesOf(flow);
+      const outcome = rand() < 0.14 ? "no_answer" : outcomes[Math.floor(rand() * outcomes.length)];
+      const contact = contacts[Math.floor(rand() * contacts.length)];
+      const start = new Date(now.getTime() - day * DAY);
+      start.setHours(9 + Math.floor(rand() * 9), Math.floor(rand() * 60), 0, 0);
+      calls.push({
+        id: `call_h${day}_${i}`,
+        contactId: contact.id,
+        flowId: flow.id,
+        direction: flow.direction === "inbound" ? "inbound" : "outbound",
+        startedAt: start.toISOString(),
+        durationSec: outcome === "no_answer" ? 0 : Math.round(35 + rand() * 180),
+        outcome,
+        summary: outcome === "no_answer" ? "No answer." : SUMMARIES[outcome] ?? "Call completed.",
+        saved: {},
+        transcript: [],
+      });
+    }
+  }
+  return calls;
 }

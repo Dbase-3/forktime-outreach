@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { FileUp, Plus, Search, SlidersHorizontal, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "@/lib/store";
 import { AddContactSheet, ContactSheet, FieldsSheet, ImportSheet } from "@/components/contacts/contact-sheets";
 import { Avatar, EmptyState, PageHeader } from "@/components/ui";
@@ -15,6 +15,11 @@ export default function ContactsPage() {
   const [group, setGroup] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Search (⌘K) links here with ?open=<id>.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("open");
+    if (id) setOpenId(id);
+  }, []);
   const groups = [...new Set(app.contacts.flatMap((c) => c.groups))];
   const q = query.trim().toLowerCase();
   const shown = app.contacts.filter((c) => (!group || c.groups.includes(group)) && (!q || `${c.name} ${c.phone} ${c.email ?? ""}`.toLowerCase().includes(q)));

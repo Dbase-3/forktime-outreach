@@ -126,6 +126,7 @@ export interface Call {
   summary: string;
   saved: Record<string, string>;
   transcript: { who: "agent" | "caller"; text: string }[];
+  live?: boolean; // the call is happening right now
 }
 
 // ---- Workspace ----

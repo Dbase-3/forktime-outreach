@@ -3,13 +3,14 @@
 import clsx from "clsx";
 import { AlertTriangle, ArrowLeft, CheckCircle2, MessageSquareText, Play } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  TOP, allSteps, askedFields, findStep, flowIssues, insertStep, makeStep, moveStep, removeStep, updateStep, type Container,
+  TOP, allSteps, askedFields, countSteps, findStep, flowIssues, insertStep, makeStep, moveStep, removeStep, updateStep, type Container,
 } from "@/lib/flow-tree";
 import { nowIso, update, useApp } from "@/lib/store";
 import type { Direction, Flow, Step } from "@/lib/types";
-import { Badge, EmptyState, Field, Segmented } from "../ui";
+import { Badge, EmptyState, Field, Segmented, Sheet } from "../ui";
+import { FlowCanvas } from "./flow-canvas";
 import { PracticeSheet } from "./practice-sheet";
 import { StepList, type StepListContext } from "./step-list";
 import { AddStepSheet, StepSheet, type NewStepChoice } from "./step-sheet";
@@ -133,29 +134,29 @@ function StepsTab({ flow, issues, onEdit }: { flow: Flow; issues: ReturnType<typ
     setSelectedId(step.id);
   };
 
-  return (
-    <div className="mx-auto max-w-3xl">
-      {issues.length > 0 && <IssueList issues={issues} onSelect={setSelectedId} />}
-      <div className="card overflow-hidden focus-within:border-fg-3">
-        <div className="flex items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-2xs font-medium uppercase tracking-[0.06em] text-fg-3">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          </span>
-          Call starts · the agent says
-        </div>
-        <textarea
-          className="block w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none"
-          rows={3}
-          value={flow.greeting}
-          onChange={(e) => onEdit((f) => ({ ...f, greeting: e.target.value }))}
-          aria-label="Greeting"
-        />
-        <p className="px-3 pb-2.5 text-2xs text-fg-4">Keep &ldquo;AI assistant&rdquo; and &ldquo;recorded&rdquo; in the greeting: callers must be told.</p>
-      </div>
-      <StepList steps={flow.steps} container={TOP} depth={0} ctx={ctx} />
-      {flow.steps.length === 0 && <p className="text-center text-sm text-fg-3">Tap + to add the first step.</p>}
+  const [mode, setMode] = useDefaultView();
+  const [greetingOpen, setGreetingOpen] = useState(false);
 
+  return (
+    <div className={clsx(mode === "list" && "mx-auto max-w-3xl")}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <Segmented<ViewMode> value={mode} onChange={setMode} options={[{ value: "canvas", label: "Canvas" }, { value: "list", label: "List" }]} />
+        <span className="hidden text-xs text-fg-4 sm:inline">{countSteps(flow.steps)} steps · click a box to edit it, + to add</span>
+      </div>
+      {issues.length > 0 && <IssueList issues={issues} onSelect={setSelectedId} />}
+      {mode === "canvas" ? (
+        <FlowCanvas steps={flow.steps} greeting={flow.greeting} ctx={ctx} onAddAt={(at) => setAdding(at)} onEditGreeting={() => setGreetingOpen(true)} />
+      ) : (
+        <>
+          <GreetingCard greeting={flow.greeting} onChange={(greeting) => onEdit((f) => ({ ...f, greeting }))} />
+          <StepList steps={flow.steps} container={TOP} depth={0} ctx={ctx} />
+          {flow.steps.length === 0 && <p className="text-center text-sm text-fg-3">Tap + to add the first step.</p>}
+        </>
+      )}
+
+      <Sheet open={greetingOpen} onClose={() => setGreetingOpen(false)} title="Start of the call" footer={<button type="button" className="btn-primary w-full" onClick={() => setGreetingOpen(false)}>Done</button>}>
+        <GreetingCard greeting={flow.greeting} onChange={(greeting) => onEdit((f) => ({ ...f, greeting }))} />
+      </Sheet>
       <AddStepSheet open={adding !== null} onClose={() => setAdding(null)} onPick={pick} />
       <StepSheet
         step={selected}
@@ -174,10 +175,43 @@ function StepsTab({ flow, issues, onEdit }: { flow: Flow; issues: ReturnType<typ
   );
 }
 
+type ViewMode = "canvas" | "list";
+
+/** Canvas on wide screens, list on phones; the person can switch either way. */
+function useDefaultView(): [ViewMode, (m: ViewMode) => void] {
+  const [mode, setMode] = useState<ViewMode>("list");
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 768px)").matches) setMode("canvas");
+  }, []);
+  return [mode, setMode];
+}
+
+function GreetingCard({ greeting, onChange }: { greeting: string; onChange: (greeting: string) => void }) {
+  return (
+    <div className="card overflow-hidden focus-within:border-fg-3">
+      <div className="flex items-center gap-2 border-b border-line bg-subtle px-3 py-2 font-mono text-2xs uppercase tracking-[0.06em] text-fg-3">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+          <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        </span>
+        Call starts · the agent says
+      </div>
+      <textarea
+        className="block w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none"
+        rows={3}
+        value={greeting}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Greeting"
+      />
+      <p className="px-3 pb-2.5 text-2xs text-fg-4">Keep &ldquo;AI assistant&rdquo; and &ldquo;recorded&rdquo; in the greeting: callers must be told.</p>
+    </div>
+  );
+}
+
 function IssueList({ issues, onSelect }: { issues: ReturnType<typeof flowIssues>; onSelect: (id: string) => void }) {
   return (
     <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 dark:text-amber-400 dark:text-amber-300">
+      <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
         <AlertTriangle size={16} /> {issues.length === 1 ? "1 thing to fix before going live" : `${issues.length} things to fix before going live`}
       </div>
       <ul className="mt-2 space-y-1">
@@ -187,7 +221,7 @@ function IssueList({ issues, onSelect }: { issues: ReturnType<typeof flowIssues>
               type="button"
               disabled={!issue.stepId}
               onClick={() => issue.stepId && onSelect(issue.stepId)}
-              className={clsx("text-left text-sm text-amber-600 dark:text-amber-400 dark:text-amber-300", issue.stepId && "underline decoration-amber-300 underline-offset-2 hover:decoration-amber-600")}
+              className={clsx("text-left text-sm text-amber-800 dark:text-amber-200", issue.stepId && "underline decoration-amber-300 underline-offset-2 hover:decoration-amber-600")}
             >
               {issue.message}
             </button>

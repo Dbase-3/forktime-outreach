@@ -1,11 +1,12 @@
 "use client";
 
-// The frame around every page: a sidebar on desktop, a top bar plus bottom tabs
-// on phones. The four most-used pages sit in the tabs; the rest under "More".
+// The frame around every page. Desktop: sidebar (with your agents nested under
+// Flows, like LiveKit) and a breadcrumb bar. Phones: top bar plus bottom tabs.
+// ⌘K search works everywhere.
 
 import clsx from "clsx";
 import {
-  AudioLines, CalendarClock, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Settings, Sun, Users, Workflow,
+  AudioLines, CalendarClock, ChevronRight, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -13,6 +14,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "@/lib/store";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
+import type { AppState } from "@/lib/types";
+import { CommandPalette, useCommandPalette } from "./command-palette";
+import { SkeletonFor } from "./skeleton";
 import { Sheet } from "./ui";
 
 interface NavItem {
@@ -58,31 +62,25 @@ function isActive(pathname: string, href: string): boolean {
 
 export function Shell({ children }: { children: ReactNode }) {
   const mounted = useMounted();
+  const pathname = usePathname();
+  const [searchOpen, setSearchOpen] = useCommandPalette();
   return (
     <div className="min-h-dvh lg:pl-60">
-      <Sidebar />
-      <MobileTopBar />
-      <main className="mx-auto w-full max-w-[1120px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-9">{mounted ? children : <PageSkeleton />}</main>
+      <Sidebar onSearch={() => setSearchOpen(true)} />
+      <MobileTopBar onSearch={() => setSearchOpen(true)} />
+      {mounted && <Breadcrumbs />}
+      <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-8">{mounted ? children : <SkeletonFor pathname={pathname} />}</main>
       <BottomTabs />
+      {mounted && <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} pages={NAV} />}
     </div>
   );
 }
 
-/** The workspace lives in this browser, so pages render after mount (no flash of sample data). */
+/** The workspace lives in this browser, so pages render after mount; until then each page shows its skeleton. */
 function useMounted(): boolean {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted;
-}
-
-function PageSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="h-7 w-40 rounded-md bg-muted" />
-      <div className="h-28 rounded-xl bg-subtle" />
-      <div className="h-28 rounded-xl bg-subtle" />
-    </div>
-  );
 }
 
 function Brand() {
@@ -96,43 +94,79 @@ function Brand() {
   );
 }
 
-function Sidebar() {
+// ---- Desktop sidebar ----
+
+function Sidebar({ onSearch }: { onSearch: () => void }) {
   const pathname = usePathname();
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-line bg-background lg:flex">
-      <div className="flex h-14 items-center px-5">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-background lg:flex">
+      <div className="flex h-12 items-center border-b border-line px-4">
         <Brand />
       </div>
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 pt-2">
+      <div className="px-3 pt-3">
+        <button type="button" onClick={onSearch} className="flex h-8 w-full items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-sm text-fg-4 transition-colors hover:border-line-strong hover:text-fg-3">
+          <Search size={14} />
+          <span className="flex-1 text-left">Search</span>
+          <kbd className="kbd">⌘K</kbd>
+        </button>
+      </div>
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 pt-4">
         {NAV_GROUPS.map((group, i) => (
           <div key={group.title ?? i}>
             {group.title && <div className="eyebrow mb-1.5 px-2.5">{group.title}</div>}
             <div className="space-y-px">
-              {group.items.map(({ href, label, icon: Icon }) => {
-                const active = isActive(pathname, href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={clsx(
-                      "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors",
-                      active ? "bg-muted font-medium text-fg" : "text-fg-3 hover:bg-subtle hover:text-fg",
-                    )}
-                  >
-                    <Icon size={16} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-fg" : "text-fg-4"} />
-                    {label}
-                  </Link>
-                );
-              })}
+              {group.items.map((item) => (
+                <div key={item.href}>
+                  <NavLink item={item} active={isActive(pathname, item.href)} exact={pathname === item.href} />
+                  {item.href === "/flows" && <AgentList pathname={pathname} />}
+                </div>
+              ))}
             </div>
           </div>
         ))}
       </nav>
-      <div className="space-y-3 border-t border-line p-3">
+      <div className="space-y-2 border-t border-line p-3">
         <ThemeSwitch />
         <WorkspaceCard />
       </div>
     </aside>
+  );
+}
+
+function NavLink({ item, active, exact }: { item: NavItem; active: boolean; exact: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={clsx(
+        "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors",
+        active && exact ? "bg-muted font-medium text-fg" : active ? "font-medium text-fg hover:bg-subtle" : "text-fg-3 hover:bg-subtle hover:text-fg",
+      )}
+    >
+      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-fg" : "text-fg-4"} />
+      {item.label}
+    </Link>
+  );
+}
+
+/** Your agents under Flows, each with a live/draft square. */
+function AgentList({ pathname }: { pathname: string }) {
+  const { flows } = useApp();
+  if (flows.length === 0) return null;
+  return (
+    <div className="relative ml-[17px] mt-px space-y-px border-l border-line pl-2">
+      {flows.map((flow) => {
+        const href = `/flows/${flow.id}`;
+        const active = pathname === href;
+        return (
+          <Link key={flow.id} href={href} className={clsx("group flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors", active ? "bg-muted text-fg" : "text-fg-3 hover:bg-subtle hover:text-fg")}>
+            <span className={clsx("h-1.5 w-1.5 shrink-0 rounded-[1px]", flow.status === "live" ? "bg-emerald-500" : "bg-fg-4")} />
+            <span className="flex-1 truncate">{flow.name}</span>
+            <ChevronRight size={13} className="text-fg-4 opacity-0 transition group-hover:opacity-100" />
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -181,16 +215,67 @@ function WorkspaceCard() {
   );
 }
 
-function MobileTopBar() {
+// ---- Breadcrumb bar (desktop) ----
+
+const SECTION_LABELS: Record<string, string> = Object.fromEntries(NAV.map((n) => [n.href.slice(1), n.label]));
+
+export function crumbsFor(pathname: string, app: Pick<AppState, "flows" | "automations" | "settings">): { label: string; href?: string }[] {
+  const [section, id] = pathname.split("/").filter(Boolean);
+  const crumbs: { label: string; href?: string }[] = [{ label: app.settings.businessName, href: "/" }];
+  if (!section) return [...crumbs, { label: "Overview" }];
+  crumbs.push({ label: SECTION_LABELS[section] ?? section, href: id ? `/${section}` : undefined });
+  if (!id) return crumbs;
+  const name = section === "flows" ? app.flows.find((f) => f.id === id)?.name : app.automations.find((a) => a.id === id)?.name;
+  return [...crumbs, { label: name ?? "Not found" }];
+}
+
+function Breadcrumbs() {
+  const app = useApp();
+  const pathname = usePathname();
+  const crumbs = crumbsFor(pathname, app);
+  const live = app.calls.filter((c) => c.live).length;
+  return (
+    <div className="sticky top-0 z-20 hidden h-12 items-center justify-between border-b border-line bg-background/80 px-10 backdrop-blur-md lg:flex">
+      <nav className="flex min-w-0 items-center gap-1.5 text-sm">
+        {crumbs.map((crumb, i) => (
+          <span key={i} className="flex min-w-0 items-center gap-1.5">
+            {i > 0 && <span className="text-fg-4">/</span>}
+            {crumb.href && i < crumbs.length - 1 ? (
+              <Link href={crumb.href} className="truncate text-fg-3 transition-colors hover:text-fg">{crumb.label}</Link>
+            ) : (
+              <span className="truncate font-medium text-fg">{crumb.label}</span>
+            )}
+          </span>
+        ))}
+      </nav>
+      <div className="flex items-center gap-4">
+        <span className="metric-label">Current status</span>
+        <span className="flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400">
+          <span className="h-1.5 w-1.5 rounded-[1px] bg-emerald-500" />
+          {live > 0 ? `${live} on a call` : "Ready"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---- Phones ----
+
+function MobileTopBar({ onSearch }: { onSearch: () => void }) {
   const [theme, setTheme] = useTheme();
   const next: Record<ThemeChoice, ThemeChoice> = { system: "dark", dark: "light", light: "system" };
   const Icon = THEMES.find((t) => t.value === theme)?.icon ?? Monitor;
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-line bg-background/80 px-4 backdrop-blur-md lg:hidden">
       <Brand />
-      <button type="button" className="btn-icon" onClick={() => setTheme(next[theme])} aria-label="Change theme">
-        <Icon size={16} />
-      </button>
+      <div className="flex items-center">
+        <button type="button" className="btn-icon" onClick={onSearch} aria-label="Search">
+          <Search size={16} />
+        </button>
+        <button type="button" className="btn-icon" onClick={() => setTheme(next[theme])} aria-label="Change theme">
+          <Icon size={16} />
+        </button>
+      </div>
     </header>
   );
 }

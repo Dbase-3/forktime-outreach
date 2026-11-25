@@ -8,6 +8,7 @@ import type { AppState, Call } from "@/lib/types";
 import { Badge, Sheet, type Tone } from "./ui";
 
 export function outcomeTone(outcome: string): Tone {
+  if (outcome === "no_answer" || outcome === "in_progress") return "gray";
   if (/booked|set|promise|transferred|given/.test(outcome)) return "green";
   if (/not_now|needs|message/.test(outcome)) return "amber";
   if (/not_interested|wrong|failed/.test(outcome)) return "red";
@@ -22,13 +23,13 @@ export function CallSheet({ call, app, onClose }: { call: Call | null; app: AppS
       {call && (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2 text-sm text-fg-3">
-            <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>
+            {call.live ? <Badge tone="green" dot>Live now</Badge> : <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>}
             <span>{call.direction === "inbound" ? "Called in" : "We called"}</span>·<span>{duration(call.durationSec)}</span>·<span>{relativeTime(call.startedAt)}</span>
           </div>
-          <div className="rounded-xl bg-accent/[0.06] p-4 text-base leading-relaxed text-fg sm:text-sm">{call.summary}</div>
+          <div className="rounded-lg border border-line bg-subtle p-3.5 text-sm leading-relaxed text-fg">{call.summary}</div>
           {Object.keys(call.saved).length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-4">Saved from the call</h3>
+              <h3 className="metric-label mb-2">Saved from the call</h3>
               <dl className="divide-y divide-line rounded-xl border border-line">
                 {Object.entries(call.saved).map(([key, value]) => (
                   <div key={key} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
@@ -40,7 +41,8 @@ export function CallSheet({ call, app, onClose }: { call: Call | null; app: AppS
             </div>
           )}
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-4">Transcript · {flow?.name}</h3>
+            <h3 className="metric-label mb-2">Transcript · {flow?.name}</h3>
+            {call.transcript.length === 0 && <p className="text-sm text-fg-3">No transcript for this call.</p>}
             <div className="space-y-2.5">
               {call.transcript.map((line, i) => (
                 <div key={i} className={clsx("flex", line.who === "caller" && "justify-end")}>

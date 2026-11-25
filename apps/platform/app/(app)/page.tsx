@@ -1,158 +1,332 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, CheckCircle2, Circle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarClock, Megaphone, Phone, Plug, Users, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { upcomingCalls } from "@/lib/automation";
-import { dayLabel, humanize, relativeTime } from "@/lib/format";
+import { dayLabel, duration, humanize, relativeTime } from "@/lib/format";
+import { agentStats, answered, callsPerDay, isWin, totals } from "@/lib/stats";
 import { useApp } from "@/lib/store";
-import type { Call } from "@/lib/types";
+import { voiceById } from "@/lib/voices";
+import type { AppState, Call, Flow } from "@/lib/types";
+import { AreaChart, Legend, Sparkline, type Series } from "@/components/charts";
 import { CallSheet, outcomeTone } from "@/components/call-sheet";
-import { Avatar, Badge, StatStrip } from "@/components/ui";
+import { Avatar, Badge, Segmented } from "@/components/ui";
+
+const SERIES: Series[] = [
+  { key: "calls", label: "Calls", color: "rgb(var(--series-1))" },
+  { key: "wins", label: "Booked or done", color: "rgb(var(--series-2))" },
+];
 
 export default function HomePage() {
   const app = useApp();
   const [open, setOpen] = useState<Call | null>(null);
-  const now = new Date();
-  const weekAgo = now.getTime() - 7 * 86400000;
-  const recent = app.calls.filter((c) => new Date(c.startedAt).getTime() > weekAgo);
-  const wins = recent.filter((c) => outcomeTone(c.outcome) === "green").length;
-  const minutes = Math.round(recent.reduce((sum, c) => sum + c.durationSec, 0) / 60);
-  const upcoming = app.automations
-    .filter((a) => a.enabled)
-    .flatMap((a) => upcomingCalls(a, app.contacts, now, 30).map((p) => ({ ...p, automation: a })))
-    .sort((a, b) => a.due.getTime() - b.due.getTime())
-    .slice(0, 5);
-
+  const now = useMemo(() => new Date(), []);
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-[-0.02em]">{greeting(now)}</h1>
-          <p className="mt-1 text-sm text-fg-3">Here&rsquo;s what your agents have been up to.</p>
-        </div>
-        <span className="inline-flex h-7 items-center gap-2 rounded-full border border-line bg-surface px-3 text-xs text-fg-2">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          </span>
-          Answering on {app.settings.phoneNumber}
-        </span>
-      </div>
-
-      <StatStrip
-        items={[
-          { label: "Calls this week", value: recent.length },
-          { label: "Booked or done", value: wins, sub: recent.length ? `${Math.round((wins / recent.length) * 100)}% of calls` : undefined },
-          { label: "Minutes used", value: minutes, sub: "of 500 this month" },
-          { label: "Automations on", value: app.automations.filter((a) => a.enabled).length },
-        ]}
-      />
-
-      <Checklist />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section>
-          <SectionTitle title="Next up" href="/automations" />
-          <div className="card divide-y divide-line">
-            {upcoming.length === 0 && <p className="p-4 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
-            {upcoming.map(({ contact, due, automation }) => (
-              <div key={`${automation.id}-${contact.id}`} className="flex items-center gap-3 px-4 py-3">
-                <Avatar name={contact.name} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{contact.name}</span>
-                  <span className="block truncate text-xs text-fg-3">{automation.name}</span>
-                </span>
-                <span className="text-xs font-medium text-fg-3">{dayLabel(due)}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section>
-          <SectionTitle title="Recent calls" href="/calls" />
-          <div className="card divide-y divide-line">
-            {app.calls.length === 0 && <p className="p-4 text-sm text-fg-3">No calls yet.</p>}
-            {[...app.calls].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 5).map((call) => {
-              const contact = app.contacts.find((c) => c.id === call.contactId);
-              return (
-                <button key={call.id} type="button" onClick={() => setOpen(call)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-subtle">
-                  <Avatar name={contact?.name ?? "?"} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{contact?.name}</span>
-                    <span className="block truncate text-xs text-fg-3">{relativeTime(call.startedAt)}</span>
-                  </span>
-                  <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+    <div className="space-y-10">
+      <StatusStrip app={app} now={now} />
+      <QuickActions />
+      <Agents app={app} now={now} onOpen={setOpen} />
+      <Insights app={app} now={now} onOpen={setOpen} />
       <CallSheet call={open} app={app} onClose={() => setOpen(null)} />
     </div>
   );
 }
 
-function greeting(now: Date): string {
-  const hour = now.getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
+// ---- Top strip: the few things you check first ----
 
-function SectionTitle({ title, href }: { title: string; href: string }) {
+function StatusStrip({ app, now }: { app: AppState; now: Date }) {
+  const live = app.calls.filter((c) => c.live).length;
+  const today = callsPerDay(app.calls, 1, now)[0].calls;
+  const items: { label: string; value: ReactNode }[] = [
+    { label: "Your number", value: <span className="font-mono">{app.settings.phoneNumber}</span> },
+    { label: "Agents live", value: app.flows.filter((f) => f.status === "live").length },
+    { label: "On a call now", value: <span className={clsx(live > 0 && "text-emerald-600 dark:text-emerald-400")}>{live}</span> },
+    { label: "Calls today", value: today },
+    {
+      label: "Status",
+      value: (
+        <span className="flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400">
+          <span className="h-1.5 w-1.5 rounded-[1px] bg-emerald-500" /> All systems normal
+        </span>
+      ),
+    },
+  ];
   return (
-    <div className="mb-2 flex items-center justify-between">
-      <h2 className="text-sm font-medium text-fg-2">{title}</h2>
-      <Link href={href} className="flex items-center gap-1 text-xs text-fg-3 transition-colors hover:text-fg">
-        See all <ArrowRight size={13} />
-      </Link>
+    <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0">
+          <div className="metric-label">{item.label}</div>
+          <div className="mt-2 truncate text-base text-fg">{item.value}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
-/** Getting started: hides itself once everything is done. */
-function Checklist() {
-  const app = useApp();
-  const items = [
-    { done: Boolean(app.settings.phoneNumber), label: "Get your phone number", href: "/settings" },
-    { done: app.flows.some((f) => f.status === "live"), label: "Put a flow live", href: "/flows" },
-    { done: app.integrations.some((i) => i.connected), label: "Connect your calendar or CRM", href: "/integrations" },
-    { done: app.automations.some((a) => a.enabled), label: "Switch on an automation", href: "/automations" },
-  ];
-  const done = items.filter((i) => i.done).length;
-  if (done === items.length) return null;
+// ---- Shortcuts ----
+
+const ACTIONS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/flows", label: "Build and manage flows", icon: Workflow },
+  { href: "/automations", label: "Set up automations", icon: CalendarClock },
+  { href: "/campaigns", label: "Start a campaign", icon: Megaphone },
+  { href: "/contacts", label: "Add or import contacts", icon: Users },
+  { href: "/integrations", label: "Connect calendar or CRM", icon: Plug },
+  { href: "/settings", label: "Your number and hours", icon: Phone },
+];
+
+function QuickActions() {
   return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-medium">Get set up</h2>
-        <div className="flex items-center gap-2.5">
-          <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-fg transition-all" style={{ width: `${(done / items.length) * 100}%` }} />
-          </div>
-          <span className="font-mono text-2xs text-fg-3">{done}/{items.length}</span>
-        </div>
-      </div>
-      <div className="grid border-t border-line sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((item, i) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={clsx(
-              "flex items-center gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5",
-              i > 0 && "border-t border-line sm:border-t-0",
-              i % 2 === 1 && "sm:border-l",
-              i >= 2 && "sm:border-t lg:border-t-0",
-              i === 2 && "lg:border-l",
-              item.done && "text-fg-4 line-through",
-            )}
-          >
-            {item.done ? <CheckCircle2 size={15} className="shrink-0 text-emerald-500" /> : <Circle size={15} className="shrink-0 text-fg-4" />}
-            {item.label}
-          </Link>
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+      {ACTIONS.map(({ href, label, icon: Icon }) => (
+        <Link key={href} href={href} className="group flex min-h-11 items-center gap-2.5 rounded-lg border border-line bg-subtle px-3 py-2 text-xs leading-tight text-fg-2 transition-colors hover:border-line-strong hover:bg-muted hover:text-fg sm:gap-3 sm:px-3.5 sm:text-sm">
+          <Icon size={16} className="shrink-0 text-fg-3 group-hover:text-fg" />
+          <span className="flex-1">{label}</span>
+          <ArrowRight size={14} className="hidden shrink-0 text-fg-4 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 sm:block" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ---- Agents: each flow with its voice, live state and recent trend ----
+
+function Agents({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Call) => void }) {
+  const flows = [...app.flows].sort((a, b) => Number(b.status === "live") - Number(a.status === "live"));
+  return (
+    <section>
+      <SectionHead title="Your agents" action={<Link href="/flows" className="btn-secondary h-7 px-2.5 text-xs">All flows</Link>} />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {flows.map((flow) => (
+          <AgentCard key={flow.id} flow={flow} app={app} now={now} onOpen={onOpen} />
         ))}
       </div>
+    </section>
+  );
+}
+
+function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now: Date; onOpen: (c: Call) => void }) {
+  const stats = agentStats(flow, app.calls, now);
+  const trend = callsPerDay(app.calls.filter((c) => c.flowId === flow.id), 14, now).map((p) => p.calls);
+  const liveCall = app.calls.find((c) => c.live && c.flowId === flow.id);
+  const voice = voiceById(flow.agent.voiceId);
+  const isLive = flow.status === "live";
+  return (
+    <div className="card flex flex-col overflow-hidden transition-colors hover:border-line-strong">
+      <Link href={`/flows/${flow.id}`} className="block p-4 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate font-medium text-fg">{flow.name}</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-fg-3">
+              <Avatar name={flow.agent.name} className="h-4 w-4 border-0 text-[8px]" />
+              {flow.agent.name} · {voice.accent} · {flow.direction === "inbound" ? "Answers calls" : flow.direction === "outbound" ? "Makes calls" : "Both ways"}
+            </div>
+          </div>
+          <ArrowUpRight size={15} className="shrink-0 text-fg-4" />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <Metric label="Live now" value={stats.liveNow} highlight={stats.liveNow > 0} />
+          <Metric label="Today" value={stats.today} />
+          <Metric label="Answered" value={stats.answerRate === null ? "—" : `${Math.round(stats.answerRate * 100)}%`} />
+        </div>
+        <div className="mt-3">
+          <Sparkline values={trend} />
+        </div>
+      </Link>
+      <div className="mt-auto flex h-10 items-center justify-between gap-2 border-t border-line bg-subtle/60 px-4">
+        <span className={clsx("flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em]", isLive ? "text-emerald-600 dark:text-emerald-400" : "text-fg-4")}>
+          <span className={clsx("h-1.5 w-1.5 rounded-[1px]", isLive ? "bg-emerald-500" : "bg-fg-4")} />
+          {isLive ? "Live" : "Draft"}
+        </span>
+        {liveCall ? (
+          <button type="button" onClick={() => onOpen(liveCall)} className="flex items-center gap-1.5 text-xs text-fg-2 hover:text-fg">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+              <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            On a call · listen
+          </button>
+        ) : (
+          <span className="text-xs text-fg-4">{stats.lastCallAt ? `Last call ${relativeTime(stats.lastCallAt, now)}` : "No calls yet"}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, highlight }: { label: string; value: ReactNode; highlight?: boolean }) {
+  return (
+    <div>
+      <div className="metric-label text-[10px]">{label}</div>
+      <div className={clsx("mt-1 font-mono text-base tabular-nums", highlight ? "text-emerald-600 dark:text-emerald-400" : "text-fg")}>{value}</div>
+    </div>
+  );
+}
+
+// ---- Insights ----
+
+type Range = "7" | "14";
+
+function Insights({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Call) => void }) {
+  const [range, setRange] = useState<Range>("14");
+  const days = Number(range);
+  const points = callsPerDay(app.calls, days, now);
+  const sum = totals(points);
+  const since = now.getTime() - days * 86400000;
+  const inRange = app.calls.filter((c) => !c.live && new Date(c.startedAt).getTime() >= since);
+  const talked = inRange.filter(answered);
+  const minutes = Math.round(talked.reduce((s, c) => s + c.durationSec, 0) / 60);
+  const chartPoints = points.map((p) => ({
+    label: p.day.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
+    tick: p.day.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+    values: { calls: p.calls, wins: p.wins },
+  }));
+
+  return (
+    <section className="space-y-3">
+      <SectionHead
+        title="Insights"
+        action={<Segmented<Range> value={range} onChange={setRange} options={[{ value: "7", label: "7 days" }, { value: "14", label: "14 days" }]} />}
+      />
+      <div className="card p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="metric-label">Calls handled</div>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums tracking-[-0.03em]">{sum.calls}</span>
+              <span className="text-sm text-fg-3">{sum.calls ? `${Math.round((sum.wins / sum.calls) * 100)}% booked or done` : "no calls yet"}</span>
+            </div>
+          </div>
+          <Legend series={SERIES} totals={sum} />
+        </div>
+        <AreaChart points={chartPoints} series={SERIES} />
+      </div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <Figure label="Average call" value={talked.length ? duration(Math.round(talked.reduce((s, c) => s + c.durationSec, 0) / talked.length)) : "—"} />
+        <Figure label="Minutes used" value={minutes} sub="of 500 this month" />
+        <Figure label="Answered" value={inRange.length ? `${Math.round((talked.length / inRange.length) * 100)}%` : "—"} sub={`${inRange.length - talked.length} not picked up`} />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Outcomes calls={inRange} />
+        <NextUp app={app} now={now} />
+        <RecentCalls app={app} onOpen={onOpen} />
+      </div>
+    </section>
+  );
+}
+
+function Figure({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
+  return (
+    <div className="card min-w-0 p-3 sm:p-5">
+      <div className="metric-label truncate text-[10px] sm:text-2xs">{label}</div>
+      <div className="mt-2 truncate text-lg font-semibold tabular-nums tracking-[-0.03em] sm:mt-3 sm:text-2xl">{value}</div>
+      {sub && <div className="mt-0.5 hidden text-xs text-fg-4 sm:block">{sub}</div>}
+    </div>
+  );
+}
+
+function Panel({ title, href, children }: { title: string; href?: string; children: ReactNode }) {
+  return (
+    <div className="card flex flex-col overflow-hidden">
+      <div className="flex h-10 items-center justify-between border-b border-line px-4">
+        <span className="metric-label">{title}</span>
+        {href && (
+          <Link href={href} className="flex items-center gap-1 text-xs text-fg-3 hover:text-fg">
+            See all <ArrowRight size={12} />
+          </Link>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Outcomes({ calls }: { calls: Call[] }) {
+  const counts = Object.entries(
+    calls.reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.outcome]: (acc[c.outcome] ?? 0) + 1 }), {}),
+  ).sort((a, b) => b[1] - a[1]);
+  return (
+    <Panel title="Outcomes">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left">
+            <th className="metric-label px-4 py-2 font-normal text-[10px]">Outcome</th>
+            <th className="metric-label px-4 py-2 text-right font-normal text-[10px]">Calls</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {counts.slice(0, 6).map(([outcome, count]) => (
+            <tr key={outcome}>
+              <td className="px-4 py-2">
+                <span className="flex items-center gap-2">
+                  <span className={clsx("h-1.5 w-1.5 rounded-full", isWin(outcome) ? "bg-emerald-500" : outcome === "no_answer" ? "bg-fg-4" : "bg-amber-500")} />
+                  {humanize(outcome)}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums">{count}</td>
+            </tr>
+          ))}
+          {counts.length === 0 && (
+            <tr><td className="px-4 py-3 text-fg-3" colSpan={2}>No calls in this range.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function NextUp({ app, now }: { app: AppState; now: Date }) {
+  const upcoming = app.automations
+    .filter((a) => a.enabled)
+    .flatMap((a) => upcomingCalls(a, app.contacts, now, 30).map((p) => ({ ...p, automation: a })))
+    .sort((a, b) => a.due.getTime() - b.due.getTime())
+    .slice(0, 5);
+  return (
+    <Panel title="Next up" href="/automations">
+      <div className="divide-y divide-line">
+        {upcoming.length === 0 && <p className="px-4 py-3 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
+        {upcoming.map(({ contact, due, automation }) => (
+          <div key={`${automation.id}-${contact.id}`} className="flex items-center gap-3 px-4 py-2.5">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">{contact.name}</span>
+              <span className="block truncate text-xs text-fg-4">{automation.name}</span>
+            </span>
+            <span className="font-mono text-2xs text-fg-3">{dayLabel(due, now)}</span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function RecentCalls({ app, onOpen }: { app: AppState; onOpen: (c: Call) => void }) {
+  const recent = [...app.calls].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 5);
+  return (
+    <Panel title="Recent calls" href="/calls">
+      <div className="divide-y divide-line">
+        {recent.map((call) => {
+          const contact = app.contacts.find((c) => c.id === call.contactId);
+          return (
+            <button key={call.id} type="button" onClick={() => onOpen(call)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-subtle">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm">{contact?.name}</span>
+                <span className="block truncate text-xs text-fg-4">{call.live ? "Now" : relativeTime(call.startedAt)}</span>
+              </span>
+              {call.live ? <Badge tone="green" dot>Live</Badge> : <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>}
+            </button>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function SectionHead({ title, action }: { title: string; action?: ReactNode }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h2 className="text-base font-semibold tracking-[-0.01em]">{title}</h2>
+      {action}
     </div>
   );
 }

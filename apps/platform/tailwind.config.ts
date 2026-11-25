@@ -20,6 +20,8 @@ const config: Config = {
         "fg-3": token("fg-3"), // muted text
         "fg-4": token("fg-4"), // faint text, icons
         accent: token("accent"), // selection, focus, live state only
+        "series-1": token("series-1"), // charts only
+        "series-2": token("series-2"),
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],

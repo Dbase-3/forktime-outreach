@@ -4,7 +4,7 @@
 // with useApp() and change it with update(); the API replaces this later.
 
 import { useSyncExternalStore } from "react";
-import { seedState } from "./seed";
+import { SEED_VERSION, seedState } from "./seed";
 import type { AppState } from "./types";
 
 const KEY = "forktime-platform.v1";
@@ -23,7 +23,7 @@ function readSaved(): AppState | null {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AppState;
-    return parsed.version === 1 ? parsed : null;
+    return parsed.version === SEED_VERSION ? parsed : null;
   } catch {
     return null;
   }

@@ -18,9 +18,9 @@ export default function SettingsPage() {
   const inboundFlows = app.flows.filter((f) => f.direction !== "outbound");
 
   return (
-    <div className="max-w-3xl">
-      <PageHeader title="Settings" />
-      <div className="space-y-4">
+    <div className="max-w-4xl">
+      <PageHeader title="Settings" subtitle="Your number, business details and calling rules." />
+      <div>
         <Section title="Your phone number" body="Included with your plan. Your agents call from it, and calls to it are answered by the flow below.">
           <div className="flex items-center gap-3 rounded-lg border border-line bg-subtle p-3.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fg text-background"><Phone size={15} /></span>
@@ -98,12 +98,12 @@ export default function SettingsPage() {
 
 function Section({ title, body, children }: { title: string; body?: string; children: ReactNode }) {
   return (
-    <section className="card space-y-4 p-5">
+    <section className="grid gap-4 border-b border-line py-7 first:pt-0 last:border-0 md:grid-cols-[260px_minmax(0,1fr)] md:gap-10">
       <div>
-        <h2 className="font-semibold">{title}</h2>
-        {body && <p className="mt-0.5 text-sm text-fg-3">{body}</p>}
+        <h2 className="text-base font-medium">{title}</h2>
+        {body && <p className="mt-1 text-sm text-fg-3">{body}</p>}
       </div>
-      {children}
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }

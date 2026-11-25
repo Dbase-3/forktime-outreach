@@ -1,12 +1,11 @@
 "use client";
 
-// The frame around every page. Desktop: sidebar (with your agents nested under
-// Flows, like LiveKit) and a breadcrumb bar. Phones: top bar plus bottom tabs.
+// The frame around every page. Desktop: sidebar and a breadcrumb bar. Phones: top bar plus bottom tabs.
 // ⌘K search works everywhere.
 
 import clsx from "clsx";
 import {
-  AudioLines, CalendarClock, ChevronRight, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
+  AudioLines, CalendarClock, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -118,7 +117,6 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
               {group.items.map((item) => (
                 <div key={item.href}>
                   <NavLink item={item} active={isActive(pathname, item.href)} exact={pathname === item.href} />
-                  {item.href === "/flows" && <AgentList pathname={pathname} />}
                 </div>
               ))}
             </div>
@@ -146,27 +144,6 @@ function NavLink({ item, active, exact }: { item: NavItem; active: boolean; exac
       <Icon size={16} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-fg" : "text-fg-4"} />
       {item.label}
     </Link>
-  );
-}
-
-/** Your agents under Flows, each with a live/draft square. */
-function AgentList({ pathname }: { pathname: string }) {
-  const { flows } = useApp();
-  if (flows.length === 0) return null;
-  return (
-    <div className="relative ml-[17px] mt-px space-y-px border-l border-line pl-2">
-      {flows.map((flow) => {
-        const href = `/flows/${flow.id}`;
-        const active = pathname === href;
-        return (
-          <Link key={flow.id} href={href} className={clsx("group flex h-7 items-center gap-2 rounded-md px-2.5 text-[13px] transition-colors", active ? "bg-muted text-fg" : "text-fg-3 hover:bg-subtle hover:text-fg")}>
-            <span className="flex-1 truncate">{flow.name}</span>
-            {flow.status === "draft" && <span className="text-2xs text-fg-4">Draft</span>}
-            <ChevronRight size={13} className="shrink-0 text-fg-4 opacity-0 transition group-hover:opacity-100" />
-          </Link>
-        );
-      })}
-    </div>
   );
 }
 

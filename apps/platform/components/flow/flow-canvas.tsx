@@ -7,6 +7,7 @@
 import clsx from "clsx";
 import { AlertCircle, Flag, Maximize2, Minus, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { DRAG_THRESHOLD, distance, midpoint, pinch, zoomAt, type Point, type View } from "@/lib/canvas-view";
 import { layoutFlow, type InsertAt, type LayoutEdge, type LayoutNode } from "@/lib/flow-layout";
 import type { Step } from "@/lib/types";
 import { footnote, metaOf, summarize } from "./meta";
@@ -20,20 +21,21 @@ interface Props {
   onEditGreeting: () => void;
 }
 
-interface View {
-  x: number;
-  y: number;
-  z: number;
-}
 
-const MIN_Z = 0.35;
-const MAX_Z = 1.6;
+type Gesture =
+  | { kind: "drag"; id: number; start: Point; view: View; moving: boolean }
+  | { kind: "pinch"; view: View; mid: Point; dist: number };
 
 export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Props) {
   const layout = useMemo(() => layoutFlow(steps), [steps]);
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 40, z: 1 });
-  const drag = useRef<{ px: number; py: number; vx: number; vy: number } | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const pointers = useRef(new Map<number, Point>());
+  const gesture = useRef<Gesture | null>(null);
+  const swallowClick = useRef(false); // a drag that started on a box must not also open it
+  const [grabbing, setGrabbing] = useState(false);
   const fitted = useRef(false);
 
   const fit = useCallback(() => {
@@ -50,47 +52,117 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
     fit();
   }, [fit]);
 
-  // Wheel: scroll moves the canvas; with ⌘ / Ctrl (or a pinch on a trackpad) it zooms around the pointer.
+  // Trackpad and mouse wheel: two-finger scroll moves the canvas; a pinch
+  // (which Chrome and Firefox send as ctrl + wheel) or ⌘/Ctrl + scroll zooms
+  // around the pointer. Safari sends pinches as its own gesture events.
   useEffect(() => {
     const el = box.current;
     if (!el) return;
+    const at = (e: { clientX: number; clientY: number }) => {
+      const r = el.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       if (!event.ctrlKey && !event.metaKey) {
         setView((v) => ({ ...v, x: v.x - event.deltaX, y: v.y - event.deltaY }));
         return;
       }
-      const rect = el.getBoundingClientRect();
-      const px = event.clientX - rect.left;
-      const py = event.clientY - rect.top;
-      setView((v) => {
-        const z = Math.max(MIN_Z, Math.min(MAX_Z, v.z * Math.exp(-event.deltaY * 0.01)));
-        return { z, x: px - ((px - v.x) / v.z) * z, y: py - ((py - v.y) / v.z) * z };
-      });
+      const p = at(event);
+      setView((v) => zoomAt(v, p.x, p.y, Math.exp(-event.deltaY * 0.01)));
+    };
+    type SafariGesture = Event & { scale: number; clientX: number; clientY: number };
+    let gestureStart: View | null = null;
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      gestureStart = viewRef.current;
+    };
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      const g = e as SafariGesture;
+      if (!gestureStart) return;
+      const p = at(g);
+      setView(zoomAt(gestureStart, p.x, p.y, g.scale));
+    };
+    const onGestureEnd = (e: Event) => {
+      e.preventDefault();
+      gestureStart = null;
     };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    el.addEventListener("gesturestart", onGestureStart);
+    el.addEventListener("gesturechange", onGestureChange);
+    el.addEventListener("gestureend", onGestureEnd);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("gesturestart", onGestureStart);
+      el.removeEventListener("gesturechange", onGestureChange);
+      el.removeEventListener("gestureend", onGestureEnd);
+    };
   }, []);
 
+  const local = (event: ReactPointerEvent): Point => {
+    const r = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - r.left, y: event.clientY - r.top };
+  };
+
+  // Pointers: one finger or the mouse drags (from anywhere, boxes included,
+  // once it has moved a few pixels; a plain click still opens a box), two
+  // fingers pinch to zoom and pan together.
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button")) return;
-    drag.current = { px: event.clientX, py: event.clientY, vx: view.x, vy: view.y };
+    if ((event.target as HTMLElement).closest("[data-canvas-controls]")) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    pointers.current.set(event.pointerId, local(event));
+    if (pointers.current.size === 1) {
+      swallowClick.current = false;
+      gesture.current = { kind: "drag", id: event.pointerId, start: local(event), view: viewRef.current, moving: false };
+      return;
+    }
+    const [a, b] = [...pointers.current.values()];
+    gesture.current = { kind: "pinch", view: viewRef.current, mid: midpoint(a, b), dist: distance(a, b) };
+    swallowClick.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
   };
+
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    setView((v) => ({ ...v, x: d.vx + event.clientX - d.px, y: d.vy + event.clientY - d.py }));
+    if (!pointers.current.has(event.pointerId)) return;
+    const p = local(event);
+    pointers.current.set(event.pointerId, p);
+    const g = gesture.current;
+    if (!g) return;
+    if (g.kind === "pinch") {
+      const [a, b] = [...pointers.current.values()];
+      if (a && b) setView(pinch(g.view, g.mid, g.dist, midpoint(a, b), distance(a, b)));
+      return;
+    }
+    if (g.id !== event.pointerId) return;
+    const dx = p.x - g.start.x;
+    const dy = p.y - g.start.y;
+    if (!g.moving) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      g.moving = true;
+      swallowClick.current = true;
+      setGrabbing(true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    setView({ ...g.view, x: g.view.x + dx, y: g.view.y + dy });
   };
+
+  const onPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size === 0) {
+      gesture.current = null;
+      setGrabbing(false);
+      return;
+    }
+    // Lifting one of two fingers carries on as a drag with the other.
+    const [[id, p]] = [...pointers.current.entries()];
+    gesture.current = { kind: "drag", id, start: p, view: viewRef.current, moving: true };
+  };
+
   const zoomBy = (factor: number) => {
     const el = box.current;
     if (!el) return;
-    const cx = el.clientWidth / 2;
-    const cy = el.clientHeight / 2;
-    setView((v) => {
-      const z = Math.max(MIN_Z, Math.min(MAX_Z, v.z * factor));
-      return { z, x: cx - ((cx - v.x) / v.z) * z, y: cy - ((cy - v.y) / v.z) * z };
-    });
+    setView((v) => zoomAt(v, el.clientWidth / 2, el.clientHeight / 2, factor));
   };
 
   const byId = new Map(layout.nodes.map((n) => [n.id, n]));
@@ -99,11 +171,17 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
     <div
       ref={box}
       className="relative h-full min-h-[420px] touch-none select-none overflow-hidden bg-surface [background-image:radial-gradient(rgb(var(--line-strong))_1px,transparent_1px)] [background-size:18px_18px]"
-      style={{ backgroundPosition: `${view.x}px ${view.y}px`, cursor: drag.current ? "grabbing" : "grab" }}
+      style={{ backgroundPosition: `${view.x}px ${view.y}px`, cursor: grabbing ? "grabbing" : "grab" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={() => (drag.current = null)}
-      onPointerCancel={() => (drag.current = null)}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
+      onClickCapture={(e) => {
+        if (!swallowClick.current) return;
+        swallowClick.current = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }}
     >
       <div className="absolute left-0 top-0 origin-top-left" style={{ width: layout.width, height: layout.height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
         <svg width={layout.width} height={layout.height} className="absolute inset-0 overflow-visible">
@@ -128,14 +206,14 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
         ))}
       </div>
 
-      <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 shadow-pop">
+      <div data-canvas-controls className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 shadow-pop">
         <button type="button" className="btn-icon h-7 w-7" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out"><Minus size={14} /></button>
         <span className="w-11 text-center font-mono text-2xs tabular-nums text-fg-3">{Math.round(view.z * 100)}%</span>
         <button type="button" className="btn-icon h-7 w-7" onClick={() => zoomBy(1.2)} aria-label="Zoom in"><Plus size={14} /></button>
         <span className="mx-0.5 h-4 w-px bg-line" />
         <button type="button" className="btn-icon h-7 w-7" onClick={fit} aria-label="Fit to screen"><Maximize2 size={13} /></button>
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-3 hidden font-mono text-2xs text-fg-4 sm:block">Drag to move · ⌘ + scroll to zoom</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 hidden font-mono text-2xs text-fg-4 sm:block">Drag or two-finger scroll to move · pinch to zoom</div>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function ContactSheet({ contact, onClose }: { contact: Contact | null; on
       wide
       footer={
         <div className="flex">
-          <button type="button" className="btn-ghost text-rose-600 hover:bg-rose-50" onClick={remove}>
+          <button type="button" className="btn-ghost text-rose-600 dark:text-rose-400 hover:bg-rose-500/10" onClick={remove}>
             <Trash2 size={16} /> Delete
           </button>
           <button type="button" className="btn-primary ml-auto" onClick={onClose}>Done</button>
@@ -61,20 +61,20 @@ export function ContactSheet({ contact, onClose }: { contact: Contact | null; on
             </Field>
           </div>
           <div>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Fields</h3>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-4">Fields</h3>
             <FieldInputs defs={app.fieldDefs} values={contact.fields} onChange={(key, value) => edit({ fields: { ...contact.fields, [key]: value } })} />
           </div>
           <div>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Calls</h3>
-            {calls.length === 0 && <p className="text-sm text-zinc-500">No calls yet.</p>}
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-4">Calls</h3>
+            {calls.length === 0 && <p className="text-sm text-fg-3">No calls yet.</p>}
             <ul className="space-y-2">
               {calls.map((call) => (
-                <li key={call.id} className="rounded-xl bg-zinc-50 p-3">
+                <li key={call.id} className="rounded-lg bg-subtle p-3">
                   <div className="flex items-center justify-between gap-2">
                     <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>
-                    <span className="text-xs text-zinc-400">{relativeTime(call.startedAt)}</span>
+                    <span className="text-xs text-fg-4">{relativeTime(call.startedAt)}</span>
                   </div>
-                  <p className="mt-1.5 text-sm text-zinc-600">{call.summary}</p>
+                  <p className="mt-1.5 text-sm text-fg-2">{call.summary}</p>
                 </li>
               ))}
             </ul>
@@ -137,12 +137,12 @@ export function FieldsSheet({ open, onClose }: { open: boolean; onClose: () => v
   };
   return (
     <Sheet open={open} onClose={onClose} title="Contact fields">
-      <p className="mb-4 text-sm text-zinc-500">Anything you know about a contact. Flows can read them out, and automations can trigger on them.</p>
-      <ul className="mb-5 divide-y divide-zinc-100 rounded-2xl border border-zinc-200">
+      <p className="mb-4 text-sm text-fg-3">Anything you know about a contact. Flows can read them out, and automations can trigger on them.</p>
+      <ul className="mb-5 divide-y divide-line rounded-xl border border-line">
         {fieldDefs.map((def) => (
           <li key={def.key} className="flex items-center gap-3 px-4 py-2.5">
             <span className="flex-1 text-sm font-medium">{def.label}</span>
-            <span className="text-xs text-zinc-400">{TYPES.find((t) => t.value === def.type)?.label ?? def.type}</span>
+            <span className="text-xs text-fg-4">{TYPES.find((t) => t.value === def.type)?.label ?? def.type}</span>
             <button type="button" className="btn-icon h-8 w-8" aria-label={`Remove ${def.label}`} onClick={() => update((s) => ({ ...s, fieldDefs: s.fieldDefs.filter((d) => d.key !== def.key) }))}>
               <Trash2 size={15} />
             </button>
@@ -182,10 +182,10 @@ export function ImportSheet({ open, onClose }: { open: boolean; onClose: () => v
   };
   return (
     <Sheet open={open} onClose={onClose} title="Import contacts" footer={result && <button type="button" className="btn-primary w-full" disabled={result.contacts.length === 0} onClick={save}>Import {result.contacts.length} contacts</button>}>
-      <label className="flex cursor-pointer flex-col items-center rounded-2xl border-2 border-dashed border-zinc-200 px-6 py-10 text-center transition hover:border-brand-300 hover:bg-brand-50/30">
-        <FileUp size={24} className="text-brand-600" />
+      <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-line px-6 py-10 text-center transition hover:border-accent/50 hover:bg-accent/5">
+        <FileUp size={24} className="text-accent" />
         <span className="mt-3 text-sm font-semibold">Choose a CSV file</span>
-        <span className="mt-1 text-xs text-zinc-500">Needs a phone column. Every other column becomes a field.</span>
+        <span className="mt-1 text-xs text-fg-3">Needs a phone column. Every other column becomes a field.</span>
         <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => read(e.target.files?.[0])} />
       </label>
       {result && (

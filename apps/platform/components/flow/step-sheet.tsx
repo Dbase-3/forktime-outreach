@@ -36,14 +36,14 @@ export function AddStepSheet({ open, onClose, onPick }: { open: boolean; onClose
               key={choice.label}
               type="button"
               onClick={() => onPick(choice)}
-              className="card flex flex-col items-start gap-2 p-3.5 text-left transition hover:border-brand-300 hover:shadow-md"
+              className="card flex flex-col items-start gap-2 p-3.5 text-left transition hover:border-accent/50"
             >
-              <span className={clsx("flex h-9 w-9 items-center justify-center rounded-xl", meta.tint)}>
+              <span className={clsx("flex h-9 w-9 items-center justify-center rounded-lg", meta.tint)}>
                 <Icon size={17} />
               </span>
               <span>
                 <span className="block text-sm font-semibold">{choice.label}</span>
-                <span className="block text-xs text-zinc-500">{choice.hint}</span>
+                <span className="block text-xs text-fg-3">{choice.hint}</span>
               </span>
             </button>
           );
@@ -78,7 +78,7 @@ export function StepSheet({ step, defs, askedFields, onChange, onMove, onDelete,
           <button type="button" className="btn-icon" onClick={() => onMove(1)} aria-label="Move down">
             <ArrowDown size={18} />
           </button>
-          <button type="button" className="btn-icon text-rose-500 hover:bg-rose-50 hover:text-rose-600" onClick={onDelete} aria-label="Delete step">
+          <button type="button" className="btn-icon text-rose-500 hover:bg-rose-500/10 hover:text-rose-600" onClick={onDelete} aria-label="Delete step">
             <Trash2 size={18} />
           </button>
           <button type="button" className="btn-primary ml-auto" onClick={onClose}>
@@ -135,7 +135,7 @@ function AskForm({ step, onChange }: { step: Extract<Step, { kind: "ask" }>; onC
               key={type.value}
               type="button"
               onClick={() => onChange({ answerType: type.value })}
-              className={clsx("rounded-full border px-3 py-1.5 text-sm transition", step.answerType === type.value ? "border-brand-500 bg-brand-50 text-brand-700" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50")}
+              className={clsx("rounded-full border px-3 py-1.5 text-sm transition", step.answerType === type.value ? "border-accent bg-accent/10 text-accent" : "border-line text-fg-2 hover:bg-subtle")}
             >
               {type.label}
             </button>
@@ -165,7 +165,7 @@ function BranchForm({ step, defs, askedFields, onChange }: { step: Extract<Step,
   const needsValue = !VALUELESS_OPS.includes(step.condition.op);
   return (
     <div className="space-y-4">
-      <p className="text-sm text-zinc-500">The call goes down &ldquo;If yes&rdquo; when this is true, and &ldquo;Otherwise&rdquo; when it isn&rsquo;t.</p>
+      <p className="text-sm text-fg-3">The call goes down &ldquo;If yes&rdquo; when this is true, and &ldquo;Otherwise&rdquo; when it isn&rsquo;t.</p>
       <Field label="Check">
         <select className="field" value={step.condition.field} onChange={(e) => setCondition({ field: e.target.value })}>
           <option value="">Pick an answer or contact field</option>
@@ -213,7 +213,7 @@ function ActionForm({ step, onChange }: { step: Extract<Step, { kind: "action" }
               key={kind}
               type="button"
               onClick={() => onChange({ action: kind })}
-              className={clsx("flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm transition", step.action === kind ? "border-brand-500 bg-brand-50 text-brand-700" : "border-zinc-200 hover:bg-zinc-50")}
+              className={clsx("flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-sm transition", step.action === kind ? "border-accent bg-accent/10 text-accent" : "border-line hover:bg-subtle")}
             >
               <Icon size={16} />
               {meta.label}

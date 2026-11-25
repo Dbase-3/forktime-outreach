@@ -36,7 +36,7 @@ export function TriggerCard({ trigger, defs, flows, groups, onChange }: { trigge
             key={kind}
             type="button"
             onClick={() => kind !== trigger.kind && onChange(defaultTrigger(kind, defs, flows))}
-            className={clsx("flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition", trigger.kind === kind ? "border-brand-500 bg-brand-50 text-brand-700" : "border-zinc-200 hover:bg-zinc-50")}
+            className={clsx("flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition", trigger.kind === kind ? "border-accent bg-accent/10 text-accent" : "border-line hover:bg-subtle")}
           >
             <Icon size={16} className="shrink-0" />
             <span className="leading-tight">{label}</span>

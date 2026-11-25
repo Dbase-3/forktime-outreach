@@ -43,12 +43,12 @@ export function FlowEditor({ id }: { id: string }) {
 
   return (
     <div>
-      <Link href="/flows" className="mb-3 inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900">
+      <Link href="/flows" className="mb-3 inline-flex items-center gap-1.5 text-sm text-fg-3 hover:text-fg">
         <ArrowLeft size={16} /> Flows
       </Link>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <input
-          className="min-w-0 flex-1 rounded-lg bg-transparent px-1 py-0.5 text-2xl font-semibold tracking-tight outline-none transition hover:bg-zinc-100 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+          className="min-w-0 flex-1 rounded-lg bg-transparent -ml-1 px-1 py-0.5 text-xl font-semibold tracking-[-0.02em] outline-none transition-colors hover:bg-subtle focus:bg-surface focus:ring-[3px] focus:ring-fg/5"
           value={flow.name}
           onChange={(e) => edit((f) => ({ ...f, name: e.target.value }))}
           aria-label="Flow name"
@@ -89,7 +89,7 @@ export function FlowEditor({ id }: { id: string }) {
 function GoLive({ flow, blocked, onToggle }: { flow: Flow; blocked: boolean; onToggle: () => void }) {
   if (flow.status === "live") {
     return (
-      <button type="button" className="btn-secondary flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 sm:flex-none" onClick={onToggle} title="Switch back to draft">
+      <button type="button" className="btn-secondary flex-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 sm:flex-none" onClick={onToggle} title="Switch back to draft">
         <CheckCircle2 size={16} /> Live
       </button>
     );
@@ -136,21 +136,25 @@ function StepsTab({ flow, issues, onEdit }: { flow: Flow; issues: ReturnType<typ
   return (
     <div className="mx-auto max-w-3xl">
       {issues.length > 0 && <IssueList issues={issues} onSelect={setSelectedId} />}
-      <div className="card p-4">
-        <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" /> Call starts · the agent says
+      <div className="card overflow-hidden focus-within:border-fg-3">
+        <div className="flex items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-2xs font-medium uppercase tracking-[0.06em] text-fg-3">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+            <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          </span>
+          Call starts · the agent says
         </div>
         <textarea
-          className="mt-2 w-full resize-none bg-transparent text-[15px] leading-relaxed outline-none sm:text-sm"
+          className="block w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none"
           rows={3}
           value={flow.greeting}
           onChange={(e) => onEdit((f) => ({ ...f, greeting: e.target.value }))}
           aria-label="Greeting"
         />
-        <p className="text-xs text-zinc-400">Keep &ldquo;AI assistant&rdquo; and &ldquo;recorded&rdquo; in the greeting: callers must be told.</p>
+        <p className="px-3 pb-2.5 text-2xs text-fg-4">Keep &ldquo;AI assistant&rdquo; and &ldquo;recorded&rdquo; in the greeting: callers must be told.</p>
       </div>
       <StepList steps={flow.steps} container={TOP} depth={0} ctx={ctx} />
-      {flow.steps.length === 0 && <p className="text-center text-sm text-zinc-500">Tap + to add the first step.</p>}
+      {flow.steps.length === 0 && <p className="text-center text-sm text-fg-3">Tap + to add the first step.</p>}
 
       <AddStepSheet open={adding !== null} onClose={() => setAdding(null)} onPick={pick} />
       <StepSheet
@@ -172,8 +176,8 @@ function StepsTab({ flow, issues, onEdit }: { flow: Flow; issues: ReturnType<typ
 
 function IssueList({ issues, onSelect }: { issues: ReturnType<typeof flowIssues>; onSelect: (id: string) => void }) {
   return (
-    <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+    <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+      <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 dark:text-amber-400 dark:text-amber-300">
         <AlertTriangle size={16} /> {issues.length === 1 ? "1 thing to fix before going live" : `${issues.length} things to fix before going live`}
       </div>
       <ul className="mt-2 space-y-1">
@@ -183,7 +187,7 @@ function IssueList({ issues, onSelect }: { issues: ReturnType<typeof flowIssues>
               type="button"
               disabled={!issue.stepId}
               onClick={() => issue.stepId && onSelect(issue.stepId)}
-              className={clsx("text-left text-sm text-amber-900", issue.stepId && "underline decoration-amber-300 underline-offset-2 hover:decoration-amber-600")}
+              className={clsx("text-left text-sm text-amber-600 dark:text-amber-400 dark:text-amber-300", issue.stepId && "underline decoration-amber-300 underline-offset-2 hover:decoration-amber-600")}
             >
               {issue.message}
             </button>
@@ -215,8 +219,8 @@ function DetailsTab({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => Fl
       <Field label="What the agent knows" hint="Opening hours, prices, policies, FAQs. The agent answers only from this and says so when it doesn't know.">
         <textarea className="field min-h-48" value={flow.knowledge} onChange={(e) => onEdit((f) => ({ ...f, knowledge: e.target.value }))} placeholder={"We're open Monday to Friday, 9am to 6pm.\nA standard service is $249."} />
       </Field>
-      <div className="flex items-center justify-between rounded-xl bg-zinc-50 p-3 text-sm">
-        <span className="text-zinc-500">Status</span>
+      <div className="flex items-center justify-between rounded-lg bg-subtle p-3 text-sm">
+        <span className="text-fg-3">Status</span>
         <Badge tone={flow.status === "live" ? "green" : "gray"} dot>{flow.status === "live" ? "Live" : "Draft"}</Badge>
       </div>
     </div>

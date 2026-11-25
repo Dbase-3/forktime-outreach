@@ -21,18 +21,18 @@ export function CallSheet({ call, app, onClose }: { call: Call | null; app: AppS
     <Sheet open={call !== null} onClose={onClose} title={contact?.name ?? "Call"} wide>
       {call && (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-500">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-fg-3">
             <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>
             <span>{call.direction === "inbound" ? "Called in" : "We called"}</span>·<span>{duration(call.durationSec)}</span>·<span>{relativeTime(call.startedAt)}</span>
           </div>
-          <div className="rounded-2xl bg-brand-50/60 p-4 text-[15px] leading-relaxed text-zinc-800 sm:text-sm">{call.summary}</div>
+          <div className="rounded-xl bg-accent/[0.06] p-4 text-base leading-relaxed text-fg sm:text-sm">{call.summary}</div>
           {Object.keys(call.saved).length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Saved from the call</h3>
-              <dl className="divide-y divide-zinc-100 rounded-2xl border border-zinc-200">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-4">Saved from the call</h3>
+              <dl className="divide-y divide-line rounded-xl border border-line">
                 {Object.entries(call.saved).map(([key, value]) => (
                   <div key={key} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
-                    <dt className="text-zinc-500">{humanize(key)}</dt>
+                    <dt className="text-fg-3">{humanize(key)}</dt>
                     <dd className="text-right font-medium">{value}</dd>
                   </div>
                 ))}
@@ -40,11 +40,11 @@ export function CallSheet({ call, app, onClose }: { call: Call | null; app: AppS
             </div>
           )}
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Transcript · {flow?.name}</h3>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-4">Transcript · {flow?.name}</h3>
             <div className="space-y-2.5">
               {call.transcript.map((line, i) => (
                 <div key={i} className={clsx("flex", line.who === "caller" && "justify-end")}>
-                  <div className={clsx("max-w-[85%] rounded-2xl px-3.5 py-2 text-[15px] leading-snug sm:text-sm", line.who === "agent" ? "rounded-tl-md bg-zinc-100" : "rounded-tr-md bg-brand-600 text-white")}>
+                  <div className={clsx("max-w-[85%] rounded-xl px-3.5 py-2 text-sm leading-snug", line.who === "agent" ? "rounded-tl-md bg-muted" : "rounded-tr-md bg-fg text-background")}>
                     {line.text}
                   </div>
                 </div>

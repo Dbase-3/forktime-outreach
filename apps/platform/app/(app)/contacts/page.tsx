@@ -38,7 +38,7 @@ export default function ContactsPage() {
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-4" />
           <input className="field pl-10" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, phone or email" />
         </div>
         <button type="button" className="btn-secondary" onClick={() => setPanel("fields")}>
@@ -48,7 +48,7 @@ export default function ContactsPage() {
       {groups.length > 0 && (
         <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           {[null, ...groups].map((g) => (
-            <button key={g ?? "all"} type="button" onClick={() => setGroup(g)} className={clsx("shrink-0 rounded-full border px-3 py-1.5 text-sm transition", group === g ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50")}>
+            <button key={g ?? "all"} type="button" onClick={() => setGroup(g)} className={clsx("shrink-0 rounded-full border px-3 py-1.5 text-sm transition", group === g ? "border-fg bg-fg text-background" : "border-line bg-surface text-fg-2 hover:bg-subtle")}>
               {g ?? "Everyone"}
             </button>
           ))}
@@ -57,18 +57,18 @@ export default function ContactsPage() {
       {app.contacts.length === 0 ? (
         <EmptyState icon={<Users size={22} />} title="No contacts yet" body="Import a CSV or add people one by one." action={<button type="button" className="btn-primary" onClick={() => setPanel("import")}>Import a CSV</button>} />
       ) : (
-        <div className="card divide-y divide-zinc-100 overflow-hidden">
-          {shown.length === 0 && <p className="p-4 text-sm text-zinc-500">No one matches.</p>}
+        <div className="card divide-y divide-line overflow-hidden">
+          {shown.length === 0 && <p className="p-4 text-sm text-fg-3">No one matches.</p>}
           {shown.map((contact) => (
-            <button key={contact.id} type="button" onClick={() => setOpenId(contact.id)} className="flex w-full items-center gap-3 p-3.5 text-left transition hover:bg-zinc-50">
+            <button key={contact.id} type="button" onClick={() => setOpenId(contact.id)} className="flex w-full items-center gap-3 p-3.5 text-left transition hover:bg-subtle">
               <Avatar name={contact.name} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{contact.name}</span>
-                <span className="block truncate text-xs text-zinc-500">{contact.phone}</span>
+                <span className="block truncate text-xs text-fg-3">{contact.phone}</span>
               </span>
               {visibleDefs.map((def) => (
-                <span key={def.key} className="hidden w-36 truncate text-sm text-zinc-600 md:block">
-                  <span className="block text-[11px] text-zinc-400">{def.label}</span>
+                <span key={def.key} className="hidden w-36 truncate text-sm text-fg-2 md:block">
+                  <span className="block text-2xs text-fg-4">{def.label}</span>
                   {contact.fields[def.key] || "—"}
                 </span>
               ))}

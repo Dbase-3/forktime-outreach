@@ -25,7 +25,7 @@ export function PracticeSheet({ open, onClose, flow, business, contacts }: { ope
   return (
     <Sheet open={open} onClose={onClose} title="Try this flow" wide footer={<Reply state={state} onAnswer={(a) => setState((s) => answerPractice(s, a))} onRestart={() => setState(begin())} />}>
       {contacts.length > 0 && (
-        <label className="mb-4 flex items-center gap-2 text-sm text-zinc-500">
+        <label className="mb-4 flex items-center gap-2 text-sm text-fg-3">
           Calling as
           <select className="field w-auto py-1.5" value={contactId} onChange={(e) => setContactId(e.target.value)}>
             {contacts.map((c) => (
@@ -48,13 +48,13 @@ function Transcript({ state }: { state: PracticeState }) {
         if (line.who === "system") {
           return (
             <div key={i} className="flex justify-center">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">{line.text}</span>
+              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{line.text}</span>
             </div>
           );
         }
         return (
           <div key={i} className={clsx("flex", line.who === "caller" && "justify-end")}>
-            <div className={clsx("max-w-[85%] rounded-2xl px-3.5 py-2 text-[15px] leading-snug sm:text-sm", line.who === "agent" ? "rounded-tl-md bg-zinc-100 text-zinc-900" : "rounded-tr-md bg-brand-600 text-white")}>
+            <div className={clsx("max-w-[85%] rounded-xl px-3.5 py-2 text-sm leading-snug", line.who === "agent" ? "rounded-tl-md bg-muted text-fg" : "rounded-tr-md bg-fg text-background")}>
               {line.text}
             </div>
           </div>
@@ -91,7 +91,7 @@ function Reply({ state, onAnswer, onRestart }: { state: PracticeState; onAnswer:
       {quick.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {quick.map((option) => (
-            <button key={option} type="button" className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50" onClick={() => send(option)}>
+            <button key={option} type="button" className="rounded-full border border-line px-3 py-1.5 text-sm hover:bg-subtle" onClick={() => send(option)}>
               {option}
             </button>
           ))}

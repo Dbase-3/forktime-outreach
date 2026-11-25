@@ -15,18 +15,18 @@ interface Meta {
 }
 
 export const STEP_META: Record<Exclude<StepKind, "action">, Meta> = {
-  say: { label: "Say", icon: MessageSquareText, tint: "bg-sky-50 text-sky-600" },
-  ask: { label: "Ask", icon: HelpCircle, tint: "bg-brand-50 text-brand-600" },
-  branch: { label: "Decide", icon: GitBranch, tint: "bg-amber-50 text-amber-600" },
-  end: { label: "End call", icon: Flag, tint: "bg-rose-50 text-rose-600" },
+  say: { label: "Say", icon: MessageSquareText, tint: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+  ask: { label: "Ask", icon: HelpCircle, tint: "bg-accent/10 text-accent" },
+  branch: { label: "Decide", icon: GitBranch, tint: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  end: { label: "End call", icon: Flag, tint: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
 };
 
 export const ACTION_META: Record<ActionKind, Meta & { hint: string }> = {
-  book: { label: "Book on calendar", icon: CalendarCheck, tint: "bg-emerald-50 text-emerald-600", hint: "Which calendar and how long" },
-  transfer: { label: "Transfer to a person", icon: PhoneForwarded, tint: "bg-emerald-50 text-emerald-600", hint: "Who to put them through to" },
-  text: { label: "Send a text", icon: MessageCircle, tint: "bg-emerald-50 text-emerald-600", hint: "What the text says, and to whom" },
-  crm: { label: "Update CRM", icon: Database, tint: "bg-emerald-50 text-emerald-600", hint: "What to create or change" },
-  webhook: { label: "Send to webhook", icon: Webhook, tint: "bg-emerald-50 text-emerald-600", hint: "Where the call's answers are sent" },
+  book: { label: "Book on calendar", icon: CalendarCheck, tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", hint: "Which calendar and how long" },
+  transfer: { label: "Transfer to a person", icon: PhoneForwarded, tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", hint: "Who to put them through to" },
+  text: { label: "Send a text", icon: MessageCircle, tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", hint: "What the text says, and to whom" },
+  crm: { label: "Update CRM", icon: Database, tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", hint: "What to create or change" },
+  webhook: { label: "Send to webhook", icon: Webhook, tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", hint: "Where the call's answers are sent" },
 };
 
 export const ANSWER_TYPES: { value: AnswerType; label: string }[] = [

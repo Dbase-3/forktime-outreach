@@ -45,17 +45,17 @@ export function AutomationEditor({ id }: { id: string }) {
 
   return (
     <div>
-      <Link href="/automations" className="mb-3 inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900">
+      <Link href="/automations" className="mb-3 inline-flex items-center gap-1.5 text-sm text-fg-3 hover:text-fg">
         <ArrowLeft size={16} /> Automations
       </Link>
       <div className="mb-6 flex items-center gap-3">
         <input
-          className="min-w-0 flex-1 rounded-lg bg-transparent px-1 py-0.5 text-2xl font-semibold tracking-tight outline-none transition hover:bg-zinc-100 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+          className="min-w-0 flex-1 rounded-lg bg-transparent -ml-1 px-1 py-0.5 text-xl font-semibold tracking-[-0.02em] outline-none transition-colors hover:bg-subtle focus:bg-surface focus:ring-[3px] focus:ring-fg/5"
           value={automation.name}
           onChange={(e) => edit((a) => ({ ...a, name: e.target.value }))}
           aria-label="Automation name"
         />
-        <span className="hidden text-sm text-zinc-500 sm:inline">{automation.enabled ? "On" : "Off"}</span>
+        <span className="hidden text-sm text-fg-3 sm:inline">{automation.enabled ? "On" : "Off"}</span>
         <Toggle checked={automation.enabled} onChange={(enabled) => edit((a) => ({ ...a, enabled }))} label="Automation on" />
       </div>
 
@@ -76,7 +76,7 @@ export function AutomationEditor({ id }: { id: string }) {
           <Section n={5} title="Limits">
             <Limits automation={automation} app={app} onChange={(maxCallsPerWeek) => edit((a) => ({ ...a, maxCallsPerWeek }))} />
           </Section>
-          <button type="button" className="btn-ghost text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={remove}>
+          <button type="button" className="btn-ghost text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:text-rose-700" onClick={remove}>
             <Trash2 size={16} /> Delete automation
           </button>
         </div>
@@ -92,9 +92,9 @@ function Section({ n, title, optional, children }: { n: number; title: string; o
   return (
     <section className="card p-4 sm:p-5">
       <h2 className="mb-4 flex items-center gap-2.5 text-sm font-semibold">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">{n}</span>
+        <span className="flex h-6 w-6 items-center justify-center rounded-md border border-line bg-subtle font-mono text-2xs text-fg-2">{n}</span>
         {title}
-        {optional && <span className="font-normal text-zinc-400">· optional</span>}
+        {optional && <span className="font-normal text-fg-4">· optional</span>}
       </h2>
       {children}
     </section>
@@ -111,11 +111,11 @@ function FlowPicker({ automation, app, onChange }: { automation: Automation; app
         ))}
       </select>
       {flow && (
-        <Link href={`/flows/${flow.id}`} className="inline-block text-sm text-brand-600 hover:underline">
+        <Link href={`/flows/${flow.id}`} className="inline-block text-sm text-accent hover:underline">
           Open {flow.name}
         </Link>
       )}
-      {flow?.status === "draft" && <p className="text-sm text-amber-700">This flow is a draft. Calls start once it&rsquo;s live.</p>}
+      {flow?.status === "draft" && <p className="text-sm text-amber-600 dark:text-amber-400">This flow is a draft. Calls start once it&rsquo;s live.</p>}
     </div>
   );
 }
@@ -123,14 +123,14 @@ function FlowPicker({ automation, app, onChange }: { automation: Automation; app
 function FollowUps({ automation, app, onChange }: { automation: Automation; app: AppState; onChange: (f: FollowUp[]) => void }) {
   const flow = app.flows.find((f) => f.id === automation.flowId);
   const outcomes = flow ? outcomesOf(flow) : [];
-  if (outcomes.length === 0) return <p className="text-sm text-zinc-500">The flow has no endings yet, so there&rsquo;s nothing to follow up.</p>;
+  if (outcomes.length === 0) return <p className="text-sm text-fg-3">The flow has no endings yet, so there&rsquo;s nothing to follow up.</p>;
   const daysFor = (outcome: string) => automation.followUps.find((f) => f.outcome === outcome)?.thenDays ?? 0;
   const set = (outcome: string, thenDays: number) => onChange([...automation.followUps.filter((f) => f.outcome !== outcome), ...(thenDays > 0 ? [{ outcome, thenDays }] : [])]);
   return (
     <div className="space-y-2">
-      <p className="mb-3 text-sm text-zinc-500">Call the same person again, depending on how the call ended.</p>
+      <p className="mb-3 text-sm text-fg-3">Call the same person again, depending on how the call ended.</p>
       {outcomes.map((outcome) => (
-        <div key={outcome} className="flex flex-col gap-2 rounded-xl bg-zinc-50 p-3 sm:flex-row sm:items-center">
+        <div key={outcome} className="flex flex-col gap-2 rounded-lg bg-subtle p-3 sm:flex-row sm:items-center">
           <span className="flex-1 text-sm">
             Ends with <span className="font-medium">{humanize(outcome)}</span>
           </span>
@@ -158,9 +158,9 @@ function Limits({ automation, app, onChange }: { automation: Automation; app: Ap
           ))}
         </select>
       </label>
-      <p className="text-zinc-500">
+      <p className="text-fg-3">
         Calls go out {days}, {hourLabel(settings.callingStart)} to {hourLabel(settings.callingEnd)} in each person&rsquo;s own time zone, and never to numbers on your do-not-call list.{" "}
-        <Link href="/settings" className="text-brand-600 hover:underline">Change</Link>
+        <Link href="/settings" className="text-accent hover:underline">Change</Link>
       </p>
     </div>
   );
@@ -173,37 +173,37 @@ function Preview({ automation, app }: { automation: Automation; app: AppState })
   const followUps = automation.followUps.map((f) => `${humanize(f.outcome).toLowerCase()}, call again in ${daysLabel(f.thenDays)}`);
   return (
     <div className="card overflow-hidden">
-      <div className="bg-gradient-to-br from-brand-600 to-brand-700 p-5 text-white">
-        <div className="text-xs font-medium uppercase tracking-wide text-brand-100">In plain words</div>
-        <p className="mt-2 text-[15px] leading-relaxed first-letter:uppercase">
+      <div className="border-b border-line bg-subtle p-5">
+        <div className="eyebrow">In plain words</div>
+        <p className="mt-2 text-base leading-relaxed text-fg-2 first-letter:uppercase">
           {describeTrigger(automation.trigger, app.fieldDefs, app.flows)}
           {automation.conditions.length > 0 && <>, only if {automation.conditions.map((c) => describeCondition(c, app.fieldDefs)).join(" and ")}</>}
-          , call with <span className="font-semibold">{flow?.name ?? "no flow"}</span>.
+          , call with <span className="font-medium text-fg">{flow?.name ?? "no flow"}</span>.
           {followUps.length > 0 && <> If it ends {followUps.join("; ")}.</>}
         </p>
       </div>
       <div className="p-5">
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="text-sm font-semibold">Next calls</h3>
-          <span className="text-xs text-zinc-500">{reach} of {app.contacts.length} contacts match</span>
+          <span className="text-xs text-fg-3">{reach} of {app.contacts.length} contacts match</span>
         </div>
         {automation.trigger.kind !== "date_field" ? (
-          <p className="text-sm text-zinc-500">This one runs when it happens, so there&rsquo;s no fixed list ahead of time.</p>
+          <p className="text-sm text-fg-3">This one runs when it happens, so there&rsquo;s no fixed list ahead of time.</p>
         ) : planned.length === 0 ? (
-          <p className="text-sm text-zinc-500">No one is due in the next 90 days.</p>
+          <p className="text-sm text-fg-3">No one is due in the next 90 days.</p>
         ) : (
           <ul className="space-y-2.5">
             {planned.slice(0, 6).map(({ contact, due }) => (
               <li key={contact.id} className="flex items-center gap-3">
                 <Avatar name={contact.name} className="h-8 w-8" />
                 <span className="min-w-0 flex-1 truncate text-sm">{contact.name}</span>
-                <span className="text-xs font-medium text-zinc-500">{dayLabel(due)}</span>
+                <span className="text-xs font-medium text-fg-3">{dayLabel(due)}</span>
               </li>
             ))}
-            {planned.length > 6 && <li className="text-xs text-zinc-400">and {planned.length - 6} more</li>}
+            {planned.length > 6 && <li className="text-xs text-fg-4">and {planned.length - 6} more</li>}
           </ul>
         )}
-        {!automation.enabled && <p className="mt-4 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-500">It&rsquo;s off: nothing goes out until you switch it on.</p>}
+        {!automation.enabled && <p className="mt-4 rounded-lg bg-subtle p-3 text-xs text-fg-3">It&rsquo;s off: nothing goes out until you switch it on.</p>}
       </div>
     </div>
   );

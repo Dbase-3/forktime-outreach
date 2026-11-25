@@ -42,19 +42,19 @@ export default function CampaignsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="truncate font-semibold">{campaign.name}</h3>
-                    <p className="truncate text-sm text-zinc-500">{campaign.group} · {flow?.name}</p>
+                    <p className="truncate text-sm text-fg-3">{campaign.group} · {flow?.name}</p>
                   </div>
                   <Badge tone={status.tone} dot>{status.label}</Badge>
                 </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-                  <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
                 </div>
-                <div className="mt-2 flex justify-between text-xs text-zinc-500">
+                <div className="mt-2 flex justify-between text-xs text-fg-3">
                   <span>{campaign.called} of {campaign.total} called · {campaign.answered} answered</span>
                   <span>{pct}%</span>
                 </div>
-                <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3">
-                  <span className="text-xs text-zinc-400">
+                <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+                  <span className="text-xs text-fg-4">
                     {campaign.days.map((d) => WEEKDAYS[d]).join(" ")} · {hourLabel(campaign.startHour)}–{hourLabel(campaign.endHour)}
                   </span>
                   {campaign.status === "running" && (
@@ -121,7 +121,7 @@ function NewCampaignSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <span className="label">Days</span>
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAYS.map((day, d) => (
-              <button key={day} type="button" onClick={() => toggleDay(d)} className={clsx("h-9 w-11 rounded-xl border text-sm font-medium transition", draft.days.includes(d) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-zinc-200 text-zinc-500 hover:bg-zinc-50")}>
+              <button key={day} type="button" onClick={() => toggleDay(d)} className={clsx("h-9 w-11 rounded-lg border text-sm font-medium transition", draft.days.includes(d) ? "border-accent bg-accent/10 text-accent" : "border-line text-fg-3 hover:bg-subtle")}>
                 {day}
               </button>
             ))}
@@ -146,7 +146,7 @@ function NewCampaignSheet({ open, onClose }: { open: boolean; onClose: () => voi
             </Field>
           </div>
         </div>
-        <p className="rounded-xl bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-500">
+        <p className="rounded-lg bg-subtle p-3 text-xs leading-relaxed text-fg-3">
           Hours are each person&rsquo;s own local time. Numbers on your do-not-call list are skipped, and anyone who says &ldquo;don&rsquo;t call me&rdquo; is added to it automatically.
         </p>
       </div>

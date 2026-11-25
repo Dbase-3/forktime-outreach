@@ -22,12 +22,13 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
       <div className="space-y-4">
         <Section title="Your phone number" body="Included with your plan. Your agents call from it, and calls to it are answered by the flow below.">
-          <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-brand-50 to-white p-4 ring-1 ring-brand-100">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white"><Phone size={18} /></span>
-            <div>
-              <div className="text-lg font-semibold tracking-tight">{settings.phoneNumber}</div>
-              <div className="text-xs text-zinc-500">Active · local number</div>
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-subtle p-3.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fg text-background"><Phone size={15} /></span>
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-base font-medium tracking-tight">{settings.phoneNumber}</div>
+              <div className="text-xs text-fg-3">Local number · calls in and out</div>
             </div>
+            <span className="chip bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-current" />Active</span>
           </div>
           <Field label="Answer incoming calls with">
             <select className="field" value={settings.inboundFlowId} onChange={(e) => set({ inboundFlowId: e.target.value })}>
@@ -55,7 +56,7 @@ export default function SettingsPage() {
             {WEEKDAYS.map((day, d) => {
               const on = settings.callingDays.includes(d);
               return (
-                <button key={day} type="button" onClick={() => set({ callingDays: on ? settings.callingDays.filter((x) => x !== d) : [...settings.callingDays, d].sort() })} className={clsx("h-9 w-11 rounded-xl border text-sm font-medium transition", on ? "border-brand-500 bg-brand-50 text-brand-700" : "border-zinc-200 text-zinc-500 hover:bg-zinc-50")}>
+                <button key={day} type="button" onClick={() => set({ callingDays: on ? settings.callingDays.filter((x) => x !== d) : [...settings.callingDays, d].sort() })} className={clsx("h-9 w-11 rounded-lg border text-sm font-medium transition", on ? "border-accent bg-accent/10 text-accent" : "border-line text-fg-3 hover:bg-subtle")}>
                   {day}
                 </button>
               );
@@ -100,7 +101,7 @@ function Section({ title, body, children }: { title: string; body?: string; chil
     <section className="card space-y-4 p-5">
       <div>
         <h2 className="font-semibold">{title}</h2>
-        {body && <p className="mt-0.5 text-sm text-zinc-500">{body}</p>}
+        {body && <p className="mt-0.5 text-sm text-fg-3">{body}</p>}
       </div>
       {children}
     </section>

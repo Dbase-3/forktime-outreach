@@ -35,14 +35,14 @@ export function VoicePanel({ agent, onChange }: { agent: AgentVoice; onChange: (
                 key={voice.id}
                 type="button"
                 onClick={() => onChange({ voiceId: voice.id })}
-                className={clsx("flex items-center gap-3 rounded-2xl border p-3 text-left transition", selected ? "border-brand-500 bg-brand-50/60 ring-4 ring-brand-500/10" : "border-zinc-200 bg-white hover:border-zinc-300")}
+                className={clsx("flex items-center gap-3 rounded-xl border p-3 text-left transition", selected ? "border-accent bg-accent/[0.06] ring-[3px] ring-accent/15" : "border-line bg-surface hover:border-line-strong")}
               >
                 <Avatar name={voice.name} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">{voice.name}</span>
-                  <span className="block truncate text-xs text-zinc-500">{voice.accent} · {voice.tone}</span>
+                  <span className="block truncate text-xs text-fg-3">{voice.accent} · {voice.tone}</span>
                 </span>
-                {selected && <Check size={16} className="text-brand-600" />}
+                {selected && <Check size={16} className="text-accent" />}
               </button>
             );
           })}
@@ -57,10 +57,10 @@ export function VoicePanel({ agent, onChange }: { agent: AgentVoice; onChange: (
               key={p.id}
               type="button"
               onClick={() => onChange({ personality: p.id })}
-              className={clsx("rounded-2xl border p-3 text-left transition", agent.personality === p.id ? "border-brand-500 bg-brand-50/60" : "border-zinc-200 bg-white hover:border-zinc-300")}
+              className={clsx("rounded-xl border p-3 text-left transition", agent.personality === p.id ? "border-accent bg-accent/[0.06]" : "border-line bg-surface hover:border-line-strong")}
             >
               <span className="block text-sm font-semibold">{p.label}</span>
-              <span className="mt-0.5 block text-xs text-zinc-500">{p.hint}</span>
+              <span className="mt-0.5 block text-xs text-fg-3">{p.hint}</span>
             </button>
           ))}
         </div>
@@ -69,7 +69,7 @@ export function VoicePanel({ agent, onChange }: { agent: AgentVoice; onChange: (
       <div>
         <div className="flex items-center justify-between">
           <span className="label">Speaking speed</span>
-          <span className="text-sm font-medium tabular-nums text-zinc-700">{agent.speed.toFixed(2)}×</span>
+          <span className="text-sm font-medium tabular-nums text-fg-2">{agent.speed.toFixed(2)}×</span>
         </div>
         <input
           type="range"
@@ -78,10 +78,10 @@ export function VoicePanel({ agent, onChange }: { agent: AgentVoice; onChange: (
           step={0.05}
           value={agent.speed}
           onChange={(e) => onChange({ speed: Number(e.target.value) })}
-          className="w-full accent-brand-600"
+          className="w-full accent-[rgb(var(--accent))]"
           aria-label="Speaking speed"
         />
-        <div className="flex justify-between text-xs text-zinc-400">
+        <div className="flex justify-between text-xs text-fg-4">
           <span>Slower</span>
           <span>Normal</span>
           <span>Faster</span>

@@ -9,7 +9,7 @@ import { dayLabel, humanize, relativeTime } from "@/lib/format";
 import { useApp } from "@/lib/store";
 import type { Call } from "@/lib/types";
 import { CallSheet, outcomeTone } from "@/components/call-sheet";
-import { Avatar, Badge, Stat } from "@/components/ui";
+import { Avatar, Badge, StatStrip } from "@/components/ui";
 
 export default function HomePage() {
   const app = useApp();
@@ -27,49 +27,60 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{greeting(now)}</h1>
-        <p className="mt-1 text-sm text-zinc-500">Here&rsquo;s what your agents have been up to.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">{greeting(now)}</h1>
+          <p className="mt-1 text-sm text-fg-3">Here&rsquo;s what your agents have been up to.</p>
+        </div>
+        <span className="inline-flex h-7 items-center gap-2 rounded-full border border-line bg-surface px-3 text-xs text-fg-2">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          </span>
+          Answering on {app.settings.phoneNumber}
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Calls this week" value={recent.length} />
-        <Stat label="Booked or done" value={wins} sub={recent.length ? `${Math.round((wins / recent.length) * 100)}% of calls` : undefined} />
-        <Stat label="Minutes used" value={minutes} sub="of 500 this month" />
-        <Stat label="Automations on" value={app.automations.filter((a) => a.enabled).length} />
-      </div>
+      <StatStrip
+        items={[
+          { label: "Calls this week", value: recent.length },
+          { label: "Booked or done", value: wins, sub: recent.length ? `${Math.round((wins / recent.length) * 100)}% of calls` : undefined },
+          { label: "Minutes used", value: minutes, sub: "of 500 this month" },
+          { label: "Automations on", value: app.automations.filter((a) => a.enabled).length },
+        ]}
+      />
 
       <Checklist />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
           <SectionTitle title="Next up" href="/automations" />
-          <div className="card divide-y divide-zinc-100">
-            {upcoming.length === 0 && <p className="p-4 text-sm text-zinc-500">Nothing scheduled in the next 30 days.</p>}
+          <div className="card divide-y divide-line">
+            {upcoming.length === 0 && <p className="p-4 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
             {upcoming.map(({ contact, due, automation }) => (
-              <div key={`${automation.id}-${contact.id}`} className="flex items-center gap-3 p-3.5">
+              <div key={`${automation.id}-${contact.id}`} className="flex items-center gap-3 px-4 py-3">
                 <Avatar name={contact.name} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{contact.name}</span>
-                  <span className="block truncate text-xs text-zinc-500">{automation.name}</span>
+                  <span className="block truncate text-xs text-fg-3">{automation.name}</span>
                 </span>
-                <span className="text-xs font-medium text-zinc-500">{dayLabel(due)}</span>
+                <span className="text-xs font-medium text-fg-3">{dayLabel(due)}</span>
               </div>
             ))}
           </div>
         </section>
         <section>
           <SectionTitle title="Recent calls" href="/calls" />
-          <div className="card divide-y divide-zinc-100">
-            {app.calls.length === 0 && <p className="p-4 text-sm text-zinc-500">No calls yet.</p>}
+          <div className="card divide-y divide-line">
+            {app.calls.length === 0 && <p className="p-4 text-sm text-fg-3">No calls yet.</p>}
             {[...app.calls].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 5).map((call) => {
               const contact = app.contacts.find((c) => c.id === call.contactId);
               return (
-                <button key={call.id} type="button" onClick={() => setOpen(call)} className="flex w-full items-center gap-3 p-3.5 text-left transition hover:bg-zinc-50">
+                <button key={call.id} type="button" onClick={() => setOpen(call)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-subtle">
                   <Avatar name={contact?.name ?? "?"} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{contact?.name}</span>
-                    <span className="block truncate text-xs text-zinc-500">{relativeTime(call.startedAt)}</span>
+                    <span className="block truncate text-xs text-fg-3">{relativeTime(call.startedAt)}</span>
                   </span>
                   <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>
                 </button>
@@ -92,10 +103,10 @@ function greeting(now: Date): string {
 
 function SectionTitle({ title, href }: { title: string; href: string }) {
   return (
-    <div className="mb-2.5 flex items-center justify-between">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      <Link href={href} className="flex items-center gap-1 text-sm text-brand-600 hover:underline">
-        See all <ArrowRight size={14} />
+    <div className="mb-2 flex items-center justify-between">
+      <h2 className="text-sm font-medium text-fg-2">{title}</h2>
+      <Link href={href} className="flex items-center gap-1 text-xs text-fg-3 transition-colors hover:text-fg">
+        See all <ArrowRight size={13} />
       </Link>
     </div>
   );
@@ -113,18 +124,31 @@ function Checklist() {
   const done = items.filter((i) => i.done).length;
   if (done === items.length) return null;
   return (
-    <div className="card p-4 sm:p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Get set up</h2>
-        <span className="text-xs text-zinc-500">{done} of {items.length}</span>
+    <div className="card overflow-hidden">
+      <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+        <h2 className="text-sm font-medium">Get set up</h2>
+        <div className="flex items-center gap-2.5">
+          <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-fg transition-all" style={{ width: `${(done / items.length) * 100}%` }} />
+          </div>
+          <span className="font-mono text-2xs text-fg-3">{done}/{items.length}</span>
+        </div>
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-        <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${(done / items.length) * 100}%` }} />
-      </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {items.map((item) => (
-          <Link key={item.label} href={item.href} className={clsx("flex items-center gap-2.5 rounded-xl p-2.5 text-sm transition hover:bg-zinc-50", item.done && "text-zinc-400 line-through")}>
-            {item.done ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} className="text-zinc-300" />}
+      <div className="grid border-t border-line sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item, i) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={clsx(
+              "flex items-center gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5",
+              i > 0 && "border-t border-line sm:border-t-0",
+              i % 2 === 1 && "sm:border-l",
+              i >= 2 && "sm:border-t lg:border-t-0",
+              i === 2 && "lg:border-l",
+              item.done && "text-fg-4 line-through",
+            )}
+          >
+            {item.done ? <CheckCircle2 size={15} className="shrink-0 text-emerald-500" /> : <Circle size={15} className="shrink-0 text-fg-4" />}
             {item.label}
           </Link>
         ))}

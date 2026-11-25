@@ -48,7 +48,7 @@ function Transcript({ state }: { state: PracticeState }) {
         if (line.who === "system") {
           return (
             <div key={i} className="flex justify-center">
-              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{line.text}</span>
+              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">{line.text}</span>
             </div>
           );
         }

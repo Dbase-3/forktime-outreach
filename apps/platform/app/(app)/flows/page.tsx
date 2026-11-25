@@ -52,7 +52,7 @@ export default function FlowsPage() {
                   <Badge tone={flow.status === "live" ? "green" : "gray"} dot>{flow.status === "live" ? "Live" : "Draft"}</Badge>
                 </div>
                 <div className="mt-4 flex items-center gap-2.5 border-t border-line pt-3 text-xs text-fg-3">
-                  <Avatar name={flow.agent.name} className="h-6 w-6 text-[10px]" />
+                  <Avatar name={flow.agent.name} className="h-6 w-6 text-2xs" />
                   <span className="truncate">{flow.agent.name} · {voiceById(flow.agent.voiceId).accent}</span>
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     <DirIcon size={13} /> {dir.label}

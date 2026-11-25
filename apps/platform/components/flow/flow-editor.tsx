@@ -90,7 +90,7 @@ export function FlowEditor({ id }: { id: string }) {
 function GoLive({ flow, blocked, onToggle }: { flow: Flow; blocked: boolean; onToggle: () => void }) {
   if (flow.status === "live") {
     return (
-      <button type="button" className="btn-secondary flex-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 sm:flex-none" onClick={onToggle} title="Switch back to draft">
+      <button type="button" className="btn-secondary flex-1 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 sm:flex-none" onClick={onToggle} title="Switch back to draft">
         <CheckCircle2 size={16} /> Live
       </button>
     );
@@ -211,7 +211,7 @@ function GreetingCard({ greeting, onChange }: { greeting: string; onChange: (gre
 function IssueList({ issues, onSelect }: { issues: ReturnType<typeof flowIssues>; onSelect: (id: string) => void }) {
   return (
     <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+      <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
         <AlertTriangle size={16} /> {issues.length === 1 ? "1 thing to fix before going live" : `${issues.length} things to fix before going live`}
       </div>
       <ul className="mt-2 space-y-1">

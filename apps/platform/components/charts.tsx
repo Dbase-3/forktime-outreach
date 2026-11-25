@@ -76,12 +76,12 @@ export function AreaChart({ points, series, height = 220 }: { points: ChartPoint
           {ticks.map((t) => (
             <g key={t}>
               <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} stroke="rgb(var(--line))" strokeWidth="1" />
-              <text x={PAD.left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="fill-fg-4 font-mono text-[10px]">{t}</text>
+              <text x={PAD.left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="fill-fg-4 font-mono text-2xs">{t}</text>
             </g>
           ))}
           {points.map((p, i) =>
             (i % every === 0 && points.length - 1 - i >= every) || i === points.length - 1 ? (
-              <text key={p.label} x={x(i)} y={height - 6} textAnchor="middle" className="fill-fg-4 font-mono text-[10px]">{p.tick}</text>
+              <text key={p.label} x={x(i)} y={height - 6} textAnchor="middle" className="fill-fg-4 font-mono text-2xs">{p.tick}</text>
             ) : null,
           )}
           {series.map((s) => {

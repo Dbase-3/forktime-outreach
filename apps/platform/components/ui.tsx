@@ -33,7 +33,7 @@ export function EmptyState({ icon, title, body, action }: { icon: ReactNode; tit
 const TONES = {
   gray: "bg-muted text-fg-2",
   green: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  amber: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  amber: "bg-amber-500/10 text-amber-800 dark:text-amber-400",
   red: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
   brand: "bg-accent/10 text-accent",
   blue: "bg-sky-500/10 text-sky-700 dark:text-sky-400",

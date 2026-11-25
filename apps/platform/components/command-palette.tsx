@@ -77,7 +77,7 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
       <div role="dialog" aria-modal="true" aria-label="Search" className="relative w-full max-w-lg animate-fade overflow-hidden rounded-xl bg-surface shadow-lift">
         <div className="flex items-center gap-2.5 border-b border-line px-4">
           <Search size={15} className="text-fg-4" />
-          <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search agents, automations, contacts…" className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-fg-4 sm:text-sm" />
+          <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search agents, automations, contacts…" className="h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-fg-4 sm:text-sm" />
           <kbd className="kbd">esc</kbd>
         </div>
         <div className="max-h-[52vh] overflow-y-auto p-1.5">

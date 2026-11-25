@@ -99,7 +99,7 @@ function BranchBlock({ step, depth, ctx }: { step: Extract<Step, { kind: "branch
 function Lane({ title, tone, empty, children }: { title: string; tone: "yes" | "no"; empty: boolean; children: React.ReactNode }) {
   return (
     <div className={clsx("self-start rounded-xl border border-dashed p-2.5", tone === "yes" ? "border-emerald-500/30 bg-emerald-500/[0.03]" : "border-line-strong/70 bg-subtle/60")}>
-      <div className={clsx("flex items-center gap-1.5 px-0.5 text-2xs font-medium uppercase tracking-[0.06em]", tone === "yes" ? "text-emerald-600 dark:text-emerald-400" : "text-fg-3")}>
+      <div className={clsx("flex items-center gap-1.5 px-0.5 text-2xs font-medium uppercase tracking-[0.06em]", tone === "yes" ? "text-emerald-700 dark:text-emerald-400" : "text-fg-3")}>
         <span className={clsx("h-1.5 w-1.5 rounded-full", tone === "yes" ? "bg-emerald-500" : "bg-fg-4")} />
         {title}
       </div>

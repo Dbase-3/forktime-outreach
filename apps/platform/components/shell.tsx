@@ -227,7 +227,7 @@ function Breadcrumbs() {
       </nav>
       <div className="flex items-center gap-4">
         <span className="metric-label">Current status</span>
-        <span className="flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400">
+        <span className="flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-emerald-700 dark:text-emerald-400">
           <span className="h-1.5 w-1.5 rounded-[1px] bg-emerald-500" />
           {live > 0 ? `${live} on a call` : "Ready"}
         </span>

@@ -247,7 +247,7 @@ function NodeBox({ node, greeting, ctx, onEditGreeting, onAddAt }: { node: Layou
         {hasIssue && <AlertCircle size={12} className="ml-auto text-amber-500" />}
       </span>
       <span className="mt-1.5 line-clamp-2 shrink-0 text-xs leading-[1.4] text-fg">{summarize(step, ctx.defs, ctx.questions)}</span>
-      {note && <span className="mt-auto shrink-0 truncate pt-1 font-mono text-[10px] text-fg-4">{note}</span>}
+      {note && <span className="mt-auto shrink-0 truncate pt-1 font-mono text-2xs text-fg-4">{note}</span>}
     </button>
   );
 }

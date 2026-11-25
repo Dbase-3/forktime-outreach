@@ -28,10 +28,11 @@ const config: Config = {
         mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
       },
       fontSize: {
+        // Readable floor: body 14 px, nothing below 11 px (upper-case labels only).
         "2xs": ["11px", "16px"],
-        xs: ["12px", "16px"],
-        sm: ["13px", "20px"],
-        base: ["14px", "22px"],
+        xs: ["12px", "17px"],
+        sm: ["14px", "20px"],
+        base: ["15px", "24px"],
       },
       boxShadow: {
         lift: "0 16px 48px -12px rgb(0 0 0 / 0.25), 0 0 0 1px rgb(var(--line))",

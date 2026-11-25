@@ -115,7 +115,7 @@ function FlowPicker({ automation, app, onChange }: { automation: Automation; app
           Open {flow.name}
         </Link>
       )}
-      {flow?.status === "draft" && <p className="text-sm text-amber-600 dark:text-amber-400">This flow is a draft. Calls start once it&rsquo;s live.</p>}
+      {flow?.status === "draft" && <p className="text-sm text-amber-800 dark:text-amber-400">This flow is a draft. Calls start once it&rsquo;s live.</p>}
     </div>
   );
 }

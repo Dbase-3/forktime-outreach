@@ -42,12 +42,12 @@ function StatusStrip({ app, now }: { app: AppState; now: Date }) {
   const items: { label: string; value: ReactNode }[] = [
     { label: "Your number", value: <span className="font-mono">{app.settings.phoneNumber}</span> },
     { label: "Agents live", value: app.flows.filter((f) => f.status === "live").length },
-    { label: "On a call now", value: <span className={clsx(live > 0 && "text-emerald-600 dark:text-emerald-400")}>{live}</span> },
+    { label: "On a call now", value: <span className={clsx(live > 0 && "text-emerald-700 dark:text-emerald-400")}>{live}</span> },
     { label: "Calls today", value: today },
     {
       label: "Status",
       value: (
-        <span className="flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400">
+        <span className="flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-emerald-700 dark:text-emerald-400">
           <span className="h-1.5 w-1.5 rounded-[1px] bg-emerald-500" /> All systems normal
         </span>
       ),
@@ -132,7 +132,7 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
         </div>
       </Link>
       <div className="mt-auto flex h-10 items-center justify-between gap-2 border-t border-line bg-subtle/60 px-4">
-        <span className={clsx("flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em]", isLive ? "text-emerald-600 dark:text-emerald-400" : "text-fg-4")}>
+        <span className={clsx("flex items-center gap-1.5 font-mono text-2xs font-medium uppercase tracking-[0.08em]", isLive ? "text-emerald-700 dark:text-emerald-400" : "text-fg-4")}>
           <span className={clsx("h-1.5 w-1.5 rounded-[1px]", isLive ? "bg-emerald-500" : "bg-fg-4")} />
           {isLive ? "Live" : "Draft"}
         </span>
@@ -155,8 +155,8 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
 function Metric({ label, value, highlight }: { label: string; value: ReactNode; highlight?: boolean }) {
   return (
     <div>
-      <div className="metric-label text-[10px]">{label}</div>
-      <div className={clsx("mt-1 font-mono text-base tabular-nums", highlight ? "text-emerald-600 dark:text-emerald-400" : "text-fg")}>{value}</div>
+      <div className="metric-label text-2xs">{label}</div>
+      <div className={clsx("mt-1 font-mono text-base tabular-nums", highlight ? "text-emerald-700 dark:text-emerald-400" : "text-fg")}>{value}</div>
     </div>
   );
 }
@@ -216,7 +216,7 @@ function Insights({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: 
 function Figure({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
   return (
     <div className="card min-w-0 p-3 sm:p-5">
-      <div className="metric-label truncate text-[10px] sm:text-2xs">{label}</div>
+      <div className="metric-label truncate text-2xs sm:text-2xs">{label}</div>
       <div className="mt-2 truncate text-lg font-semibold tabular-nums tracking-[-0.03em] sm:mt-3 sm:text-2xl">{value}</div>
       {sub && <div className="mt-0.5 hidden text-xs text-fg-4 sm:block">{sub}</div>}
     </div>
@@ -248,8 +248,8 @@ function Outcomes({ calls }: { calls: Call[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left">
-            <th className="metric-label px-4 py-2 font-normal text-[10px]">Outcome</th>
-            <th className="metric-label px-4 py-2 text-right font-normal text-[10px]">Calls</th>
+            <th className="metric-label px-4 py-2 font-normal text-2xs">Outcome</th>
+            <th className="metric-label px-4 py-2 text-right font-normal text-2xs">Calls</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">

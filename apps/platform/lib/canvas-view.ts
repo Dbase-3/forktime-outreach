@@ -47,3 +47,15 @@ export function pinch(start: View, startMid: Point, startDist: number, mid: Poin
 
 /** How far a press must travel before it's a drag rather than a click. */
 export const DRAG_THRESHOLD = 4;
+
+/**
+ * How strongly one wheel tick zooms. A pinch (ctrl + wheel) sends small deltas
+ * and should feel direct; a mouse wheel sends ~100 per notch (or a whole line /
+ * page), so it's scaled down to about 18% per notch instead of jumping.
+ */
+export function wheelZoomSpeed(event: { ctrlKey: boolean; metaKey: boolean; deltaMode: number }): number {
+  if (event.ctrlKey || event.metaKey) return 0.01;
+  if (event.deltaMode === 1) return 0.05; // lines
+  if (event.deltaMode === 2) return 0.5; // pages
+  return 0.002;
+}

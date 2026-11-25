@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_Z, MIN_Z, clampZoom, pinch, zoomAt } from "@/lib/canvas-view";
+import { MAX_Z, MIN_Z, clampZoom, pinch, wheelZoomSpeed, zoomAt } from "@/lib/canvas-view";
 
 /** Where a point of the drawing lands on screen. */
 const onScreen = (v: { x: number; y: number; z: number }, dx: number, dy: number) => ({ x: v.x + dx * v.z, y: v.y + dy * v.z });
@@ -41,5 +41,15 @@ describe("two-finger pinch", () => {
     expect(next.z).toBe(0.5);
     expect(onScreen(next, 200, 200)).toEqual({ x: 220, y: 200 });
     expect(pinch(start, startMid, 100, startMid, 1000).z).toBe(MAX_Z);
+  });
+});
+
+describe("scroll to zoom", () => {
+  it("a pinch is direct, a mouse wheel notch zooms gently", () => {
+    const notch = Math.exp(-100 * wheelZoomSpeed({ ctrlKey: false, metaKey: false, deltaMode: 0 }));
+    expect(notch).toBeGreaterThan(0.8);
+    expect(notch).toBeLessThan(0.85);
+    expect(wheelZoomSpeed({ ctrlKey: true, metaKey: false, deltaMode: 0 })).toBe(0.01);
+    expect(wheelZoomSpeed({ ctrlKey: false, metaKey: false, deltaMode: 1 })).toBe(0.05);
   });
 });

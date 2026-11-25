@@ -7,7 +7,7 @@
 import clsx from "clsx";
 import { AlertCircle, Flag, Maximize2, Minus, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { DRAG_THRESHOLD, distance, midpoint, pinch, zoomAt, type Point, type View } from "@/lib/canvas-view";
+import { DRAG_THRESHOLD, distance, midpoint, pinch, wheelZoomSpeed, zoomAt, type Point, type View } from "@/lib/canvas-view";
 import { layoutFlow, type InsertAt, type LayoutEdge, type LayoutNode } from "@/lib/flow-layout";
 import type { Step } from "@/lib/types";
 import { footnote, metaOf, summarize } from "./meta";
@@ -52,9 +52,10 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
     fit();
   }, [fit]);
 
-  // Trackpad and mouse wheel: two-finger scroll moves the canvas; a pinch
-  // (which Chrome and Firefox send as ctrl + wheel) or ⌘/Ctrl + scroll zooms
-  // around the pointer. Safari sends pinches as its own gesture events.
+  // Trackpad and mouse wheel (owner, 2026-11-26, like ElevenLabs / React Flow):
+  // two-finger scroll and pinch both ZOOM around the pointer; moving is click
+  // and drag. Shift + scroll still moves, for anyone who wants it. Chrome and
+  // Firefox send a pinch as ctrl + wheel; Safari as its own gesture events.
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -64,12 +65,12 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
     };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      if (!event.ctrlKey && !event.metaKey) {
-        setView((v) => ({ ...v, x: v.x - event.deltaX, y: v.y - event.deltaY }));
+      if (event.shiftKey) {
+        setView((v) => ({ ...v, x: v.x - (event.deltaX || event.deltaY), y: v.y }));
         return;
       }
       const p = at(event);
-      setView((v) => zoomAt(v, p.x, p.y, Math.exp(-event.deltaY * 0.01)));
+      setView((v) => zoomAt(v, p.x, p.y, Math.exp(-event.deltaY * wheelZoomSpeed(event))));
     };
     type SafariGesture = Event & { scale: number; clientX: number; clientY: number };
     let gestureStart: View | null = null;
@@ -213,7 +214,7 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
         <span className="mx-0.5 h-4 w-px bg-line" />
         <button type="button" className="btn-icon h-7 w-7" onClick={fit} aria-label="Fit to screen"><Maximize2 size={13} /></button>
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-3 hidden font-mono text-2xs text-fg-4 sm:block">Drag or two-finger scroll to move · pinch to zoom</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 hidden font-mono text-2xs text-fg-4 sm:block">Scroll or pinch to zoom · drag to move</div>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { humanize, relativeTime } from "@/lib/format";
 import { nowIso, update, useApp } from "@/lib/store";
 import type { Contact, FieldDef, FieldType } from "@/lib/types";
 import { outcomeTone } from "../call-sheet";
-import { Badge, Field, Sheet } from "../ui";
+import { Badge, Field, Sheet, useLastPresent } from "../ui";
 
 const INPUT_TYPE: Record<FieldType, string> = { text: "text", number: "number", date: "date", yesno: "text", choice: "text" };
 
@@ -26,7 +26,8 @@ function FieldInputs({ defs, values, onChange }: { defs: FieldDef[]; values: Rec
   );
 }
 
-export function ContactSheet({ contact, onClose }: { contact: Contact | null; onClose: () => void }) {
+export function ContactSheet({ contact: current, onClose }: { contact: Contact | null; onClose: () => void }) {
+  const contact = useLastPresent(current);
   const app = useApp();
   const calls = contact ? app.calls.filter((c) => c.contactId === contact.id).sort((a, b) => b.startedAt.localeCompare(a.startedAt)) : [];
   const edit = (patch: Partial<Contact>) => contact && update((s) => ({ ...s, contacts: s.contacts.map((c) => (c.id === contact.id ? { ...c, ...patch } : c)) }));
@@ -37,7 +38,7 @@ export function ContactSheet({ contact, onClose }: { contact: Contact | null; on
   };
   return (
     <Sheet
-      open={contact !== null}
+      open={current !== null}
       onClose={onClose}
       title={contact?.name ?? ""}
       wide

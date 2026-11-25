@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { OP_LABELS, VALUELESS_OPS, fieldLabel } from "@/lib/automation";
 import { toFieldKey } from "@/lib/flow-tree";
 import type { ActionKind, Condition, FieldDef, Step, StepKind } from "@/lib/types";
-import { Field, Sheet } from "../ui";
+import { Field, Sheet, useLastPresent } from "../ui";
 import { ACTION_META, ANSWER_TYPES, STEP_META, metaOf } from "./meta";
 
 export type NewStepChoice = { kind: StepKind; action?: ActionKind };
@@ -63,11 +63,12 @@ interface EditProps {
   onClose: () => void;
 }
 
-export function StepSheet({ step, defs, askedFields, onChange, onMove, onDelete, onClose }: EditProps) {
+export function StepSheet({ step: current, defs, askedFields, onChange, onMove, onDelete, onClose }: EditProps) {
+  const step = useLastPresent(current);
   const title = step ? metaOf(step).label : "";
   return (
     <Sheet
-      open={step !== null}
+      open={current !== null}
       onClose={onClose}
       title={title}
       footer={

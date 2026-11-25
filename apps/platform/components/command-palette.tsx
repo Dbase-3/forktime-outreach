@@ -2,11 +2,13 @@
 
 // ⌘K / Ctrl+K: jump to any page, agent, automation or contact.
 
+import * as Dialog from "@radix-ui/react-dialog";
 import clsx from "clsx";
 import { CalendarClock, CornerDownLeft, FileText, Search, User, Workflow, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useApp } from "@/lib/store";
+import { useFocusReturn } from "./ui";
 
 interface Item {
   id: string;
@@ -37,6 +39,7 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const focus = useFocusReturn(open);
 
   const items = useMemo<Item[]>(
     () => [
@@ -58,52 +61,62 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
   }, [open]);
   useEffect(() => setActive(0), [query]);
 
-  if (!open) return null;
   const go = (item: Item | undefined) => {
     if (!item) return;
     router.push(item.href);
     onClose();
   };
   const onKey = (event: ReactKeyboardEvent) => {
-    if (event.key === "Escape") onClose();
     if (event.key === "ArrowDown") setActive((a) => Math.min(shown.length - 1, a + 1));
     if (event.key === "ArrowUp") setActive((a) => Math.max(0, a - 1));
     if (event.key === "Enter") go(shown[active]);
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]" onKeyDown={onKey}>
-      <div className="absolute inset-0 animate-fade bg-black/40 dark:bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label="Search" className="relative w-full max-w-lg animate-fade overflow-hidden rounded-xl bg-surface shadow-lift">
-        <div className="flex items-center gap-2.5 border-b border-line px-4">
-          <Search size={15} className="text-fg-4" />
-          <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search agents, automations, contacts…" className="h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-fg-4 sm:text-sm" />
-          <kbd className="kbd">esc</kbd>
-        </div>
-        <div className="max-h-[52vh] overflow-y-auto p-1.5">
-          {shown.length === 0 && <p className="px-3 py-6 text-center text-sm text-fg-3">Nothing matches &ldquo;{query}&rdquo;.</p>}
-          {shown.map((item, i) => {
-            const Icon = item.icon ?? FileText;
-            const newGroup = i === 0 || shown[i - 1].group !== item.group;
-            return (
-              <div key={item.id}>
-                {newGroup && <div className="eyebrow px-2.5 pb-1 pt-2.5">{item.group}</div>}
-                <button
-                  type="button"
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => go(item)}
-                  className={clsx("flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm", i === active ? "bg-muted text-fg" : "text-fg-2")}
-                >
-                  <Icon size={15} className="text-fg-4" />
-                  <span className="flex-1 truncate">{item.label}</span>
-                  <span className="truncate text-xs text-fg-4">{item.hint}</span>
-                  {i === active && <CornerDownLeft size={13} className="text-fg-4" />}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/30 data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in dark:bg-black/60" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          onKeyDown={onKey}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            input.current?.focus();
+          }}
+          onCloseAutoFocus={focus.onClose}
+          className="fixed left-1/2 top-[12vh] z-[60] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 overflow-hidden rounded-xl border border-line bg-surface shadow-lift outline-none data-[state=open]:animate-pop-in"
+        >
+          <Dialog.Title className="sr-only">Search</Dialog.Title>
+          <div className="flex items-center gap-2.5 border-b border-line px-4">
+            <Search size={15} className="text-fg-4" />
+            <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search agents, automations, contacts…" className="h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-fg-4 sm:text-sm" />
+            <kbd className="kbd">esc</kbd>
+          </div>
+          <div className="max-h-[52vh] overflow-y-auto p-1.5">
+            {shown.length === 0 && <p className="px-3 py-6 text-center text-sm text-fg-3">Nothing matches &ldquo;{query}&rdquo;.</p>}
+            {shown.map((item, i) => {
+              const Icon = item.icon ?? FileText;
+              const newGroup = i === 0 || shown[i - 1].group !== item.group;
+              return (
+                <div key={item.id}>
+                  {newGroup && <div className="eyebrow px-2.5 pb-1 pt-2.5">{item.group}</div>}
+                  <button
+                    type="button"
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => go(item)}
+                    className={clsx("flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm", i === active ? "bg-muted text-fg" : "text-fg-2")}
+                  >
+                    <Icon size={15} className="text-fg-4" />
+                    <span className="flex-1 truncate">{item.label}</span>
+                    <span className="truncate text-xs text-fg-4">{item.hint}</span>
+                    {i === active && <CornerDownLeft size={13} className="text-fg-4" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

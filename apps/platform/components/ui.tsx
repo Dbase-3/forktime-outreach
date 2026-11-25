@@ -5,7 +5,8 @@
 
 import clsx from "clsx";
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useRef, type ReactNode } from "react";
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
@@ -88,45 +89,74 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
   );
 }
 
-/** A panel: slides up from the bottom on phones, floats in from the right on larger screens. */
+/**
+ * The app's one panel component (Radix Dialog underneath: focus stays inside,
+ * Esc and a tap outside close it, focus returns to what opened it).
+ * Phones: a bottom sheet with dimmed space above it to tap away.
+ * Larger screens: a true side drawer, full height and flush to the right edge.
+ */
 export function Sheet({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
+  const focus = useFocusReturn(open);
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 animate-fade bg-black/40 backdrop-blur-[1px] dark:bg-black/60" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={clsx(
-          "absolute inset-x-0 bottom-0 flex max-h-[92dvh] animate-sheet-up flex-col rounded-t-2xl bg-surface shadow-lift",
-          "sm:inset-y-2 sm:left-auto sm:right-2 sm:max-h-none sm:animate-sheet-left sm:rounded-xl",
-          wide ? "sm:w-[560px]" : "sm:w-[420px]",
-        )}
-      >
-        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong sm:hidden" />
-        <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-4 sm:h-14 sm:px-5">
-          <h2 className="truncate text-base font-semibold tracking-[-0.01em]">{title}</h2>
-          <button type="button" className="btn-icon -mr-1.5" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-5">{children}</div>
-        {footer && <div className="pb-safe border-t border-line px-4 py-3 sm:px-5">{footer}</div>}
-      </div>
-    </div>
+    <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in dark:bg-black/60" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          onOpenAutoFocus={focus.onOpen}
+          onCloseAutoFocus={focus.onClose}
+          className={clsx(
+            "fixed z-50 flex flex-col bg-surface outline-none motion-reduce:!animate-none",
+            // phone: bottom sheet
+            "inset-x-0 bottom-0 max-h-[90dvh] rounded-t-2xl border-t border-line shadow-lift data-[state=closed]:animate-sheet-down data-[state=open]:animate-sheet-up",
+            // tablet / desktop: side drawer
+            "sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-dvh sm:max-h-none sm:w-full sm:rounded-none sm:border-l sm:border-t-0 sm:shadow-drawer sm:data-[state=closed]:animate-drawer-out sm:data-[state=open]:animate-drawer-in",
+            wide ? "sm:max-w-[560px]" : "sm:max-w-[440px]",
+          )}
+        >
+          <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-line-strong sm:hidden" />
+          <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-4 sm:h-14 sm:px-6">
+            <Dialog.Title className="truncate text-base font-semibold tracking-[-0.01em]">{title}</Dialog.Title>
+            <Dialog.Close className="btn-icon -mr-1.5" aria-label="Close">
+              <X size={16} />
+            </Dialog.Close>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">{children}</div>
+          {footer && <div className="pb-safe shrink-0 border-t border-line bg-surface px-4 py-3 sm:px-6">{footer}</div>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
+}
+
+/**
+ * Focus for panels opened from code (no Radix Trigger): on open, a field that
+ * asked for autoFocus keeps it, otherwise the panel itself takes focus (no
+ * ring jumping onto ✕); on close, focus goes back to what had it before.
+ */
+export function useFocusReturn(open: boolean) {
+  const before = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  if (open && !wasOpen.current && typeof document !== "undefined") before.current = document.activeElement as HTMLElement | null;
+  wasOpen.current = open;
+  return {
+    onOpen: (event: Event) => {
+      event.preventDefault();
+      const panel = event.currentTarget as HTMLElement;
+      if (!panel.contains(document.activeElement)) panel.focus();
+    },
+    onClose: (event: Event) => {
+      event.preventDefault();
+      before.current?.focus?.();
+    },
+  };
+}
+
+/** The last non-null value, so a closing drawer keeps showing its content while it slides away. */
+export function useLastPresent<T>(value: T | null | undefined): T | null {
+  const last = useRef<T | null>(null);
+  if (value != null) last.current = value;
+  return last.current;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

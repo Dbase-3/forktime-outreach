@@ -5,7 +5,7 @@
 import clsx from "clsx";
 import { duration, humanize, relativeTime } from "@/lib/format";
 import type { AppState, Call } from "@/lib/types";
-import { Badge, Sheet, type Tone } from "./ui";
+import { Badge, Sheet, useLastPresent, type Tone } from "./ui";
 
 export function outcomeTone(outcome: string): Tone {
   if (outcome === "no_answer" || outcome === "in_progress") return "gray";
@@ -15,11 +15,12 @@ export function outcomeTone(outcome: string): Tone {
   return "gray";
 }
 
-export function CallSheet({ call, app, onClose }: { call: Call | null; app: AppState; onClose: () => void }) {
+export function CallSheet({ call: current, app, onClose }: { call: Call | null; app: AppState; onClose: () => void }) {
+  const call = useLastPresent(current);
   const contact = call ? app.contacts.find((c) => c.id === call.contactId) : undefined;
   const flow = call ? app.flows.find((f) => f.id === call.flowId) : undefined;
   return (
-    <Sheet open={call !== null} onClose={onClose} title={contact?.name ?? "Call"} wide>
+    <Sheet open={current !== null} onClose={onClose} title={contact?.name ?? "Call"} wide>
       {call && (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2 text-sm text-fg-3">

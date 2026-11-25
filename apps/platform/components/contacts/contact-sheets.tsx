@@ -12,7 +12,7 @@ import type { Contact, FieldDef, FieldType } from "@/lib/types";
 import { outcomeTone } from "../call-sheet";
 import { Badge, Field, Sheet, useLastPresent } from "../ui";
 
-const INPUT_TYPE: Record<FieldType, string> = { text: "text", number: "number", date: "date", yesno: "text", choice: "text" };
+const INPUT_TYPE: Record<FieldType, string> = { text: "text", number: "number", date: "date", yesno: "text", choice: "text", phone: "tel", email: "email" };
 
 function FieldInputs({ defs, values, onChange }: { defs: FieldDef[]; values: Record<string, string>; onChange: (key: string, value: string) => void }) {
   return (

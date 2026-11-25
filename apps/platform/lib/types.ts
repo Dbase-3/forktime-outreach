@@ -7,12 +7,23 @@ export type Direction = "inbound" | "outbound" | "both";
 
 export type AnswerType = "text" | "yesno" | "number" | "date" | "choice";
 
-export type ConditionOp = "is" | "is_not" | "contains" | "more_than" | "less_than" | "is_yes" | "is_no" | "is_empty" | "is_set";
+export type ConditionOp =
+  | "is" | "is_not" | "contains" | "not_contains" | "starts_with"
+  | "more_than" | "less_than" | "at_least" | "at_most" | "between"
+  | "before" | "after" | "on" | "less_than_days_ago" | "more_than_days_ago" | "less_than_days_from_now" | "more_than_days_from_now"
+  | "any_of" | "none_of" | "is_yes" | "is_no" | "is_set" | "is_empty";
 
 export interface Condition {
   field: string;
   op: ConditionOp;
-  value?: string;
+  value?: string; // a list for any_of / none_of is comma-separated
+  value2?: string; // the upper end for "between"
+}
+
+/** Rules combined with And (all) or Or (any). */
+export interface ConditionGroup {
+  match: "all" | "any";
+  rules: Condition[];
 }
 
 export type ActionKind = "book" | "transfer" | "text" | "crm" | "webhook";
@@ -51,12 +62,14 @@ export interface Flow {
 
 // ---- Contacts ----
 
-export type FieldType = "text" | "number" | "date" | "yesno" | "choice";
+export type FieldType = "text" | "number" | "date" | "yesno" | "choice" | "phone" | "email";
 
 export interface FieldDef {
   key: string;
   label: string;
   type: FieldType;
+  choices?: string[];
+  source?: string; // where values come from: a data source id, "call" (saved by an agent) or absent (added by hand)
 }
 
 export interface Contact {

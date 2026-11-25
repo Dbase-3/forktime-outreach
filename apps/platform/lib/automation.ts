@@ -1,24 +1,14 @@
 // Automations in plain words, and who they would call. Pure, so the builder can
 // preview "who gets a call next" before anything is switched on.
 
+import { OPS, describe, holds } from "./conditions";
 import type { Automation, Condition, Contact, FieldDef, Flow, Trigger } from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const OP_LABELS: Record<Condition["op"], string> = {
-  is: "is",
-  is_not: "is not",
-  contains: "contains",
-  more_than: "is more than",
-  less_than: "is less than",
-  is_yes: "is yes",
-  is_no: "is no",
-  is_empty: "is empty",
-  is_set: "has a value",
-};
-
-/** Operators that need no value typed in. */
-export const VALUELESS_OPS: Condition["op"][] = ["is_yes", "is_no", "is_empty", "is_set"];
+/** Labels and "no value needed" operators, from the shared rule engine (lib/conditions.ts). */
+export const OP_LABELS = Object.fromEntries(Object.entries(OPS).map(([op, info]) => [op, info.label])) as Record<Condition["op"], string>;
+export const VALUELESS_OPS = (Object.keys(OPS) as Condition["op"][]).filter((op) => OPS[op].input === "none");
 
 export function fieldLabel(key: string, defs: FieldDef[]): string {
   return defs.find((def) => def.key === key)?.label ?? key.replace(/_/g, " ");
@@ -37,26 +27,11 @@ export function describeTrigger(trigger: Trigger, defs: FieldDef[], flows: Flow[
 }
 
 export function describeCondition(condition: Condition, defs: FieldDef[]): string {
-  const field = fieldLabel(condition.field, defs);
-  if (VALUELESS_OPS.includes(condition.op)) return `${field} ${OP_LABELS[condition.op]}`;
-  return `${field} ${OP_LABELS[condition.op]} "${condition.value ?? ""}"`;
+  return describe(condition, fieldLabel(condition.field, defs));
 }
 
-export function conditionHolds(condition: Condition, values: Record<string, string>): boolean {
-  const raw = (values[condition.field] ?? "").trim();
-  const value = raw.toLowerCase();
-  const target = (condition.value ?? "").trim().toLowerCase();
-  if (condition.op === "is_set") return raw !== "";
-  if (condition.op === "is_empty") return raw === "";
-  if (condition.op === "is_yes") return ["yes", "y", "true"].includes(value);
-  if (condition.op === "is_no") return ["no", "n", "false"].includes(value);
-  if (condition.op === "is") return value === target;
-  if (condition.op === "is_not") return value !== target;
-  if (condition.op === "contains") return value.includes(target);
-  const a = Number(raw);
-  const b = Number(condition.value);
-  if (Number.isNaN(a) || Number.isNaN(b)) return false;
-  return condition.op === "more_than" ? a > b : a < b;
+export function conditionHolds(condition: Condition, values: Record<string, string>, now = new Date()): boolean {
+  return holds(condition, values[condition.field], now);
 }
 
 export function matchesAll(conditions: Condition[], contact: Contact): boolean {

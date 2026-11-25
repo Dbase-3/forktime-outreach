@@ -142,7 +142,7 @@ export function flowFromTemplate(template: FlowTemplate | null, now = new Date()
   const body = template?.build() ?? { greeting: "Hi, this is {agent}, the AI assistant at {business}. This call is recorded.", steps: [] };
   return {
     id: newId("f"),
-    name: template?.name ?? "Untitled flow",
+    name: template?.name ?? "Untitled agent",
     description: template?.blurb ?? "",
     direction: template?.direction ?? "outbound",
     status: "draft",

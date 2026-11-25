@@ -120,7 +120,7 @@ export function StepForm({ step, fields, onChange }: { step: Step; fields: Field
       <Field label="Goodbye line">
         <textarea className="field min-h-20" value={step.text} onChange={(e) => onChange({ text: e.target.value })} />
       </Field>
-      <Field label="Outcome" hint="How this call is filed. Automations can act on it, e.g. call again in 3 months.">
+      <Field label="Outcome" hint="How this call is filed. Campaigns can act on it, e.g. call again in 3 months.">
         <input className="field" value={step.outcome} onChange={(e) => onChange({ outcome: toFieldKey(e.target.value) || "" })} placeholder="e.g. service_booked" />
       </Field>
     </div>
@@ -162,7 +162,7 @@ function AskForm({ step, onChange }: { step: Extract<Step, { kind: "ask" }>; onC
           />
         </Field>
       )}
-      <Field label="Save the answer as" hint="Decisions, automations and your CRM use this name.">
+      <Field label="Save the answer as" hint="Decisions, campaigns and your CRM use this name.">
         <input className="field font-mono text-sm" value={step.field} onChange={(e) => onChange({ field: toFieldKey(e.target.value) })} placeholder="e.g. wants_service" />
       </Field>
     </div>

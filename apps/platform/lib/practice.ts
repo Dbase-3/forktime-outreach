@@ -57,7 +57,7 @@ function run(state: PracticeState): PracticeState {
       return { queue: [], values, lines, waitingFor: null, outcome: step.outcome || "done", currentId: step.id };
     }
   }
-  lines.push({ who: "system", text: "The flow ran out of steps without an ending. Add an \"End call\" step." });
+  lines.push({ who: "system", text: "The workflow ran out of steps without an ending. Add an \"End call\" step." });
   return { queue: [], values, lines, waitingFor: null, outcome: "no_ending", currentId: null };
 }
 

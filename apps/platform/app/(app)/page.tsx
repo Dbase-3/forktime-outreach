@@ -276,18 +276,18 @@ function Outcomes({ calls }: { calls: Call[] }) {
 function NextUp({ app, now }: { app: AppState; now: Date }) {
   const upcoming = app.campaigns
     .filter((c) => c.status === "running")
-    .flatMap((c) => upcomingCalls(c, app.contacts, now, 30).map((p) => ({ ...p, automation: c })))
+    .flatMap((c) => upcomingCalls(c, app.contacts, now, 30).map((p) => ({ ...p, campaign: c })))
     .sort((a, b) => a.due.getTime() - b.due.getTime())
     .slice(0, 5);
   return (
     <Panel title="Next up" href="/campaigns">
       <div className="divide-y divide-line">
         {upcoming.length === 0 && <p className="px-4 py-3 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
-        {upcoming.map(({ contact, due, automation }) => (
-          <div key={`${automation.id}-${contact.id}`} className="flex items-center gap-3 px-4 py-2.5">
+        {upcoming.map(({ contact, due, campaign }) => (
+          <div key={`${campaign.id}-${contact.id}`} className="flex items-center gap-3 px-4 py-2.5">
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm">{contact.name}</span>
-              <span className="block truncate text-xs text-fg-4">{automation.name}</span>
+              <span className="block truncate text-xs text-fg-4">{campaign.name}</span>
             </span>
             <span className="font-mono text-2xs text-fg-3">{dayLabel(due, now)}</span>
           </div>

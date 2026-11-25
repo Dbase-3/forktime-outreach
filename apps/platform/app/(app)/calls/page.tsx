@@ -63,8 +63,8 @@ export default function CallsPage() {
           />
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:w-[640px]">
-          <select className="field" value={flowId} onChange={(e) => setFlowId(e.target.value)} aria-label="Flow">
-            <option value="">All flows</option>
+          <select className="field" value={flowId} onChange={(e) => setFlowId(e.target.value)} aria-label="Agent">
+            <option value="">All agents</option>
             {app.flows.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
           <select className="field" value={outcome} onChange={(e) => setOutcome(e.target.value)} aria-label="Outcome">

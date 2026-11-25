@@ -52,7 +52,7 @@ export function CallOverview({ call, app }: { call: Call; app: AppState }) {
         <Fact label="How it ended">{call.live ? "Still on the call" : call.endReason ? END_REASONS[call.endReason] : "—"}</Fact>
         <Fact label="Number"><span className="font-mono">{contact?.phone ?? "Unknown"}</span></Fact>
         <Fact label="When">{new Date(call.startedAt).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</Fact>
-        <Fact label="Flow">{flow ? <Link href={`/agents/${flow.id}`} className="text-accent hover:underline">{flow.name}</Link> : "—"}</Fact>
+        <Fact label="Agent">{flow ? <Link href={`/agents/${flow.id}`} className="text-accent hover:underline">{flow.name}</Link> : "—"}</Fact>
       </dl>
 
       {Object.keys(call.saved).length > 0 && (
@@ -104,7 +104,7 @@ function PathSection({ call, app }: { call: Call; app: AppState }) {
   const path = flowPath(flow.steps, values);
   const questions = Object.fromEntries(flow.steps.flatMap((s) => (s.kind === "ask" ? [[s.field, s.question]] : [])));
   return (
-    <Section title="Path through the flow" aside={<span className="text-xs text-fg-3">{path.steps.length} steps</span>}>
+    <Section title="Path through the workflow" aside={<span className="text-xs text-fg-3">{path.steps.length} steps</span>}>
       <ol className="relative space-y-0.5 pl-1">
         {path.steps.map((step, i) => {
           const meta = metaOf(step);

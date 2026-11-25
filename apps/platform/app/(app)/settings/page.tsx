@@ -21,7 +21,7 @@ export default function SettingsPage() {
     <div className="max-w-4xl">
       <PageHeader title="Settings" subtitle="Your number, business details and calling rules." />
       <div>
-        <Section title="Your phone number" body="Included with your plan. Your agents call from it, and calls to it are answered by the flow below.">
+        <Section title="Your phone number" body="Included with your plan. Your agents call from it, and calls to it are answered by the agent below.">
           <div className="flex items-center gap-3 rounded-lg border border-line bg-subtle p-3.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fg text-background"><Phone size={15} /></span>
             <div className="min-w-0 flex-1">
@@ -32,7 +32,7 @@ export default function SettingsPage() {
           </div>
           <Field label="Answer incoming calls with">
             <select className="field" value={settings.inboundFlowId} onChange={(e) => set({ inboundFlowId: e.target.value })}>
-              {inboundFlows.length === 0 && <option value="">Make a flow for incoming calls first</option>}
+              {inboundFlows.length === 0 && <option value="">Make an agent for incoming calls first</option>}
               {inboundFlows.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </Field>

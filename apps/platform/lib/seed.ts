@@ -7,7 +7,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 8;
+export const SEED_VERSION = 9;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -101,16 +101,16 @@ export function seedState(now = new Date()): AppState {
       transcript: [
         { who: "agent", at: 0.6, text: "Hi Priya, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
         { who: "caller", at: 8.4, text: "Yeah sure, what's up?" },
-        { who: "agent", at: 11.2, text: "It's been about a month since you picked up your Camry, so we're checking in. Is everything running well so far?", reason: "Opening the check-in, then the first question in the flow." },
+        { who: "agent", at: 11.2, text: "It's been about a month since you picked up your Camry, so we're checking in. Is everything running well so far?", reason: "Opening the check-in, then the first question in the workflow." },
         { who: "caller", at: 20.5, text: "Yeah it's been great actually." },
-        { who: "agent", at: 23.1, text: "Love to hear it. Would you like to book your first free service?", reason: "All good is yes, so the flow skips the problem questions." },
+        { who: "agent", at: 23.1, text: "Love to hear it. Would you like to book your first free service?", reason: "All good is yes, so the workflow skips the problem questions." },
         { who: "caller", at: 30.8, text: "Yes, maybe next Tuesday morning?" },
         { who: "action", text: "Checked the service calendar: Tue 10:00, 10:30 and 11:00 free" },
         { who: "agent", at: 36.4, text: "Tuesday at 10am is free. Shall I lock that in?", reason: "Offered the earliest morning slot, as asked." },
         { who: "caller", at: 42.9, text: "Perfect." },
         { who: "action", text: "Booked on the service calendar: Tue 10:00, 1 hour" },
         { who: "action", text: "Texted the booking details to Priya" },
-        { who: "agent", at: 46.2, text: "You're all set. We'll text you the details. Thanks!", reason: "Booked, so the flow ends with Service booked." },
+        { who: "agent", at: 46.2, text: "You're all set. We'll text you the details. Thanks!", reason: "Booked, so the call ends with Service booked." },
       ],
     },
     {

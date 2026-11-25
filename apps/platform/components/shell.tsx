@@ -4,10 +4,7 @@
 // ⌘K search works everywhere.
 
 import clsx from "clsx";
-import {
-  AudioLines, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
-  type LucideIcon,
-} from "lucide-react";
+import { AudioLines, BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -31,6 +28,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
     items: [
       { href: "/", label: "Home", icon: Home, tab: true },
       { href: "/calls", label: "Calls", icon: PhoneCall, tab: true },
+      { href: "/analytics", label: "Analytics", icon: BarChart3, tab: false },
     ],
   },
   {

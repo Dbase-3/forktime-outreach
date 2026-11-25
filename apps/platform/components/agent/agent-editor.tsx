@@ -182,7 +182,7 @@ export function AgentEditor({ id }: { id: string }) {
 
       <div className="flex min-h-0 flex-1">
         {/* Left: the agent's setup */}
-        <aside className={clsx("flex w-full min-w-0 flex-col border-line bg-surface md:flex-[3] md:border-r lg:flex-[7]", !phoneSetup && "max-md:hidden")}>
+        <aside className={clsx("flex w-full min-w-0 flex-col border-line bg-surface md:flex-[3] md:border-r", !phoneSetup && "max-md:hidden")}>
           <TabBar
             tabs={setupTabs}
             value={setupTab}
@@ -232,7 +232,7 @@ export function AgentEditor({ id }: { id: string }) {
         </aside>
 
         {/* Right: Workflow | Preview */}
-        <section className={clsx("flex min-w-0 flex-col md:flex-[2] lg:min-w-[340px] lg:flex-[3]", phoneSetup && "max-md:hidden")}>
+        <section className={clsx("flex min-w-0 flex-col md:flex-[2] lg:min-w-[360px]", phoneSetup && "max-md:hidden")}>
           <div className="flex shrink-0 items-center gap-3 border-b border-line pr-3 max-md:hidden">
             <TabBar tabs={[{ id: "workflow", label: "Workflow", count: allSteps(flow.steps).length }, { id: "preview", label: "Preview" }]} value={mainTab} onChange={setMainTab} bare />
             {mainTab === "workflow" && (

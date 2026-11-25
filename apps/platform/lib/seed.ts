@@ -7,7 +7,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 12;
+export const SEED_VERSION = 13;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -318,6 +318,7 @@ const SUMMARIES: Record<string, string> = {
   needs_decision_maker: "Interested, but someone else decides. Follow-up set.",
   transferred: "Asked for a person and was put through.",
   message_taken: "Left a message for the team.",
+  routed: "Passed to the bookings agent.",
 };
 
 /** A small, fixed pseudo-random sequence so the sample is the same on every load. */
@@ -332,29 +333,56 @@ function sequence(seed: number): () => number {
 function sampleHistory(now: Date, flows: Flow[], contacts: Contact[]): Call[] {
   const rand = sequence(7);
   const calls: Call[] = [];
-  for (let day = 13; day >= 1; day--) {
-    const weekend = new Date(now.getTime() - day * DAY).getDay() % 6 === 0;
+  for (let day = 100; day >= 1; day--) {
+    const base = new Date(now.getTime() - day * DAY);
+    const weekday = base.getDay(); // 0 Sun … 6 Sat
+    const weekend = weekday % 6 === 0;
     const count = Math.round((weekend ? 3 : 7) + rand() * 7);
     for (let i = 0; i < count; i++) {
       const flow = flows[Math.floor(rand() * flows.length)];
-      const outcomes = outcomesOf(flow);
-      const outcome = rand() < 0.14 ? "no_answer" : outcomes[Math.floor(rand() * outcomes.length)];
       const contact = contacts[Math.floor(rand() * contacts.length)];
-      const start = new Date(now.getTime() - day * DAY);
-      start.setHours(9 + Math.floor(rand() * 9), Math.floor(rand() * 60), 0, 0);
+      const outbound = flow.direction !== "inbound";
+      // Calls go out in the contact's own business hours (NZ is UTC+13, Australia UTC+11 in summer).
+      const offset = contact.phone.startsWith("+64") ? 13 : 11;
+      const localHour = 8 + Math.floor(rand() * 12);
+      const start = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), localHour - offset, Math.floor(rand() * 60)));
+      // Late mornings and late afternoons pick up best; lunch and Monday mornings worst.
+      const chance = 0.7 + (localHour >= 10 && localHour < 12 ? 0.14 : 0) + (localHour >= 16 && localHour < 18 ? 0.1 : 0) - (localHour >= 12 && localHour < 14 ? 0.16 : 0) - (weekday === 1 && localHour < 12 ? 0.12 : 0) + (weekend ? 0.06 : 0);
+      const missed = outbound && rand() > chance;
+      const missKind = rand();
+      const miss = missKind < 0.45 ? "no_answer" : missKind < 0.85 ? "voicemail" : missKind < 0.96 ? "busy" : "failed";
+      const outcomes = outcomesOf(flow);
+      let outcome = missed ? miss : outcomes[Math.floor(rand() * outcomes.length)];
+      let transferTo: Call["transferTo"];
+      if (!missed && flow.direction === "inbound" && rand() < 0.07) {
+        outcome = "routed";
+        transferTo = "agent";
+      }
+      if (outcome === "transferred") transferTo = "person";
+      const durationSec = missed ? (miss === "voicemail" ? 22 : 0) : Math.round(35 + rand() * 180);
+      const win = /booked|_set|promise|transferred|given|taken/.test(outcome);
+      const roll = rand();
+      const lead = missed ? undefined : win ? (roll < 0.75 ? "qualified" : "potential") : roll < 0.3 ? "potential" : "unqualified";
+      const engagement = missed ? undefined : durationSec > 150 ? (roll < 0.8 ? "high" : "medium") : durationSec > 80 ? (roll < 0.6 ? "medium" : "high") : roll < 0.65 ? "low" : "medium";
+      const upset = !missed && !win && rand() < 0.22;
+      const mood = missed ? undefined : Array.from({ length: 3 }, () => Math.round((upset ? 0.45 + rand() * 0.4 : rand() * 0.4) * 100) / 100);
       calls.push({
         id: `call_h${day}_${i}`,
         contactId: contact.id,
         flowId: flow.id,
-        direction: flow.direction === "inbound" ? "inbound" : "outbound",
+        direction: outbound ? "outbound" : "inbound",
         startedAt: start.toISOString(),
-        durationSec: outcome === "no_answer" ? 0 : Math.round(35 + rand() * 180),
+        durationSec,
         outcome,
-        summary: outcome === "no_answer" ? "No answer." : SUMMARIES[outcome] ?? "Call completed.",
+        summary: missed ? (miss === "voicemail" ? "Left a voicemail." : miss === "busy" ? "The line was busy." : "No answer.") : SUMMARIES[outcome] ?? "Call completed.",
         saved: {},
         transcript: [],
-        endReason: outcome === "no_answer" ? "no_answer" : outcome === "transferred" ? "transferred" : "agent_ended",
-        actions: outcome === "transferred" ? ["transferred"] : /booked|set/.test(outcome) ? ["booked"] : outcome === "message_taken" ? ["message"] : [],
+        endReason: missed ? miss : outcome === "transferred" ? "transferred" : "agent_ended",
+        actions: outcome === "transferred" ? ["transferred"] : outcome === "routed" ? ["routed"] : /booked|set/.test(outcome) ? ["booked"] : outcome === "message_taken" ? ["message"] : [],
+        lead,
+        engagement,
+        mood,
+        transferTo,
       });
     }
   }

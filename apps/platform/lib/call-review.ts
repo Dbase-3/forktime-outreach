@@ -112,6 +112,7 @@ export const CALL_ACTIONS: Record<string, string> = {
   texted: "Sent a text",
   crm: "Updated CRM",
   message: "Took a message",
+  routed: "Passed to another agent",
 };
 
 /** The same reasons the Forktime dashboard offers, so feedback reads the same everywhere. */

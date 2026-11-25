@@ -158,7 +158,7 @@ export function FormSkeleton() {
 
 /** Which skeleton fits a path: used by the shell before the workspace is ready. */
 export function SkeletonFor({ pathname }: { pathname: string }) {
-  if (pathname === "/") return <HomeSkeleton />;
+  if (pathname === "/" || pathname.startsWith("/analytics")) return <HomeSkeleton />;
   if (/^\/agents\/[^/]+/.test(pathname)) return <EditorSkeleton />;
   if (/^\/(agents|campaigns|integrations)/.test(pathname)) return <CardsSkeleton />;
   if (pathname.startsWith("/knowledge")) return <ListSkeleton />;

@@ -42,69 +42,60 @@ export function NumberPicker({
 }) {
   // The parent holds the choice; a taken number can be chosen (to see who has it) but not saved.
   const blockedBy = numberOwner(flows, value, exceptFlowId);
-  const pick = onChange;
+  const free = numbers.filter((n) => !numberOwner(flows, n.id, exceptFlowId));
+  const taken = numbers.filter((n) => numberOwner(flows, n.id, exceptFlowId));
+  const current = numbers.find((n) => n.id === value);
 
   return (
     <div className="space-y-2">
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line" role="radiogroup" aria-label="Phone number">
-        {numbers.map((n) => {
-          const owner = numberOwner(flows, n.id, exceptFlowId);
-          const selected = value === n.id;
-          return (
-            <button
-              key={n.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => pick(n.id)}
-              className={clsx("flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors", selected ? (owner ? "bg-amber-500/[0.07]" : "bg-accent/[0.06]") : "hover:bg-subtle")}
-            >
-              <Radio on={selected} warn={Boolean(owner)} />
-              <span className="min-w-0 flex-1">
-                <span className="block font-mono text-sm font-medium">{n.display}</span>
-                <span className="block text-xs text-fg-3">{describeNumber(n)}</span>
-              </span>
-              {owner ? (
-                <span className="shrink-0 truncate text-xs text-fg-3">Used by <span className="font-medium text-fg-2">{owner.name}</span></span>
-              ) : (
-                <span className="shrink-0 text-xs font-medium text-emerald-700 dark:text-emerald-400">Free</span>
-              )}
-            </button>
-          );
-        })}
-        <button type="button" role="radio" aria-checked={!value} onClick={() => pick(undefined)} className={clsx("flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors", !value ? "bg-accent/[0.06]" : "hover:bg-subtle")}>
-          <Radio on={!value} />
-          <span className="flex-1 text-sm text-fg-2">Decide later</span>
-          <span className="text-xs text-fg-3">Needed before it goes live</span>
-        </button>
-      </div>
+      <select
+        className={clsx("field font-mono", blockedBy && "border-amber-500/60")}
+        value={value ?? ""}
+        aria-label="Phone number"
+        onChange={(e) => {
+          if (e.target.value === NEW) {
+            onGetNumber();
+            return;
+          }
+          onChange(e.target.value || undefined);
+        }}
+      >
+        <option value="">Decide later</option>
+        {free.length > 0 && (
+          <optgroup label="Free">
+            {free.map((n) => <option key={n.id} value={n.id}>{n.display} · {describeNumber(n)}</option>)}
+          </optgroup>
+        )}
+        {taken.length > 0 && (
+          <optgroup label="Used by another agent">
+            {taken.map((n) => <option key={n.id} value={n.id}>{n.display} · used by {numberOwner(flows, n.id, exceptFlowId)?.name}</option>)}
+          </optgroup>
+        )}
+        <option value={NEW}>+ Get another number…</option>
+      </select>
 
-      {blockedBy && (
+      {blockedBy ? (
         <div className="flex gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-3" role="alert">
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-medium">This number belongs to {blockedBy.name}</p>
-            <p className="mt-0.5 text-fg-2">A number can answer for one agent only. Get another number for this one, or pick a free number above.</p>
+            <p className="mt-0.5 text-fg-2">A number can answer for one agent only. Get another number for this one, or pick a free one.</p>
             <button type="button" className="btn-primary mt-2.5 h-8" onClick={onGetNumber}><Plus size={14} /> Get another number</button>
           </div>
         </div>
-      )}
-      {!blockedBy && (
-        <button type="button" onClick={onGetNumber} className="flex items-center gap-1.5 rounded-md px-1 py-1 text-sm font-medium text-fg-2 hover:text-fg">
-          <Plus size={14} /> Get another number
-        </button>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="text-fg-3">{current ? "" : "It needs a number before it goes live."}</span>
+          <button type="button" onClick={onGetNumber} className="flex items-center gap-1 font-medium text-fg-2 hover:text-fg">
+            <Plus size={13} /> Get another number
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-function Radio({ on, warn }: { on: boolean; warn?: boolean }) {
-  return (
-    <span className={clsx("flex h-4 w-4 shrink-0 items-center justify-center rounded-full border", on ? (warn ? "border-amber-600 bg-amber-600" : "border-accent bg-accent") : "border-line-strong")} aria-hidden>
-      {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-    </span>
-  );
-}
+const NEW = "__new";
 
 /** Search for a number by country, type and area, and add one. */
 export function GetNumber({ taken, onAdded, defaultCountry = "AU" }: { taken: string[]; onAdded: (n: PhoneNumber) => void; defaultCountry?: string }) {

@@ -89,13 +89,21 @@ function QuickActions() {
 // ---- Agents: each flow with its voice, live state and recent trend ----
 
 function Agents({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Call) => void }) {
-  const flows = [...app.flows].sort((a, b) => Number(b.status === "live") - Number(a.status === "live"));
+  // The three most recent (owner 2026-11-26): on a call now first, then the latest call or edit. "All agents" shows the rest.
+  const lastActive = (flow: Flow) => {
+    const lastCall = app.calls.reduce((latest, c) => (c.flowId === flow.id && c.startedAt > latest ? c.startedAt : latest), "");
+    return lastCall > flow.updatedAt ? lastCall : flow.updatedAt;
+  };
+  const onCall = (flow: Flow) => app.calls.some((c) => c.live && c.flowId === flow.id);
+  const flows = [...app.flows].sort((a, b) => Number(onCall(b)) - Number(onCall(a)) || lastActive(b).localeCompare(lastActive(a))).slice(0, 3);
   return (
     <section>
-      <SectionHead title="Your agents" action={<Link href="/agents" className="btn-secondary h-7 px-2.5 text-xs">All agents</Link>} />
+      <SectionHead title="Your agents" action={<Link href="/agents" className="btn-secondary h-7 px-2.5 text-xs">All agents{app.flows.length > 3 ? ` (${app.flows.length})` : ""}</Link>} />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {flows.map((flow) => (
-          <AgentCard key={flow.id} flow={flow} app={app} now={now} onOpen={onOpen} />
+        {flows.map((flow, i) => (
+          <div key={flow.id} className={clsx("flex", i === 2 && "md:max-xl:hidden")}>
+            <AgentCard flow={flow} app={app} now={now} onOpen={onOpen} />
+          </div>
         ))}
       </div>
     </section>
@@ -110,7 +118,7 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
   const isLive = flow.status === "live";
   const number = app.numbers.find((n) => n.id === flow.numberId);
   return (
-    <div className="card flex flex-col overflow-hidden transition-colors hover:border-line-strong">
+    <div className="card flex w-full flex-col overflow-hidden transition-colors hover:border-line-strong">
       <Link href={`/agents/${flow.id}`} className="block p-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

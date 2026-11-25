@@ -59,7 +59,9 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
     setActive(0);
     requestAnimationFrame(() => input.current?.focus());
   }, [open]);
-  useEffect(() => setActive(0), [query]);
+  useEffect(() => {
+    setActive(0);
+  }, [query]);
 
   const go = (item: Item | undefined) => {
     if (!item) return;

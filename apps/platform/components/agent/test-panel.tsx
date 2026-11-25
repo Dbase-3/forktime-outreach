@@ -23,10 +23,20 @@ export function TestPanel({ flow, business, contacts, onActiveStep }: { flow: Fl
   const result = structuredResult(schema, state.values);
 
   // Restart whenever the workflow or the contact changes, so the test always matches what's on screen.
-  useEffect(() => setState(begin()), [begin]);
-  useEffect(() => onActiveStep(state.currentId), [state.currentId, onActiveStep]);
-  useEffect(() => () => onActiveStep(null), [onActiveStep]);
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [state.lines.length]);
+  useEffect(() => {
+    setState(begin());
+  }, [begin]);
+  useEffect(() => {
+    onActiveStep(state.currentId);
+  }, [state.currentId, onActiveStep]);
+  useEffect(() => {
+    return () => {
+      onActiveStep(null);
+    };
+  }, [onActiveStep]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [state.lines.length]);
 
   const ask = state.waitingFor;
   const quick = ask?.answerType === "yesno" ? ["Yes", "No"] : ask?.answerType === "choice" ? ask.choices ?? [] : [];

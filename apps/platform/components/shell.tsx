@@ -80,7 +80,9 @@ export function Shell({ children }: { children: ReactNode }) {
 /** The workspace lives in this browser, so pages render after mount; until then each page shows its skeleton. */
 function useMounted(): boolean {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   return mounted;
 }
 
@@ -265,7 +267,9 @@ function BottomTabs() {
   const extras = NAV.filter((item) => !item.tab);
   const extraActive = extras.some((item) => isActive(pathname, item.href));
 
-  useEffect(() => setMoreOpen(false), [pathname]);
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
 
   return (
     <>

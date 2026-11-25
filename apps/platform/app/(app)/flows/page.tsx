@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, FilePlus2, Plus, Workflow } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { countSteps } from "@/lib/flow-tree";
 import { relativeTime } from "@/lib/format";
 import { update, useApp } from "@/lib/store";
@@ -22,6 +22,9 @@ const DIRECTION = {
 export default function FlowsPage() {
   const { flows, calls } = useApp();
   const [picking, setPicking] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("new") === "1") setPicking(true);
+  }, []);
   const newButton = (
     <button type="button" className="btn-primary" onClick={() => setPicking(true)}>
       <Plus size={16} /> New flow

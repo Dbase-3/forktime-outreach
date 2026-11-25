@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ArrowUpRight, CalendarClock, Megaphone, Phone, Plug, Users, Workflow, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Plus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { upcomingCalls } from "@/lib/automation";
@@ -65,25 +65,22 @@ function StatusStrip({ app, now }: { app: AppState; now: Date }) {
   );
 }
 
-// ---- Shortcuts ----
+// ---- Shortcuts: a few plain things people come here to do ----
 
 const ACTIONS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/flows", label: "Build and manage flows", icon: Workflow },
-  { href: "/automations", label: "Set up automations", icon: CalendarClock },
-  { href: "/campaigns", label: "Start a campaign", icon: Megaphone },
-  { href: "/contacts", label: "Add or import contacts", icon: Users },
-  { href: "/integrations", label: "Connect calendar or CRM", icon: Plug },
-  { href: "/settings", label: "Your number and hours", icon: Phone },
+  { href: "/flows?new=1", label: "Create an agent", icon: Plus },
+  { href: "/contacts", label: "Add contacts", icon: Users },
+  { href: "/automations", label: "Call people automatically", icon: CalendarClock },
+  { href: "/integrations", label: "Connect your calendar", icon: CalendarCheck },
 ];
 
 function QuickActions() {
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
       {ACTIONS.map(({ href, label, icon: Icon }) => (
-        <Link key={href} href={href} className="group flex min-h-11 items-center gap-2.5 rounded-lg border border-line bg-subtle px-3 py-2 text-xs leading-tight text-fg-2 transition-colors hover:border-line-strong hover:bg-muted hover:text-fg sm:gap-3 sm:px-3.5 sm:text-sm">
-          <Icon size={16} className="shrink-0 text-fg-3 group-hover:text-fg" />
-          <span className="flex-1">{label}</span>
-          <ArrowRight size={14} className="hidden shrink-0 text-fg-4 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 sm:block" />
+        <Link key={href} href={href} className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm text-fg-2 transition-colors hover:border-line-strong hover:bg-subtle hover:text-fg">
+          <Icon size={14} className="text-fg-3" />
+          {label}
         </Link>
       ))}
     </div>

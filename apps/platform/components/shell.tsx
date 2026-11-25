@@ -159,10 +159,10 @@ function AgentList({ pathname }: { pathname: string }) {
         const href = `/flows/${flow.id}`;
         const active = pathname === href;
         return (
-          <Link key={flow.id} href={href} className={clsx("group flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors", active ? "bg-muted text-fg" : "text-fg-3 hover:bg-subtle hover:text-fg")}>
-            <span className={clsx("h-1.5 w-1.5 shrink-0 rounded-[1px]", flow.status === "live" ? "bg-emerald-500" : "bg-fg-4")} />
+          <Link key={flow.id} href={href} className={clsx("group flex h-7 items-center gap-2 rounded-md px-2.5 text-[13px] transition-colors", active ? "bg-muted text-fg" : "text-fg-3 hover:bg-subtle hover:text-fg")}>
             <span className="flex-1 truncate">{flow.name}</span>
-            <ChevronRight size={13} className="text-fg-4 opacity-0 transition group-hover:opacity-100" />
+            {flow.status === "draft" && <span className="text-2xs text-fg-4">Draft</span>}
+            <ChevronRight size={13} className="shrink-0 text-fg-4 opacity-0 transition group-hover:opacity-100" />
           </Link>
         );
       })}

@@ -12,6 +12,20 @@ export const maxDuration = 120;
 
 const MODEL = "claude-opus-5-5";
 
+// The review deploy has no sign-in yet, so cap AI writes per visitor (best effort:
+// per server instance). The backend replaces this with per-workspace limits.
+const LIMIT_PER_HOUR = 20;
+const recent = new Map<string, number[]>();
+function overLimit(request: Request): boolean {
+  const who = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const now = Date.now();
+  const hits = (recent.get(who) ?? []).filter((t) => now - t < 3600_000);
+  if (hits.length >= LIMIT_PER_HOUR) return true;
+  hits.push(now);
+  recent.set(who, hits);
+  return false;
+}
+
 function bad(status: number, error: string) {
   return NextResponse.json({ error }, { status });
 }
@@ -19,6 +33,7 @@ function bad(status: number, error: string) {
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY_EVAL || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return bad(503, "Writing agents with AI isn't set up on this server yet.");
+  if (overLimit(request)) return bad(429, "That's a lot of AI writing for one hour. Try again a bit later.");
 
   let body: DraftRequest;
   try {

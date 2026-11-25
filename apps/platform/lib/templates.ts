@@ -1,4 +1,4 @@
-// Starter flows. Picking one copies it with fresh ids; the customer edits the copy.
+// Starter agents. Picking one copies it with fresh ids; the customer edits the copy.
 
 import { newId } from "./flow-tree";
 import type { AgentVoice, Direction, Flow, Step } from "./types";
@@ -9,7 +9,7 @@ export interface FlowTemplate {
   blurb: string;
   direction: Direction;
   category: "Sales" | "Service" | "Front desk" | "Billing";
-  build: () => Pick<Flow, "greeting" | "steps">;
+  build: () => Pick<Flow, "greeting" | "steps" | "prompt">;
 }
 
 const say = (text: string): Step => ({ id: newId(), kind: "say", text });
@@ -32,6 +32,16 @@ export const TEMPLATES: FlowTemplate[] = [
     direction: "outbound",
     category: "Service",
     build: () => ({
+      prompt: `You are {agent}, the AI assistant at {business}, calling a customer about a month after they bought from us.
+
+Tone: warm, relaxed and brief, like a friendly service advisor. One question at a time.
+
+Your job: check everything is going well, note any problem for the service team, and offer to book their first free service.
+
+Rules:
+- If they're busy, offer to call back another time and end politely.
+- Never argue about a fault or promise a repair cost; pass it to the service team.
+- If they ask to stop being called, say sorry for the bother and end the call.`,
       greeting: "Hi {first_name}, this is {agent}, the AI assistant at {business}. This call is recorded. Have you got a minute?",
       steps: [
         say("It's been about a month since you picked up your {car_model}, so we're checking in."),
@@ -53,6 +63,16 @@ export const TEMPLATES: FlowTemplate[] = [
     direction: "outbound",
     category: "Sales",
     build: () => ({
+      prompt: `You are {agent}, the AI assistant at {business}, calling someone who just enquired online.
+
+Tone: upbeat, confident, never pushy. Keep replies to one or two sentences.
+
+Your job: understand what they need, how soon, and whether they decide, then book a call with the sales team.
+
+Rules:
+- Don't quote prices or discounts; the sales team does that.
+- If they're not interested, thank them and end the call.
+- If they ask to stop being called, apologise and end the call.`,
       greeting: "Hi {first_name}, it's {agent}, the AI assistant at {business}. This call is recorded. You just asked about us online, is now a good time?",
       steps: [
         text("What made you reach out today?", "need"),
@@ -73,6 +93,16 @@ export const TEMPLATES: FlowTemplate[] = [
     direction: "inbound",
     category: "Front desk",
     build: () => ({
+      prompt: `You are {agent}, the AI assistant answering the phone for {business}.
+
+Tone: friendly, calm and helpful. Short answers, plain words.
+
+Your job: find out why they're calling, answer common questions from what you know, and either put them through or take a message.
+
+Rules:
+- Only answer from the business's knowledge; if you don't know, say so and offer to take a message.
+- Never make up opening hours, prices or availability.
+- Anyone upset or asking for a person can be put through straight away.`,
       greeting: "Thanks for calling {business}, this is {agent}, the AI assistant. This call is recorded. How can I help?",
       steps: [
         choice("Is this about a booking, a question, or something else?", "reason", ["Booking", "Question", "Something else"]),
@@ -92,6 +122,16 @@ export const TEMPLATES: FlowTemplate[] = [
     direction: "inbound",
     category: "Front desk",
     build: () => ({
+      prompt: `You are {agent}, the AI assistant at {business}, handling appointments by phone.
+
+Tone: efficient and friendly. Confirm details back clearly.
+
+Your job: book, move or cancel an appointment on the calendar.
+
+Rules:
+- Always read the day and time back before booking.
+- Offer the nearest free times if their choice is taken.
+- Never share another customer's booking details.`,
       greeting: "Hi, you've reached {business}, this is {agent}, the AI assistant. This call is recorded. Are you booking, moving or cancelling an appointment?",
       steps: [
         choice("What would you like to do?", "request", ["Book", "Move", "Cancel"]),
@@ -109,6 +149,16 @@ export const TEMPLATES: FlowTemplate[] = [
     direction: "outbound",
     category: "Billing",
     build: () => ({
+      prompt: `You are {agent}, the AI assistant at {business}, calling about an unpaid invoice.
+
+Tone: polite, understanding and matter-of-fact. Never threatening.
+
+Your job: remind them of the amount and due date, offer a payment link by text, and note when they expect to pay.
+
+Rules:
+- Only discuss the invoice with the account holder.
+- Don't agree to discounts or payment plans; offer to have the accounts team call back.
+- If they dispute the invoice, note why and pass it to the accounts team.`,
       greeting: "Hi {first_name}, this is {agent}, the AI assistant at {business}. This call is recorded. Just a quick call about invoice {invoice_number}.",
       steps: [
         say("Our records show {amount} is still open, due on {due_date}."),
@@ -126,6 +176,15 @@ export const TEMPLATES: FlowTemplate[] = [
     direction: "outbound",
     category: "Service",
     build: () => ({
+      prompt: `You are {agent}, the AI assistant at {business}, calling for quick feedback after a visit.
+
+Tone: light, grateful and quick. Respect their time.
+
+Your job: get a score from 1 to 10 and, if it's low, what went wrong so the manager can follow up.
+
+Rules:
+- Don't argue with feedback or make excuses; thank them for it.
+- Don't offer refunds or compensation; say the manager will be in touch.`,
       greeting: "Hi {first_name}, it's {agent}, the AI assistant at {business}. This call is recorded. Got 30 seconds for quick feedback?",
       steps: [
         { id: newId(), kind: "ask", question: "From 1 to 10, how was your visit?", field: "score", answerType: "number" },
@@ -138,8 +197,18 @@ export const TEMPLATES: FlowTemplate[] = [
 
 export const DEFAULT_AGENT: AgentVoice = { name: "Ava", voiceId: "v_ava", personality: "friendly", speed: 1, language: "English" };
 
-export function flowFromTemplate(template: FlowTemplate | null, now = new Date()): Flow {
-  const body = template?.build() ?? { greeting: "Hi, this is {agent}, the AI assistant at {business}. This call is recorded.", steps: [] };
+export const BLANK_PROMPT = `You are {agent}, the AI assistant at {business}.
+
+Tone: friendly, clear and brief. One question at a time.
+
+Rules:
+- Only say what you know; if you're not sure, offer to have someone call back.
+- If they ask to stop being called, apologise and end the call.`;
+
+export const BLANK_GREETING = "Hi, this is {agent}, the AI assistant at {business}. This call is recorded.";
+
+export function flowFromTemplate(template: FlowTemplate | null, now = new Date(), timezone = "UTC"): Flow {
+  const body = template?.build() ?? { greeting: BLANK_GREETING, prompt: BLANK_PROMPT, steps: [] };
   return {
     id: newId("f"),
     name: template?.name ?? "Untitled agent",
@@ -152,6 +221,8 @@ export function flowFromTemplate(template: FlowTemplate | null, now = new Date()
     dataFields: [],
     askRequired: {},
     checks: [],
+    timezone,
+    tools: [],
     ...body,
   };
 }

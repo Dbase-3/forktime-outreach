@@ -41,8 +41,9 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
   const fit = useCallback(() => {
     const el = box.current;
     if (!el) return;
-    // Fit the width (never below 70%, never above 100%); tall flows scroll down.
-    const z = Math.max(0.7, Math.min(1, (el.clientWidth - 64) / layout.width));
+    // Fit the width (never below 45%, never above 100%), so a branch isn't cut off
+    // in the narrow 30% panel; tall flows scroll down.
+    const z = Math.max(0.45, Math.min(1, (el.clientWidth - 48) / layout.width));
     setView({ z, x: (el.clientWidth - layout.width * z) / 2, y: 32 });
   }, [layout.width]);
 
@@ -221,7 +222,7 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
         <span className="mx-0.5 h-4 w-px bg-line" />
         <button type="button" className="btn-icon h-7 w-7" onClick={showAll} aria-label="Fit the whole workflow" title="Fit the whole workflow"><Maximize2 size={13} /></button>
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-3 hidden font-mono text-2xs text-fg-4 sm:block">Scroll or pinch to zoom · drag to move</div>
+      <div className="pointer-events-none absolute left-3 top-3 hidden font-mono text-2xs text-fg-4 sm:block">Scroll or pinch to zoom · drag to move</div>
     </div>
   );
 }

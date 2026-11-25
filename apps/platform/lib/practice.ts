@@ -32,9 +32,10 @@ export function startPractice(flow: Pick<Flow, "greeting" | "steps">, ctx: Pract
   return run({ queue: [...flow.steps], values, lines: [greeting], waitingFor: null, outcome: null, currentId: null });
 }
 
-export function answerPractice(state: PracticeState, answer: string): PracticeState {
+/** `answer` is what the caller said (shown); `saved` is what the step keeps, when it differs ("yeah sure" -> "Yes"). */
+export function answerPractice(state: PracticeState, answer: string, saved = answer): PracticeState {
   if (!state.waitingFor) return state;
-  const values = { ...state.values, [state.waitingFor.field]: answer.trim() };
+  const values = { ...state.values, [state.waitingFor.field]: saved.trim() };
   const lines = [...state.lines, { who: "caller" as const, text: answer.trim() }];
   return run({ ...state, values, lines, waitingFor: null });
 }

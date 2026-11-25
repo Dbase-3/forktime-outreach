@@ -7,7 +7,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 9;
+export const SEED_VERSION = 11;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -18,7 +18,7 @@ function isoDay(now: Date, offsetDays: number): string {
 export function seedState(now = new Date()): AppState {
   const template = (id: string) => TEMPLATES.find((t) => t.id === id) ?? null;
   const service = {
-    ...flowFromTemplate(template("service_check"), now),
+    ...flowFromTemplate(template("service_check"), now, "Australia/Sydney"),
     id: "f_service",
     status: "live" as const,
     knowledgeIds: ["k_service"],
@@ -32,8 +32,8 @@ export function seedState(now = new Date()): AppState {
       { id: "chk_happy", label: "Customer is happy", description: "Passed when they say the car is running well" },
     ],
   };
-  const lead = { ...flowFromTemplate(template("lead_follow_up"), now), id: "f_lead", status: "live" as const, agent: { name: "Noah", voiceId: "v_noah", personality: "professional" as const, speed: 1.05, language: "English" } };
-  const desk = { ...flowFromTemplate(template("front_desk"), now), id: "f_desk", status: "live" as const, knowledgeIds: ["k_service", "k_warranty"], agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
+  const lead = { ...flowFromTemplate(template("lead_follow_up"), now, "Australia/Sydney"), id: "f_lead", status: "live" as const, agent: { name: "Noah", voiceId: "v_noah", personality: "professional" as const, speed: 1.05, language: "English" } };
+  const desk = { ...flowFromTemplate(template("front_desk"), now, "Australia/Sydney"), id: "f_desk", status: "live" as const, knowledgeIds: ["k_service", "k_warranty"], agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
 
   const people: [string, string, string, number][] = [
     ["Sarah Chen", "+61412555019", "Corolla Hybrid", -27],

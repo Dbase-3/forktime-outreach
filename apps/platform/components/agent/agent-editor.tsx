@@ -1,30 +1,36 @@
 "use client";
 
-// One agent, on a split screen like ElevenLabs: the workflow on the left
-// (canvas, or a list), and on the right a panel to test it live, set its
-// voice, knowledge and the data it collects, or edit the step you clicked.
+// One agent, on a split screen (owner 2026-11-26): its setup on the left
+// (Config first, then Knowledge, Data, Tools) and on the right two tabs,
+// Workflow (canvas or list; a clicked step opens on the left) and
+// Preview (talk to it by voice, ElevenLabs-style, or chat). A blank agent
+// starts in "What should this agent do?": AI writes the instructions and the
+// workflow from it.
 
 import clsx from "clsx";
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, MessageSquareText, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Loader2, MessageSquareText, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { docsForAgent } from "@/lib/knowledge";
 import { dataSchema } from "@/lib/agent-data";
 import { TOP, allSteps, findStep, flowIssues, insertStep, makeStep, moveStep, removeStep, updateStep, type Container } from "@/lib/flow-tree";
 import { nowIso, update, useApp } from "@/lib/store";
-import type { Direction, Flow, Step } from "@/lib/types";
+import type { Flow, Step } from "@/lib/types";
 import { FlowCanvas } from "../flow/flow-canvas";
 import { metaOf } from "../flow/meta";
 import { StepList, type StepListContext } from "../flow/step-list";
 import { AddStepSheet, StepForm, decisionFields, type NewStepChoice } from "../flow/step-sheet";
-import { VoicePanel } from "../flow/voice-panel";
 import { Popover } from "../popover";
-import { EmptyState, Field, Segmented } from "../ui";
+import { EmptyState, Segmented } from "../ui";
+import { draftFields, useAgentWriter } from "./agent-writer";
+import { ConfigTab } from "./config-tab";
 import { DataTab } from "./data-tab";
 import { KnowledgeTab } from "./knowledge-tab";
-import { TestPanel } from "./test-panel";
+import { PreviewPanel } from "./preview-panel";
+import { ToolsTab } from "./tools-tab";
 
-type PanelTab = "test" | "agent" | "knowledge" | "data" | "step";
+type SetupTab = "config" | "knowledge" | "data" | "tools" | "step";
+type MainTab = "workflow" | "preview";
 type View = "canvas" | "list";
 
 function saveFlow(id: string, fn: (flow: Flow) => Flow): void {
@@ -34,29 +40,37 @@ function saveFlow(id: string, fn: (flow: Flow) => Flow): void {
 export function AgentEditor({ id }: { id: string }) {
   const app = useApp();
   const flow = app.flows.find((f) => f.id === id);
-  const [tab, setTab] = useState<PanelTab>("test");
-  const [lastTab, setLastTab] = useState<Exclude<PanelTab, "step">>("test");
+  const [setupTab, setSetupTab] = useState<SetupTab>("config");
+  const [mainTab, setMainTab] = useState<MainTab>("preview");
+  const [phoneSetup, setPhoneSetup] = useState(true); // phones show one pane: setup, or the main tab
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ container: Container; index: number } | null>(null);
   const [view, setView] = useState<View>("list");
-  const [mobilePane, setMobilePane] = useState<"workflow" | "panel">("workflow");
+  const [undo, setUndo] = useState<Flow | null>(null);
+  const [drawn, setDrawn] = useState(0); // bumps when AI (or undo) replaces the workflow, so the canvas refits
+  const [focusBrief, setFocusBrief] = useState(false); // "Start from scratch": the cursor waits in "What should this agent do?"
+  const writer = useAgentWriter();
 
   useEffect(() => {
     if (window.matchMedia("(min-width: 768px)").matches) setView("canvas");
+    // A freshly written agent opens on its workflow, so the owner sees what was built.
+    if (new URLSearchParams(window.location.search).get("blank") === "1") setFocusBrief(true);
   }, []);
 
-  const select = useCallback(
-    (stepId: string | null) => {
-      setSelectedId(stepId);
-      if (stepId) {
-        if (tab !== "step") setLastTab(tab as Exclude<PanelTab, "step">);
-        setTab("step");
-        setMobilePane("panel");
-      } else if (tab === "step") setTab(lastTab);
-    },
-    [tab, lastTab],
-  );
+  const showMain = (tab: MainTab) => {
+    setMainTab(tab);
+    setPhoneSetup(false);
+  };
+  // A clicked step opens on the left (the wide side) as its own tab; the workflow stays in view.
+  const select = useCallback((stepId: string | null) => {
+    setSelectedId(stepId);
+    if (stepId) {
+      setMainTab("workflow");
+      setSetupTab("step");
+      setPhoneSetup(true);
+    } else setSetupTab((t) => (t === "step" ? "config" : t));
+  }, []);
 
   const steps = useMemo(() => flow?.steps ?? [], [flow?.steps]);
   const issues = useMemo(() => (flow ? flowIssues(flow, app.fieldDefs.map((d) => d.key)) : []), [flow, app.fieldDefs]);
@@ -66,12 +80,12 @@ export function AgentEditor({ id }: { id: string }) {
       defs: app.fieldDefs,
       questions,
       selectedId,
-      activeId: tab === "test" ? activeId : null,
+      activeId,
       issueIds: new Set(issues.flatMap((i) => (i.stepId ? [i.stepId] : []))),
       onAdd: (container, index) => setAdding({ container, index }),
       onSelect: (sid) => select(sid),
     }),
-    [app.fieldDefs, questions, selectedId, activeId, tab, issues, select],
+    [app.fieldDefs, questions, selectedId, activeId, issues, select],
   );
 
   if (!flow) {
@@ -89,11 +103,37 @@ export function AgentEditor({ id }: { id: string }) {
     select(step.id);
   };
 
-  const tabs: { id: PanelTab; label: string; count?: number }[] = [
-    { id: "test", label: "Test" },
-    { id: "agent", label: "Agent" },
+  const writeAgent = async () => {
+    const before = flow;
+    const draft = await writer.writeAgent({ brief: flow.brief ?? "", business: app.settings.businessName, fields: draftFields(app) });
+    if (!draft) return;
+    setUndo(before);
+    setSelectedId(null);
+    setDrawn((n) => n + 1);
+    edit((f) => ({ ...f, ...draft, name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
+    showMain("workflow");
+  };
+  const rebuildWorkflow = async () => {
+    const before = flow;
+    const newSteps = await writer.rebuildWorkflow({
+      brief: flow.brief ?? "",
+      business: app.settings.businessName,
+      fields: draftFields(app),
+      agent: { name: flow.agent.name, prompt: flow.prompt, greeting: flow.greeting, direction: flow.direction },
+    });
+    if (!newSteps) return;
+    setUndo(before);
+    setSelectedId(null);
+    setDrawn((n) => n + 1);
+    edit((f) => ({ ...f, steps: newSteps, askRequired: {} }));
+    showMain("workflow");
+  };
+
+  const setupTabs: { id: SetupTab; label: string; count?: number }[] = [
+    { id: "config", label: "Config" },
     { id: "knowledge", label: "Knowledge", count: docsForAgent(app, flow).length },
     { id: "data", label: "Data", count: dataSchema(flow).length },
+    { id: "tools", label: "Tools", count: flow.tools.length || undefined },
     ...(selected ? [{ id: "step" as const, label: metaOf(selected).label }] : []),
   ];
 
@@ -129,58 +169,50 @@ export function AgentEditor({ id }: { id: string }) {
 
       {/* Phones: one pane at a time */}
       <div className="flex shrink-0 border-b border-line px-3 py-2 md:hidden">
-        <Segmented<"workflow" | "panel"> value={mobilePane} onChange={setMobilePane} options={[{ value: "workflow", label: "Workflow" }, { value: "panel", label: tab === "step" && selected ? metaOf(selected).label : "Test & settings" }]} />
+        <Segmented<"setup" | MainTab>
+          value={phoneSetup ? "setup" : mainTab}
+          onChange={(v) => (v === "setup" ? setPhoneSetup(true) : showMain(v))}
+          options={[{ value: "setup", label: "Setup" }, { value: "workflow", label: "Workflow" }, { value: "preview", label: "Preview" }]}
+        />
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* Workflow */}
-        <div className={clsx("relative min-w-0 flex-1", mobilePane === "panel" && "max-md:hidden")}>
-          <div className="absolute left-3 top-3 z-10">
-            <Segmented<View> value={view} onChange={setView} options={[{ value: "canvas", label: "Canvas" }, { value: "list", label: "List" }]} />
-          </div>
-          {view === "canvas" ? (
-            <FlowCanvas steps={flow.steps} greeting={flow.greeting} ctx={ctx} onAddAt={(at) => setAdding(at)} onEditGreeting={() => { setLastTab("agent"); setTab("agent"); setSelectedId(null); setMobilePane("panel"); }} />
-          ) : (
-            <div className="h-full overflow-y-auto px-4 pb-10 pt-16">
-              <div className="mx-auto max-w-2xl">
-                <StepList steps={flow.steps} container={TOP} depth={0} ctx={ctx} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Panel */}
-        <aside className={clsx("flex w-full min-w-0 flex-col border-line bg-surface md:w-[400px] md:shrink-0 md:border-l xl:w-[440px]", mobilePane === "workflow" && "max-md:hidden")}>
-          <div className="flex shrink-0 gap-4 overflow-x-auto border-b border-line px-4" role="tablist">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={tab === t.id}
-                onClick={() => {
-                  if (t.id !== "step") {
-                    setSelectedId(null);
-                    setLastTab(t.id);
-                  }
-                  setTab(t.id);
-                }}
-                className={clsx("-mb-px shrink-0 border-b-2 py-3 text-sm font-medium transition-colors", tab === t.id ? "border-fg text-fg" : "border-transparent text-fg-3 hover:text-fg")}
-              >
-                {t.label}
-                {t.count !== undefined && <span className="ml-1 font-mono text-xs text-fg-4">{t.count}</span>}
-              </button>
-            ))}
-          </div>
+        {/* Left: the agent's setup */}
+        <aside className={clsx("flex w-full min-w-0 flex-col border-line bg-surface md:flex-[3] md:border-r lg:flex-[7]", !phoneSetup && "max-md:hidden")}>
+          <TabBar
+            tabs={setupTabs}
+            value={setupTab}
+            onChange={(t) => {
+              if (t !== "step") setSelectedId(null);
+              setSetupTab(t);
+            }}
+          />
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {tab === "test" && <TestPanel flow={flow} business={app.settings.businessName} contacts={app.contacts} onActiveStep={setActiveId} />}
-            {tab === "agent" && <AgentTab flow={flow} onEdit={edit} />}
-            {tab === "knowledge" && <KnowledgeTab flow={flow} />}
-            {tab === "data" && <DataTab flow={flow} onEdit={edit} />}
-            {tab === "step" && selected && (
+            {setupTab === "config" && (
+              <ConfigTab
+                flow={flow}
+                onEdit={edit}
+                focusBrief={focusBrief}
+                busy={writer.busy}
+                error={writer.error}
+                onWrite={writeAgent}
+                onRebuild={rebuildWorkflow}
+                canUndo={undo !== null}
+                onUndo={() => {
+                  if (undo) edit(() => undo);
+                  setDrawn((n) => n + 1);
+                  setUndo(null);
+                  setSelectedId(null);
+                }}
+                onDismissUndo={() => setUndo(null)}
+              />
+            )}
+            {setupTab === "knowledge" && <KnowledgeTab flow={flow} />}
+            {setupTab === "data" && <DataTab flow={flow} onEdit={edit} />}
+            {setupTab === "tools" && <ToolsTab flow={flow} app={app} onEdit={edit} />}
+            {setupTab === "step" && selected && (
               <StepPanel
                 step={selected}
-                flow={flow}
                 fields={decisionFields(flow.steps, app.fieldDefs)}
                 onChange={(patch) => setSteps((s) => updateStep(s, selected.id, patch))}
                 onMove={(d) => setSteps((s) => moveStep(s, selected.id, d))}
@@ -193,6 +225,54 @@ export function AgentEditor({ id }: { id: string }) {
             )}
           </div>
         </aside>
+
+        {/* Right: Workflow | Preview */}
+        <section className={clsx("flex min-w-0 flex-col md:flex-[2] lg:min-w-[340px] lg:flex-[3]", phoneSetup && "max-md:hidden")}>
+          <div className="flex shrink-0 items-center gap-3 border-b border-line pr-3 max-md:hidden">
+            <TabBar tabs={[{ id: "workflow", label: "Workflow", count: allSteps(flow.steps).length }, { id: "preview", label: "Preview" }]} value={mainTab} onChange={setMainTab} bare />
+            {mainTab === "workflow" && (
+              <div className="ml-auto">
+                <Segmented<View> value={view} onChange={setView} options={[{ value: "canvas", label: "Canvas" }, { value: "list", label: "List" }]} />
+              </div>
+            )}
+          </div>
+
+          <div className="relative min-h-0 flex-1">
+            {/* Workflow (stays mounted under Preview so the canvas keeps its place) */}
+            <div className={clsx("absolute inset-0", mainTab !== "workflow" && "invisible")}>
+              {view === "canvas" ? (
+                <FlowCanvas
+                  key={drawn}
+                  steps={flow.steps}
+                  greeting={flow.greeting}
+                  ctx={ctx}
+                  onAddAt={(at) => setAdding(at)}
+                  onEditGreeting={() => {
+                    setSetupTab("config");
+                    setPhoneSetup(true);
+                  }}
+                />
+              ) : (
+                <div className="h-full overflow-y-auto px-4 pb-10 pt-4">
+                  <div className="mx-auto max-w-2xl">
+                    <StepList steps={flow.steps} container={TOP} depth={0} ctx={ctx} />
+                  </div>
+                </div>
+              )}
+              {writer.busy && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/70 backdrop-blur-[2px]">
+                  <Loader2 size={20} className="animate-spin text-fg-3" />
+                  <span className="text-sm text-fg-2">{writer.busy === "agent" ? "Writing your agent…" : "Rebuilding the workflow…"}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Preview (stays mounted so a call carries on while you look at the workflow) */}
+            <div className={clsx("absolute inset-0 bg-background", mainTab !== "preview" && "invisible")}>
+              <PreviewPanel flow={flow} business={app.settings.businessName} contacts={app.contacts} onActiveStep={setActiveId} />
+            </div>
+          </div>
+        </section>
       </div>
 
       <AddStepSheet open={adding !== null} onClose={() => setAdding(null)} onPick={pick} />
@@ -200,7 +280,27 @@ export function AgentEditor({ id }: { id: string }) {
   );
 }
 
-function StepPanel({ step, fields, onChange, onMove, onDelete, onClose }: { step: Step; flow: Flow; fields: ReturnType<typeof decisionFields>; onChange: (p: Partial<Step>) => void; onMove: (d: -1 | 1) => void; onDelete: () => void; onClose: () => void }) {
+function TabBar<T extends string>({ tabs, value, onChange, bare }: { tabs: { id: T; label: string; count?: number }[]; value: T; onChange: (t: T) => void; bare?: boolean }) {
+  return (
+    <div className={clsx("flex shrink-0 gap-4 overflow-x-auto px-4", !bare && "border-b border-line")} role="tablist">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={value === t.id}
+          onClick={() => onChange(t.id)}
+          className={clsx("-mb-px shrink-0 border-b-2 py-3 text-sm font-medium transition-colors", value === t.id ? "border-fg text-fg" : "border-transparent text-fg-3 hover:text-fg")}
+        >
+          {t.label}
+          {t.count !== undefined && <span className="ml-1 font-mono text-xs text-fg-4">{t.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StepPanel({ step, fields, onChange, onMove, onDelete, onClose }: { step: Step; fields: ReturnType<typeof decisionFields>; onChange: (p: Partial<Step>) => void; onMove: (d: -1 | 1) => void; onDelete: () => void; onClose: () => void }) {
   const meta = metaOf(step);
   const Icon = meta.icon;
   return (
@@ -215,34 +315,6 @@ function StepPanel({ step, fields, onChange, onMove, onDelete, onClose }: { step
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         <StepForm key={step.id} step={step} fields={fields} onChange={onChange} />
-      </div>
-    </div>
-  );
-}
-
-function AgentTab({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => Flow) => void }) {
-  return (
-    <div className="space-y-6 p-4">
-      <Field label="The agent says first" hint="Keep “AI assistant” and “recorded” in it: callers must be told.">
-        <textarea className="field min-h-24 leading-relaxed" value={flow.greeting} onChange={(e) => onEdit((f) => ({ ...f, greeting: e.target.value }))} />
-      </Field>
-      <div>
-        <span className="label">Used for</span>
-        <Segmented<Direction>
-          value={flow.direction}
-          onChange={(direction) => onEdit((f) => ({ ...f, direction }))}
-          options={[
-            { value: "outbound", label: "Making calls" },
-            { value: "inbound", label: "Answering" },
-            { value: "both", label: "Both" },
-          ]}
-        />
-      </div>
-      <Field label="Description">
-        <input className="field" value={flow.description} onChange={(e) => onEdit((f) => ({ ...f, description: e.target.value }))} />
-      </Field>
-      <div className="border-t border-line pt-5">
-        <VoicePanel agent={flow.agent} onChange={(patch) => onEdit((f) => ({ ...f, agent: { ...f.agent, ...patch } }))} />
       </div>
     </div>
   );

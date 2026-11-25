@@ -20,7 +20,7 @@ const DIRECTION: Record<Direction, { label: string; icon: typeof ArrowUpRight }>
 };
 
 export default function AgentsPage() {
-  const { flows, calls } = useApp();
+  const { flows, calls, settings } = useApp();
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
@@ -32,10 +32,10 @@ export default function AgentsPage() {
   }, []);
 
   const create = (template: FlowTemplate | null) => {
-    const flow = flowFromTemplate(template);
+    const flow = flowFromTemplate(template, new Date(), settings.timezone);
     update((s) => ({ ...s, flows: [flow, ...s.flows] }));
     setPicking(false);
-    router.push(`/agents/${flow.id}`);
+    router.push(template ? `/agents/${flow.id}` : `/agents/${flow.id}?blank=1`);
   };
   const q = query.trim().toLowerCase();
   const shown = flows.filter((f) => !q || `${f.name} ${f.description} ${f.agent.name}`.toLowerCase().includes(q));
@@ -65,7 +65,7 @@ export default function AgentsPage() {
       </div>
 
       {flows.length === 0 ? (
-        <EmptyState icon={<Workflow size={20} />} title="No agents yet" body="Start from a template or from scratch. You can change everything later." action={newButton} />
+        <EmptyState icon={<Workflow size={20} />} title="No agents yet" body="Start from scratch or from a template. You can change everything later." action={newButton} />
       ) : (
         <>
           <div className="relative mb-3 sm:w-72">
@@ -119,7 +119,7 @@ export default function AgentsPage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-fg-2"><FilePlus2 size={16} /></span>
           <span>
             <span className="block text-sm font-medium">Start from scratch</span>
-            <span className="block text-xs text-fg-3">An empty workflow you build step by step</span>
+            <span className="block text-xs text-fg-3">Describe it and AI writes the instructions and workflow, or build it yourself</span>
           </span>
         </button>
         <h3 className="eyebrow mb-2">Templates</h3>

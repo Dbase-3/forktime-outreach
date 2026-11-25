@@ -65,6 +65,15 @@ export interface SuccessCheck {
   description: string;
 }
 
+/** Something outside the workflow the agent can call. Saved now, connected when the backend lands. */
+export interface AgentTool {
+  id: string;
+  kind: "mcp" | "api";
+  name: string;
+  url: string;
+  description: string;
+}
+
 /** An agent (the UI says Agent; the code keeps the name Flow). */
 export interface Flow {
   id: string;
@@ -74,6 +83,14 @@ export interface Flow {
   status: "draft" | "live";
   agent: AgentVoice;
   greeting: string;
+  /** Who the agent is and how it behaves: persona, tone, rules, guardrails. The workflow holds the steps. */
+  prompt: string;
+  /** What the owner asked for when the agent was written for them (kept so the workflow can be rebuilt). */
+  brief?: string;
+  /** IANA zone the agent lives in: "today", opening hours and booking times are read in it. */
+  timezone: string;
+  /** Tools the agent can use beyond its workflow actions (MCP servers, APIs). Coming soon. */
+  tools: AgentTool[];
   steps: Step[];
   knowledgeIds: string[]; // documents attached to this agent (plus every "available to all" one)
   dataFields: DataField[]; // extra things to collect; Ask steps add theirs automatically

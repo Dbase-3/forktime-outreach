@@ -167,9 +167,12 @@ export interface Call {
 
 // ---- Workspace ----
 
+/** A connected tool (catalog in lib/integrations.ts). Only connected ones are stored. */
 export interface Integration {
-  id: "hubspot" | "gohighlevel" | "calcom" | "google_calendar" | "zapier" | "webhook";
+  id: string;
   connected: boolean;
+  account?: string; // which account, e.g. "northside-motors.hubspot.com"
+  connectedAt?: string;
 }
 
 export interface WorkspaceSettings {

@@ -6,7 +6,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -192,12 +192,9 @@ export function seedState(now = new Date()): AppState {
     ],
     calls: [live, ...calls, ...sampleHistory(now, [service, lead, desk], contacts)],
     integrations: [
-      { id: "hubspot", connected: false },
-      { id: "gohighlevel", connected: false },
-      { id: "calcom", connected: true },
-      { id: "google_calendar", connected: false },
-      { id: "zapier", connected: false },
-      { id: "webhook", connected: false },
+      { id: "hubspot", connected: true, account: "northside-motors.hubspot.com", connectedAt: isoDay(now, -40) },
+      { id: "calcom", connected: true, account: "cal.com/northside-service", connectedAt: isoDay(now, -40) },
+      { id: "slack", connected: true, account: "#service-desk", connectedAt: isoDay(now, -12) },
     ],
     settings: {
       businessName: "Northside Motors",

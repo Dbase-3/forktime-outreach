@@ -1,52 +1,85 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
-import { update, useApp } from "@/lib/store";
-import type { Integration } from "@/lib/types";
+// Compact catalog: logo, name, one line, a small button. Connected tools show
+// a green dot and their account; tapping any card opens its drawer.
+
+import clsx from "clsx";
+import { Search } from "lucide-react";
+import { useState } from "react";
+import { CATEGORIES, INTEGRATIONS, type IntegrationCategory } from "@/lib/integrations";
+import { useApp } from "@/lib/store";
+import { ConnectSheet, IntegrationLogo } from "@/components/integrations";
 import { PageHeader } from "@/components/ui";
 
-const INFO: Record<Integration["id"], { name: string; blurb: string; mark: string; tint: string; group: string }> = {
-  hubspot: { name: "HubSpot", blurb: "Import contacts, log every call and update deals.", mark: "H", tint: "bg-orange-500/15 text-orange-600 dark:text-orange-400", group: "CRM" },
-  gohighlevel: { name: "GoHighLevel", blurb: "Sync contacts and pipelines, book on GHL calendars.", mark: "G", tint: "bg-sky-500/15 text-sky-600 dark:text-sky-400", group: "CRM" },
-  calcom: { name: "Cal.com", blurb: "Book meetings into your event types.", mark: "C", tint: "bg-fg text-background", group: "Calendar" },
-  google_calendar: { name: "Google Calendar", blurb: "Check free times and book appointments.", mark: "G", tint: "bg-blue-500/15 text-blue-600 dark:text-blue-400", group: "Calendar" },
-  zapier: { name: "Zapier", blurb: "Send call results to 6,000+ apps.", mark: "Z", tint: "bg-orange-500/15 text-orange-500", group: "Anything else" },
-  webhook: { name: "Webhook", blurb: "Post every call's answers to your own URL.", mark: "{}", tint: "bg-violet-500/15 text-violet-600 dark:text-violet-400", group: "Anything else" },
-};
+type Filter = "all" | "connected" | IntegrationCategory;
 
 export default function IntegrationsPage() {
   const { integrations } = useApp();
-  const toggle = (id: Integration["id"]) => update((s) => ({ ...s, integrations: s.integrations.map((i) => (i.id === id ? { ...i, connected: !i.connected } : i)) }));
-  const groups = [...new Set(Object.values(INFO).map((i) => i.group))];
+  const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const connected = (id: string) => integrations.find((i) => i.id === id && i.connected);
+  const q = query.trim().toLowerCase();
+  const inFilter = (f: Filter) => (i: (typeof INTEGRATIONS)[number]) => (f === "all" ? true : f === "connected" ? Boolean(connected(i.id)) : i.category === f);
+  const shown = INTEGRATIONS.filter(inFilter(filter)).filter((i) => !q || `${i.name} ${i.blurb}`.toLowerCase().includes(q));
+  const chips: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "connected", label: "Connected" }, ...CATEGORIES];
 
   return (
     <div>
-      <PageHeader title="Integrations" subtitle="Connect the tools you already use. Flows can then book, look up and update them during a call." />
-      <div className="space-y-8">
-        {groups.map((group) => (
-          <section key={group}>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-4">{group}</h2>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {integrations.filter((i) => INFO[i.id].group === group).map((integration) => {
-                const info = INFO[integration.id];
-                return (
-                  <div key={integration.id} className="card flex flex-col p-4">
-                    <div className="flex items-center gap-3">
-                      <span className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${info.tint}`}>{info.mark}</span>
-                      <span className="flex-1 font-semibold">{info.name}</span>
-                      {integration.connected && <CheckCircle2 size={18} className="text-emerald-500" />}
-                    </div>
-                    <p className="mt-3 flex-1 text-sm text-fg-3">{info.blurb}</p>
-                    <button type="button" className={integration.connected ? "btn-secondary mt-4" : "btn-primary mt-4"} onClick={() => toggle(integration.id)}>
-                      {integration.connected ? "Disconnect" : "Connect"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+      <PageHeader title="Integrations" subtitle="Connect the tools you already use. Agents read from them during calls and write results back." />
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:pb-0">
+          {chips.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => setFilter(chip.id)}
+              className={clsx("flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors", filter === chip.id ? "border-fg bg-fg text-background" : "border-line bg-surface text-fg-2 hover:border-line-strong")}
+            >
+              {chip.label}
+              <span className={clsx("font-mono text-xs", filter === chip.id ? "text-background/70" : "text-fg-4")}>{INTEGRATIONS.filter(inFilter(chip.id)).length}</span>
+            </button>
+          ))}
+        </div>
+        <div className="relative lg:w-64">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-4" />
+          <input className="field pl-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search integrations" />
+        </div>
       </div>
+
+      {shown.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-3">
+          Nothing matches &ldquo;{query}&rdquo;. A{" "}
+          <button type="button" className="text-accent hover:underline" onClick={() => { setQuery(""); setOpenId("webhook"); }}>webhook</button> or Zapier connects almost anything else.
+        </p>
+      ) : (
+        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          {shown.map((info) => {
+            const conn = connected(info.id);
+            return (
+              <button
+                key={info.id}
+                type="button"
+                onClick={() => setOpenId(info.id)}
+                className={clsx("group flex items-center gap-3 rounded-xl border bg-surface p-3 text-left transition-colors hover:border-line-strong", conn ? "border-emerald-500/40" : "border-line")}
+              >
+                <IntegrationLogo info={info} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    {info.name}
+                    {conn && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="Connected" />}
+                  </span>
+                  <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-fg-3">{conn?.account ?? info.blurb}</span>
+                </span>
+                <span className={clsx("shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors", conn ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-400" : "border-line text-fg-2 group-hover:border-line-strong group-hover:text-fg")}>
+                  {conn ? "Connected" : "Connect"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <ConnectSheet id={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }

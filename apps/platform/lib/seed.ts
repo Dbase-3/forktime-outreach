@@ -7,7 +7,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 13;
+export const SEED_VERSION = 14;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -20,6 +20,7 @@ export function seedState(now = new Date()): AppState {
   const service = {
     ...flowFromTemplate(template("service_check"), now, "Australia/Sydney"),
     id: "f_service",
+    numberId: "n_service",
     status: "live" as const,
     knowledgeIds: ["k_service"],
     askRequired: { problem: false },
@@ -32,8 +33,8 @@ export function seedState(now = new Date()): AppState {
       { id: "chk_happy", label: "Customer is happy", description: "Passed when they say the car is running well" },
     ],
   };
-  const lead = { ...flowFromTemplate(template("lead_follow_up"), now, "Australia/Sydney"), id: "f_lead", status: "live" as const, agent: { name: "Noah", voiceId: "v_noah", personality: "professional" as const, speed: 1.05, language: "English" } };
-  const desk = { ...flowFromTemplate(template("front_desk"), now, "Australia/Sydney"), id: "f_desk", status: "live" as const, knowledgeIds: ["k_service", "k_warranty"], agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
+  const lead = { ...flowFromTemplate(template("lead_follow_up"), now, "Australia/Sydney"), id: "f_lead", numberId: "n_sales", status: "live" as const, agent: { name: "Noah", voiceId: "v_noah", personality: "professional" as const, speed: 1.05, language: "English" } };
+  const desk = { ...flowFromTemplate(template("front_desk"), now, "Australia/Sydney"), id: "f_desk", numberId: "n_main", status: "live" as const, knowledgeIds: ["k_service", "k_warranty"], agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
 
   const people: [string, string, string, number][] = [
     ["Sarah Chen", "+61412555019", "Corolla Hybrid", -27],
@@ -187,6 +188,12 @@ export function seedState(now = new Date()): AppState {
   return {
     version: SEED_VERSION,
     flows: [service, lead, desk],
+    numbers: [
+      { id: "n_main", e164: "+61255501234", display: "(02) 5550 1234", country: "AU", kind: "local", area: "2", addedAt: isoDay(now, -120) },
+      { id: "n_service", e164: "+61255501290", display: "(02) 5550 1290", country: "AU", kind: "local", area: "2", addedAt: isoDay(now, -60) },
+      { id: "n_sales", e164: "+61255501377", display: "(02) 5550 1377", country: "AU", kind: "local", area: "2", addedAt: isoDay(now, -45) },
+      { id: "n_spare", e164: "+61491570156", display: "0491 570 156", country: "AU", kind: "mobile", addedAt: isoDay(now, -10) },
+    ],
     knowledge: [
       {
         id: "k_hours",

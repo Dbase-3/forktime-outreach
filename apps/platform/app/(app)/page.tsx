@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Plus, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Phone, Plus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { upcomingCalls } from "@/lib/campaign";
@@ -40,7 +40,6 @@ function StatusStrip({ app, now }: { app: AppState; now: Date }) {
   const live = app.calls.filter((c) => c.live).length;
   const today = callsPerDay(app.calls, 1, now)[0].calls;
   const items: { label: string; value: ReactNode }[] = [
-    { label: "Your number", value: <span className="font-mono">{app.settings.phoneNumber}</span> },
     { label: "Agents live", value: app.flows.filter((f) => f.status === "live").length },
     { label: "On a call now", value: <span className={clsx(live > 0 && "text-emerald-700 dark:text-emerald-400")}>{live}</span> },
     { label: "Calls today", value: today },
@@ -54,7 +53,7 @@ function StatusStrip({ app, now }: { app: AppState; now: Date }) {
     },
   ];
   return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
           <div className="metric-label">{item.label}</div>
@@ -109,6 +108,7 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
   const liveCall = app.calls.find((c) => c.live && c.flowId === flow.id);
   const voice = voiceById(flow.agent.voiceId);
   const isLive = flow.status === "live";
+  const number = app.numbers.find((n) => n.id === flow.numberId);
   return (
     <div className="card flex flex-col overflow-hidden transition-colors hover:border-line-strong">
       <Link href={`/agents/${flow.id}`} className="block p-4 pb-3">
@@ -118,6 +118,10 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-fg-3">
               <Avatar name={flow.agent.name} className="h-4 w-4 border-0 text-[8px]" />
               {flow.agent.name} · {voice.accent} · {flow.direction === "inbound" ? "Answers calls" : flow.direction === "outbound" ? "Makes calls" : "Both ways"}
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+              <Phone size={12} className="shrink-0 text-fg-4" />
+              {number ? <span className="font-mono text-fg-2">{number.display}</span> : <span className="text-amber-700 dark:text-amber-400">No number yet</span>}
             </div>
           </div>
           <ArrowUpRight size={15} className="shrink-0 text-fg-4" />

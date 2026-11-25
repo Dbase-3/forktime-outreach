@@ -4,7 +4,7 @@
 // ⌘K search works everywhere.
 
 import clsx from "clsx";
-import { AudioLines, BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow, type LucideIcon } from "lucide-react";
+import { AudioLines, BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, Phone, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -43,6 +43,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
     title: "Manage",
     items: [
       { href: "/contacts", label: "Contacts", icon: Users, tab: false },
+      { href: "/numbers", label: "Numbers", icon: Phone, tab: false },
       { href: "/integrations", label: "Integrations", icon: Plug, tab: false },
       { href: "/settings", label: "Settings", icon: Settings, tab: false },
     ],
@@ -179,7 +180,7 @@ function ThemeSwitch() {
 }
 
 function WorkspaceCard() {
-  const { settings } = useApp();
+  const { settings, numbers, flows } = useApp();
   return (
     <Link href="/settings" className="flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-subtle">
       <span className="flex h-7 w-7 items-center justify-center rounded-md border border-line bg-surface text-2xs font-semibold text-fg-2">
@@ -187,7 +188,7 @@ function WorkspaceCard() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{settings.businessName}</span>
-        <span className="block truncate font-mono text-2xs text-fg-3">{settings.phoneNumber}</span>
+        <span className="block truncate font-mono text-2xs text-fg-3">{numbers.length} {numbers.length === 1 ? "number" : "numbers"} · {flows.length} {flows.length === 1 ? "agent" : "agents"}</span>
       </span>
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Number active" />
     </Link>

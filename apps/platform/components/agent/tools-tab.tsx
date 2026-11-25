@@ -41,7 +41,7 @@ export function ToolsTab({ flow, app, onEdit }: { flow: Flow; app: AppState; onE
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{ACTION_LABELS[action]}</span>
                     <span className="block truncate text-xs text-fg-3">
-                      {need ? (apps.length ? `Through ${apps.map((a) => a.name).join(", ")}` : "No app connected yet") : action === "text" ? `From ${app.settings.phoneNumber}` : "Built in"}
+                      {need ? (apps.length ? `Through ${apps.map((a) => a.name).join(", ")}` : "No app connected yet") : action === "text" ? (app.numbers.find((n) => n.id === flow.numberId) ? `From ${app.numbers.find((n) => n.id === flow.numberId)?.display}` : "Needs a phone number") : "Built in"}
                     </span>
                   </span>
                   {need && apps.length === 0 ? (

@@ -7,11 +7,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { relativeTime } from "@/lib/format";
 import { agentStats } from "@/lib/stats";
-import { update, useApp } from "@/lib/store";
-import { TEMPLATES, flowFromTemplate, type FlowTemplate } from "@/lib/templates";
+import { useApp } from "@/lib/store";
+import { TEMPLATES, type FlowTemplate } from "@/lib/templates";
 import { voiceById } from "@/lib/voices";
 import type { Direction } from "@/lib/types";
 import { Avatar, Badge, EmptyState, PageHeader, Sheet } from "@/components/ui";
+import { CreateAgentModal } from "@/components/agent/create-agent-modal";
 
 const DIRECTION: Record<Direction, { label: string; icon: typeof ArrowUpRight }> = {
   outbound: { label: "Makes calls", icon: ArrowUpRight },
@@ -20,7 +21,7 @@ const DIRECTION: Record<Direction, { label: string; icon: typeof ArrowUpRight }>
 };
 
 export default function AgentsPage() {
-  const { flows, calls, settings } = useApp();
+  const { flows, calls, numbers } = useApp();
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
@@ -31,11 +32,11 @@ export default function AgentsPage() {
     if (new URLSearchParams(window.location.search).get("new") === "1") setPicking(true);
   }, []);
 
+  // Scratch or a template: name it and pick its number first (CreateAgentModal), then open it.
+  const [creating, setCreating] = useState<{ template: FlowTemplate | null } | null>(null);
   const create = (template: FlowTemplate | null) => {
-    const flow = flowFromTemplate(template, new Date(), settings.timezone);
-    update((s) => ({ ...s, flows: [flow, ...s.flows] }));
     setPicking(false);
-    router.push(template ? `/agents/${flow.id}` : `/agents/${flow.id}?blank=1`);
+    setCreating({ template });
   };
   const q = query.trim().toLowerCase();
   const shown = flows.filter((f) => !q || `${f.name} ${f.description} ${f.agent.name}`.toLowerCase().includes(q));
@@ -78,6 +79,7 @@ export default function AgentsPage() {
                 <tr>
                   <th className="metric-label px-4 py-2.5 font-normal">Name</th>
                   <th className="metric-label hidden w-44 px-4 py-2.5 font-normal md:table-cell">Voice</th>
+                  <th className="metric-label hidden w-40 px-4 py-2.5 font-normal xl:table-cell">Number</th>
                   <th className="metric-label hidden w-36 px-4 py-2.5 font-normal lg:table-cell">Used for</th>
                   <th className="metric-label hidden w-24 px-4 py-2.5 text-right font-normal sm:table-cell">7d calls</th>
                   <th className="metric-label hidden w-28 px-4 py-2.5 font-normal lg:table-cell">Edited</th>
@@ -89,6 +91,7 @@ export default function AgentsPage() {
                   const dir = DIRECTION[flow.direction];
                   const DirIcon = dir.icon;
                   const voice = voiceById(flow.agent.voiceId);
+                  const number = numbers.find((n) => n.id === flow.numberId);
                   return (
                     <tr key={flow.id} onClick={() => router.push(`/agents/${flow.id}`)} className="cursor-pointer transition-colors hover:bg-subtle">
                       <td className="px-4 py-3">
@@ -101,6 +104,7 @@ export default function AgentsPage() {
                           <span className="truncate">{flow.agent.name} <span className="text-fg-3">· {voice.accent}</span></span>
                         </span>
                       </td>
+                      <td className="hidden px-4 py-3 xl:table-cell">{number ? <span className="font-mono text-xs">{number.display}</span> : <span className="text-xs text-amber-700 dark:text-amber-400">No number yet</span>}</td>
                       <td className="hidden px-4 py-3 text-fg-2 lg:table-cell"><span className="flex items-center gap-1.5"><DirIcon size={13} className="text-fg-4" /> {dir.label}</span></td>
                       <td className="hidden px-4 py-3 text-right font-mono text-xs sm:table-cell">{agentStats(flow, calls, now).week}</td>
                       <td className="hidden px-4 py-3 text-fg-3 lg:table-cell">{relativeTime(flow.updatedAt)}</td>
@@ -139,6 +143,7 @@ export default function AgentsPage() {
           })}
         </div>
       </Sheet>
+      <CreateAgentModal open={creating !== null} template={creating?.template ?? null} onClose={() => setCreating(null)} />
     </div>
   );
 }

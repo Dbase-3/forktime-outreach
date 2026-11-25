@@ -9,10 +9,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { allTimezones, offsetLabel, timeIn, zoneName } from "@/lib/timezones";
 import type { Direction, Flow } from "@/lib/types";
 import type { VarGroup } from "@/lib/variables";
+import { numberOwner } from "@/lib/numbers";
+import { useApp } from "@/lib/store";
 import { VoicePanel } from "../flow/voice-panel";
+import { GetNumber, NumberPicker } from "../numbers/number-picker";
 import { VarText } from "../var-text";
 import { Popover } from "../popover";
-import { Field, Segmented } from "../ui";
+import { Field, Modal, Segmented } from "../ui";
 
 export function ConfigTab({
   flow,
@@ -148,12 +151,54 @@ export function ConfigTab({
         <TimezoneField value={flow.timezone} onChange={(timezone) => onEdit((f) => ({ ...f, timezone }))} />
       </div>
 
+      <div id="agent-number" className="border-t border-line pt-5">
+        <h3 className="eyebrow mb-1">Phone number</h3>
+        <p className="mb-3 text-xs text-fg-3">It makes and answers calls on this number. Each number belongs to one agent.</p>
+        <NumberField flow={flow} onEdit={onEdit} />
+      </div>
+
       <div className="border-t border-line pt-5">
         <h3 className="eyebrow mb-3">Voice</h3>
         <VoicePanel agent={flow.agent} onChange={(patch) => onEdit((f) => ({ ...f, agent: { ...f.agent, ...patch } }))} />
       </div>
 
     </div>
+  );
+}
+
+/** The agent's number. A taken one can be clicked (to see who has it) but is never saved. */
+function NumberField({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => Flow) => void }) {
+  const app = useApp();
+  const [pending, setPending] = useState<string | null>(null);
+  const [getting, setGetting] = useState(false);
+  return (
+    <>
+      <NumberPicker
+        numbers={app.numbers}
+        flows={app.flows}
+        exceptFlowId={flow.id}
+        value={pending ?? flow.numberId}
+        onChange={(id) => {
+          if (id && numberOwner(app.flows, id, flow.id)) {
+            setPending(id);
+            return;
+          }
+          setPending(null);
+          onEdit((f) => ({ ...f, numberId: id }));
+        }}
+        onGetNumber={() => setGetting(true)}
+      />
+      <Modal open={getting} onClose={() => setGetting(false)} title="Get another number" description="Pick where people will see you calling from.">
+        <GetNumber
+          taken={app.numbers.map((n) => n.e164)}
+          onAdded={(n) => {
+            setPending(null);
+            onEdit((f) => ({ ...f, numberId: n.id }));
+            setGetting(false);
+          }}
+        />
+      </Modal>
+    </>
   );
 }
 

@@ -162,6 +162,7 @@ export function SkeletonFor({ pathname }: { pathname: string }) {
   if (/^\/agents\/[^/]+/.test(pathname)) return <EditorSkeleton />;
   if (/^\/(agents|campaigns|integrations)/.test(pathname)) return <CardsSkeleton />;
   if (pathname.startsWith("/knowledge")) return <ListSkeleton />;
+  if (pathname.startsWith("/numbers")) return <ListSkeleton filters={false} />;
   if (pathname.startsWith("/settings")) return <FormSkeleton />;
   return <ListSkeleton />;
 }

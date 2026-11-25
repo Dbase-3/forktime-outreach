@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { Phone, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { WEEKDAYS, hourLabel } from "@/lib/format";
 import { resetWorkspace, update, useApp } from "@/lib/store";
@@ -15,27 +16,25 @@ export default function SettingsPage() {
   const { settings } = app;
   const set = (patch: Partial<WorkspaceSettings>) => update((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
   const hours = Array.from({ length: 24 }, (_, h) => h);
-  const inboundFlows = app.flows.filter((f) => f.direction !== "outbound");
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Settings" subtitle="Your number, business details and calling rules." />
+      <PageHeader title="Settings" subtitle="Numbers, business details and calling rules." />
       <div>
-        <Section title="Your phone number" body="Included with your plan. Your agents call from it, and calls to it are answered by the agent below.">
-          <div className="flex items-center gap-3 rounded-lg border border-line bg-subtle p-3.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fg text-background"><Phone size={15} /></span>
-            <div className="min-w-0 flex-1">
-              <div className="font-mono text-base font-medium tracking-tight">{settings.phoneNumber}</div>
-              <div className="text-xs text-fg-3">Local number · calls in and out</div>
-            </div>
-            <span className="chip bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-current" />Active</span>
+        <Section title="Phone numbers" body="Each agent has its own number: it calls from it and answers calls to it.">
+          <div className="divide-y divide-line overflow-hidden rounded-lg border border-line">
+            {app.numbers.map((n) => {
+              const owner = app.flows.find((f) => f.numberId === n.id);
+              return (
+                <div key={n.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                  <Phone size={14} className="shrink-0 text-fg-4" />
+                  <span className="flex-1 font-mono text-sm">{n.display}</span>
+                  <span className="truncate text-sm text-fg-3">{owner ? owner.name : "Not in use"}</span>
+                </div>
+              );
+            })}
           </div>
-          <Field label="Answer incoming calls with">
-            <select className="field" value={settings.inboundFlowId} onChange={(e) => set({ inboundFlowId: e.target.value })}>
-              {inboundFlows.length === 0 && <option value="">Make an agent for incoming calls first</option>}
-              {inboundFlows.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </select>
-          </Field>
+          <Link href="/numbers" className="btn-secondary w-fit">Manage numbers</Link>
         </Section>
 
         <Section title="Business">

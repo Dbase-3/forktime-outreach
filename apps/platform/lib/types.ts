@@ -89,6 +89,8 @@ export interface Flow {
   brief?: string;
   /** IANA zone the agent lives in: "today", opening hours and booking times are read in it. */
   timezone: string;
+  /** The phone number it makes and takes calls on (lib/numbers.ts). One agent per number. */
+  numberId?: string;
   /** Tools the agent can use beyond its workflow actions (MCP servers, APIs). Coming soon. */
   tools: AgentTool[];
   steps: Step[];
@@ -271,9 +273,21 @@ export interface WorkspaceSettings {
   doNotCall: string[];
 }
 
+/** A phone number the workspace has. Which agent uses it lives on the agent (`Flow.numberId`). */
+export interface PhoneNumber {
+  id: string;
+  e164: string;
+  display: string; // as written locally, e.g. "(02) 5550 1234"
+  country: string; // AU, NZ, US, CA, GB
+  kind: "local" | "mobile" | "tollfree";
+  area?: string;
+  addedAt: string;
+}
+
 export interface AppState {
   version: number;
   flows: Flow[];
+  numbers: PhoneNumber[];
   knowledge: KnowledgeDoc[];
   contacts: Contact[];
   fieldDefs: FieldDef[];

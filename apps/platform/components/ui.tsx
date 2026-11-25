@@ -212,3 +212,33 @@ export function Avatar({ name, className }: { name: string; className?: string }
     </span>
   );
 }
+
+/**
+ * A centred dialog for short, focused choices (naming a new agent, getting a
+ * number). Bottom-aligned on phones so thumbs reach the buttons. Use Sheet for
+ * anything longer or for editing.
+ */
+export function Modal({ open, onClose, title, description, children, footer }: { open: boolean; onClose: () => void; title: string; description?: string; children: ReactNode; footer?: ReactNode }) {
+  const focus = useFocusReturn(open);
+  return (
+    <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in dark:bg-black/60" />
+        <Dialog.Content
+          onCloseAutoFocus={focus.onClose}
+          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-lift outline-none data-[state=open]:animate-sheet-up sm:bottom-auto sm:top-[10vh] sm:mx-auto sm:max-h-[80vh] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-xl sm:data-[state=open]:animate-pop-in"
+        >
+          <div className="flex items-start gap-3 px-5 pb-3 pt-5">
+            <div className="min-w-0 flex-1">
+              <Dialog.Title className="text-base font-semibold tracking-[-0.01em]">{title}</Dialog.Title>
+              {description ? <Dialog.Description className="mt-1 text-sm text-fg-3">{description}</Dialog.Description> : <Dialog.Description className="sr-only">{title}</Dialog.Description>}
+            </div>
+            <Dialog.Close className="btn-icon -mr-2 -mt-1 h-8 w-8 focus-visible:ring-0" aria-label="Close"><X size={16} /></Dialog.Close>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
+          {footer && <div className="border-t border-line px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:pb-4">{footer}</div>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}

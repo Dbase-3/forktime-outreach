@@ -75,7 +75,10 @@ export function AgentEditor({ id }: { id: string }) {
   }, []);
 
   const steps = useMemo(() => flow?.steps ?? [], [flow?.steps]);
-  const issues = useMemo(() => (flow ? flowIssues(flow, app.fieldDefs.map((d) => d.key)) : []), [flow, app.fieldDefs]);
+  const issues = useMemo(
+    () => (flow ? [...(flow.numberId ? [] : [{ message: "Pick a phone number for it to call from and answer on", stepId: undefined as string | undefined, number: true }]), ...flowIssues(flow, app.fieldDefs.map((d) => d.key))] : []),
+    [flow, app.fieldDefs],
+  );
   const questions = useMemo(() => Object.fromEntries(allSteps(steps).flatMap((s) => (s.kind === "ask" && s.field ? [[s.field, s.question]] : []))), [steps]);
   // Everything the instructions can use: the contact's fields and every answer the workflow saves.
   const vars = useMemo(() => variableGroups(app.fieldDefs, Object.keys(questions).map((key) => ({ key, label: humanize(key) }))), [app.fieldDefs, questions]);
@@ -158,7 +161,17 @@ export function AgentEditor({ id }: { id: string }) {
             <ul className="space-y-1">
               {issues.map((issue, i) => (
                 <li key={i}>
-                  <button type="button" disabled={!issue.stepId} onClick={() => issue.stepId && select(issue.stepId)} className="w-full rounded-md px-2 py-1.5 text-left text-sm text-fg-2 hover:bg-muted disabled:hover:bg-transparent">{issue.message}</button>
+                  <button
+                    type="button"
+                    disabled={!issue.stepId && !("number" in issue)}
+                    onClick={() => {
+                      if (issue.stepId) select(issue.stepId);
+                      else if ("number" in issue) {
+                        setSetupTab("config");
+                        setPhoneSetup(true);
+                        setTimeout(() => document.getElementById("agent-number")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                      }
+                    }} className="w-full rounded-md px-2 py-1.5 text-left text-sm text-fg-2 hover:bg-muted disabled:hover:bg-transparent">{issue.message}</button>
                 </li>
               ))}
             </ul>

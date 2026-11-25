@@ -224,7 +224,7 @@ export interface CallFeedback {
   at: string;
 }
 
-export type EndReason = "caller_hung_up" | "agent_ended" | "transferred" | "no_answer" | "voicemail";
+export type EndReason = "caller_hung_up" | "agent_ended" | "transferred" | "no_answer" | "voicemail" | "busy" | "failed";
 
 export interface Call {
   id: string;
@@ -244,6 +244,10 @@ export interface Call {
   feedback?: CallFeedback | null;
   checkResults?: Record<string, "success" | "failure" | "unknown">;
   live?: boolean; // the call is happening right now
+  // Judged after every answered call (Analytics):
+  lead?: "qualified" | "potential" | "unqualified"; // strong intent / some interest / none
+  engagement?: "high" | "medium" | "low"; // asked questions / brief replies / passive
+  transferTo?: "person" | "agent"; // a transfer went to a person, or was routed to another agent
 }
 
 // ---- Workspace ----

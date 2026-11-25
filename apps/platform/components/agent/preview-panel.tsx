@@ -26,7 +26,7 @@ export function PreviewPanel({ flow, business, contacts, onActiveStep }: { flow:
   const [mode, setMode] = useState<Mode>("voice");
   const [contactId, setContactId] = useState(contacts[0]?.id ?? "");
   const contact = contacts.find((c) => c.id === contactId);
-  const begin = useMemo(() => () => startPractice(flow, { agentName: flow.agent.name, business, contactFields: { first_name: contact?.name.split(" ")[0] ?? "", ...(contact?.fields ?? {}) } }), [flow, business, contact]);
+  const begin = useMemo(() => () => startPractice(flow, { agentName: flow.agent.name, business, contactFields: callValues(flow, contact) }), [flow, business, contact]);
   const [state, setState] = useState<PracticeState>(begin);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -279,6 +279,17 @@ export function PreviewPanel({ flow, business, contacts, onActiveStep }: { flow:
       {schema.length > 0 && <Collected schema={schema} state={state} />}
     </div>
   );
+}
+
+/** The variables a call fills in besides agent and business (see lib/variables.ts). */
+function callValues(flow: Flow, contact: Contact | undefined): Record<string, string> {
+  let today = "";
+  try {
+    today = new Intl.DateTimeFormat("en-AU", { timeZone: flow.timezone, weekday: "long", day: "numeric", month: "long" }).format(new Date());
+  } catch {
+    today = new Date().toDateString();
+  }
+  return { first_name: contact?.name.split(" ")[0] ?? "", name: contact?.name ?? "", phone: contact?.phone ?? "", today, ...(contact?.fields ?? {}) };
 }
 
 function Caption({ state, heard }: { state: PracticeState; heard: string }) {

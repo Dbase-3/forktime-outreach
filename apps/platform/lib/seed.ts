@@ -7,7 +7,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 11;
+export const SEED_VERSION = 12;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -72,7 +72,7 @@ export function seedState(now = new Date()): AppState {
     ...people.map(([name, phone, model, bought], i) => contactFor(name, phone, model, bought, i)),
     ...FIRST.map((first, j) => {
       const i = people.length + j;
-      return contactFor(`${first} ${LAST[j % LAST.length]}`, `+6142${String(1000000 + j * 7919).slice(0, 7)}`, MODELS[j % MODELS.length], -((j * 11) % 150) - 3, i);
+      return contactFor(`${first} ${LAST[j % LAST.length]}`, j % 6 === 4 ? `+6421${String(100000 + j * 7919).slice(0, 6)}` : `+6142${String(1000000 + j * 7919).slice(0, 7)}`, MODELS[j % MODELS.length], -((j * 11) % 150) - 3, i);
     }),
   ];
   // The last few came in through the website's form, not the CRM.

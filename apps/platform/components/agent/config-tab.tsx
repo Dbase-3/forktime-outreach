@@ -8,13 +8,16 @@ import { Loader2, Sparkles, Undo2, Workflow, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { allTimezones, offsetLabel, timeIn, zoneName } from "@/lib/timezones";
 import type { Direction, Flow } from "@/lib/types";
+import type { VarGroup } from "@/lib/variables";
 import { VoicePanel } from "../flow/voice-panel";
+import { VarText } from "../var-text";
 import { Popover } from "../popover";
 import { Field, Segmented } from "../ui";
 
 export function ConfigTab({
   flow,
   onEdit,
+  vars,
   focusBrief,
   busy,
   error,
@@ -26,6 +29,7 @@ export function ConfigTab({
 }: {
   flow: Flow;
   onEdit: (fn: (f: Flow) => Flow) => void;
+  vars: VarGroup[];
   focusBrief?: boolean;
   busy: null | "agent" | "workflow";
   error: string | null;
@@ -107,22 +111,23 @@ export function ConfigTab({
           />
         </div>
         <div className="relative">
-          <textarea
+          <VarText
             className="field min-h-60 text-sm leading-relaxed"
             value={flow.prompt}
-            onChange={(e) => onEdit((f) => ({ ...f, prompt: e.target.value }))}
+            onChange={(prompt) => onEdit((f) => ({ ...f, prompt }))}
+            groups={vars}
             placeholder="Who the agent is, its tone, and the rules it follows."
             disabled={busy === "agent"}
             aria-label="Instructions"
           />
           {busy === "agent" && <Shimmer />}
         </div>
-        <p className="mt-1.5 text-xs text-fg-3">Who it is, how it sounds and its rules. The steps it follows are in the Workflow. Use {"{agent}"}, {"{business}"} and contact fields like {"{first_name}"}.</p>
+        <p className="mt-1 text-xs text-fg-3">Who it is, how it sounds and its rules. The steps it follows are in the Workflow.</p>
       </div>
 
       <Field label="Welcome message" hint="Keep “AI assistant” and “recorded” in it: callers must be told.">
         <div className="relative">
-          <textarea className="field min-h-20 leading-relaxed" value={flow.greeting} onChange={(e) => onEdit((f) => ({ ...f, greeting: e.target.value }))} disabled={busy === "agent"} />
+          <VarText className="field min-h-20 leading-relaxed" value={flow.greeting} onChange={(greeting) => onEdit((f) => ({ ...f, greeting }))} groups={vars.filter((g) => g.title !== "Answers on this call")} disabled={busy === "agent"} aria-label="Welcome message" />
           {busy === "agent" && <Shimmer />}
         </div>
       </Field>

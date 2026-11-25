@@ -7,7 +7,9 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { fitOp } from "@/lib/conditions";
 import { allSteps, toFieldKey } from "@/lib/flow-tree";
 import type { ActionKind, FieldDef, Step, StepKind } from "@/lib/types";
+import { variableGroups, type VarGroup } from "@/lib/variables";
 import { RuleRow } from "../rules-editor";
+import { VarText } from "../var-text";
 import { Field, Sheet, useLastPresent } from "../ui";
 import { ACTION_META, ANSWER_TYPES, STEP_META, metaOf } from "./meta";
 
@@ -93,7 +95,12 @@ export function StepSheet({ step: current, fields, onChange, onMove, onDelete, o
   );
 }
 
-const PLACEHOLDER_HINT = "Use {first_name} or any contact field in curly brackets.";
+/** What a step's lines can use: the contact's fields and this call's answers (from decisionFields). */
+function stepVars(fields: FieldDef[], ownField?: string): VarGroup[] {
+  const isAnswer = (f: FieldDef) => f.label.startsWith("Answer: ");
+  const answers = fields.filter((f) => isAnswer(f) && f.key !== ownField).map((f) => ({ key: f.key, label: f.label.replace(/^Answer: /, "").replace(/^./, (c) => c.toUpperCase()) }));
+  return variableGroups(fields.filter((f) => !isAnswer(f)), answers);
+}
 
 /** The fields a decision can check: this call's answers (typed by their question) and the contact's own fields. */
 export function decisionFields(steps: Step[], defs: FieldDef[]): FieldDef[] {
@@ -107,18 +114,18 @@ const ANSWER_FIELD = { text: "text", yesno: "yesno", number: "number", date: "da
 export function StepForm({ step, fields, onChange }: { step: Step; fields: FieldDef[]; onChange: (patch: Partial<Step>) => void }) {
   if (step.kind === "say") {
     return (
-      <Field label="The agent says" hint={PLACEHOLDER_HINT}>
-        <textarea className="field min-h-28" value={step.text} autoFocus onChange={(e) => onChange({ text: e.target.value })} />
+      <Field label="The agent says">
+        <VarText className="field min-h-28" value={step.text} autoFocus onChange={(text) => onChange({ text })} groups={stepVars(fields)} />
       </Field>
     );
   }
-  if (step.kind === "ask") return <AskForm step={step} onChange={onChange} />;
+  if (step.kind === "ask") return <AskForm step={step} vars={stepVars(fields, step.field)} onChange={onChange} />;
   if (step.kind === "branch") return <BranchForm step={step} fields={fields} onChange={onChange} />;
   if (step.kind === "action") return <ActionForm step={step} onChange={onChange} />;
   return (
     <div className="space-y-4">
       <Field label="Goodbye line">
-        <textarea className="field min-h-20" value={step.text} onChange={(e) => onChange({ text: e.target.value })} />
+        <VarText value={step.text} onChange={(text) => onChange({ text })} groups={stepVars(fields)} />
       </Field>
       <Field label="Outcome" hint="How this call is filed. Campaigns can act on it, e.g. call again in 3 months.">
         <input className="field" value={step.outcome} onChange={(e) => onChange({ outcome: toFieldKey(e.target.value) || "" })} placeholder="e.g. service_booked" />
@@ -127,7 +134,7 @@ export function StepForm({ step, fields, onChange }: { step: Step; fields: Field
   );
 }
 
-function AskForm({ step, onChange }: { step: Extract<Step, { kind: "ask" }>; onChange: (patch: Partial<Step>) => void }) {
+function AskForm({ step, vars, onChange }: { step: Extract<Step, { kind: "ask" }>; vars: VarGroup[]; onChange: (patch: Partial<Step>) => void }) {
   const suggestField = () => {
     if (step.field || !step.question.trim()) return;
     onChange({ field: toFieldKey(step.question.split(/\s+/).slice(-3).join(" ")) });
@@ -135,7 +142,7 @@ function AskForm({ step, onChange }: { step: Extract<Step, { kind: "ask" }>; onC
   return (
     <div className="space-y-5">
       <Field label="Question" hint="The agent asks it in its own words if the caller has already answered part of it.">
-        <textarea className="field min-h-20" value={step.question} autoFocus onBlur={suggestField} onChange={(e) => onChange({ question: e.target.value })} />
+        <VarText value={step.question} autoFocus onBlur={suggestField} onChange={(question) => onChange({ question })} groups={vars} />
       </Field>
       <div>
         <span className="label">Answer type</span>

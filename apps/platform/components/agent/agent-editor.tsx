@@ -15,6 +15,8 @@ import { docsForAgent } from "@/lib/knowledge";
 import { dataSchema } from "@/lib/agent-data";
 import { TOP, allSteps, findStep, flowIssues, insertStep, makeStep, moveStep, removeStep, updateStep, type Container } from "@/lib/flow-tree";
 import { nowIso, update, useApp } from "@/lib/store";
+import { humanize } from "@/lib/format";
+import { variableGroups } from "@/lib/variables";
 import type { Flow, Step } from "@/lib/types";
 import { FlowCanvas } from "../flow/flow-canvas";
 import { metaOf } from "../flow/meta";
@@ -75,6 +77,8 @@ export function AgentEditor({ id }: { id: string }) {
   const steps = useMemo(() => flow?.steps ?? [], [flow?.steps]);
   const issues = useMemo(() => (flow ? flowIssues(flow, app.fieldDefs.map((d) => d.key)) : []), [flow, app.fieldDefs]);
   const questions = useMemo(() => Object.fromEntries(allSteps(steps).flatMap((s) => (s.kind === "ask" && s.field ? [[s.field, s.question]] : []))), [steps]);
+  // Everything the instructions can use: the contact's fields and every answer the workflow saves.
+  const vars = useMemo(() => variableGroups(app.fieldDefs, Object.keys(questions).map((key) => ({ key, label: humanize(key) }))), [app.fieldDefs, questions]);
   const ctx: StepListContext = useMemo(
     () => ({
       defs: app.fieldDefs,
@@ -192,6 +196,7 @@ export function AgentEditor({ id }: { id: string }) {
               <ConfigTab
                 flow={flow}
                 onEdit={edit}
+                vars={vars}
                 focusBrief={focusBrief}
                 busy={writer.busy}
                 error={writer.error}

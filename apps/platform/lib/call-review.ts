@@ -102,6 +102,8 @@ export const END_REASONS: Record<EndReason, string> = {
   transferred: "Passed to a person",
   no_answer: "No answer",
   voicemail: "Went to voicemail",
+  busy: "Line was busy",
+  failed: "Call didn't connect",
 };
 
 export const CALL_ACTIONS: Record<string, string> = {

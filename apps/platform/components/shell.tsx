@@ -5,7 +5,7 @@
 
 import clsx from "clsx";
 import {
-  AudioLines, CalendarClock, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
+  AudioLines, BookOpen, CalendarClock, Home, Megaphone, Monitor, Moon, MoreHorizontal, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -39,6 +39,7 @@ const NAV_GROUPS: { title: string | null; items: NavItem[] }[] = [
       { href: "/flows", label: "Flows", icon: Workflow, tab: true },
       { href: "/automations", label: "Automations", icon: CalendarClock, tab: true },
       { href: "/campaigns", label: "Campaigns", icon: Megaphone, tab: false },
+      { href: "/knowledge", label: "Knowledge", icon: BookOpen, tab: false },
     ],
   },
   {

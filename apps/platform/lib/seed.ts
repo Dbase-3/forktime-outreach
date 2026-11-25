@@ -6,7 +6,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 4;
+export const SEED_VERSION = 5;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -16,9 +16,9 @@ function isoDay(now: Date, offsetDays: number): string {
 
 export function seedState(now = new Date()): AppState {
   const template = (id: string) => TEMPLATES.find((t) => t.id === id) ?? null;
-  const service = { ...flowFromTemplate(template("service_check"), now), id: "f_service", status: "live" as const };
+  const service = { ...flowFromTemplate(template("service_check"), now), id: "f_service", status: "live" as const, knowledgeIds: ["k_service"] };
   const lead = { ...flowFromTemplate(template("lead_follow_up"), now), id: "f_lead", status: "live" as const, agent: { name: "Noah", voiceId: "v_noah", personality: "professional" as const, speed: 1.05, language: "English" } };
-  const desk = { ...flowFromTemplate(template("front_desk"), now), id: "f_desk", status: "live" as const, agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
+  const desk = { ...flowFromTemplate(template("front_desk"), now), id: "f_desk", status: "live" as const, knowledgeIds: ["k_service", "k_warranty"], agent: { name: "Mia", voiceId: "v_mia", personality: "friendly" as const, speed: 1, language: "English" } };
 
   const people: [string, string, string, number][] = [
     ["Sarah Chen", "+61412555019", "Corolla Hybrid", -27],
@@ -143,6 +143,45 @@ export function seedState(now = new Date()): AppState {
   return {
     version: SEED_VERSION,
     flows: [service, lead, desk],
+    knowledge: [
+      {
+        id: "k_hours",
+        name: "Opening hours & location",
+        kind: "text",
+        content: "Showroom: Monday to Friday 9am to 6pm, Saturday 9am to 1pm, closed Sunday.\nService centre: Monday to Friday 7:30am to 5pm.\nWe're at 12 Main Street, Northside. Customer parking at the back.",
+        sizeBytes: 196,
+        status: "ready",
+        availableToAll: true,
+        createdAt: isoDay(now, -40),
+        updatedAt: isoDay(now, -3),
+      },
+      {
+        id: "k_service",
+        name: "Service menu & prices",
+        kind: "url",
+        source: "https://northside-motors.example/service",
+        content: "First service: free within 6 months or 10,000 km.\nStandard service: $249 (oil, filter, 40-point check).\nMajor service: $449 (adds brake fluid, coolant, spark plugs).\nLoan cars available on request, book 2 days ahead.",
+        sizeBytes: 2410,
+        pages: 1,
+        status: "ready",
+        availableToAll: false,
+        autoRefresh: true,
+        createdAt: isoDay(now, -30),
+        updatedAt: isoDay(now, -1),
+      },
+      {
+        id: "k_warranty",
+        name: "Warranty terms.pdf",
+        kind: "file",
+        source: "Warranty terms.pdf",
+        content: "",
+        sizeBytes: 418_000,
+        status: "waiting",
+        availableToAll: false,
+        createdAt: isoDay(now, -8),
+        updatedAt: isoDay(now, -8),
+      },
+    ],
     automations: [
       {
         id: "a_service",

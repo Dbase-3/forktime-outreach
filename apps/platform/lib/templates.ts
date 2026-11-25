@@ -9,7 +9,7 @@ export interface FlowTemplate {
   blurb: string;
   direction: Direction;
   category: "Sales" | "Service" | "Front desk" | "Billing";
-  build: () => Pick<Flow, "greeting" | "steps" | "knowledge">;
+  build: () => Pick<Flow, "greeting" | "steps">;
 }
 
 const say = (text: string): Step => ({ id: newId(), kind: "say", text });
@@ -33,7 +33,6 @@ export const TEMPLATES: FlowTemplate[] = [
     category: "Service",
     build: () => ({
       greeting: "Hi {first_name}, this is {agent}, the AI assistant at {business}. This call is recorded. Have you got a minute?",
-      knowledge: "",
       steps: [
         say("It's been about a month since you picked up your {car_model}, so we're checking in."),
         yesno("Is everything running well so far?", "all_good"),
@@ -55,7 +54,6 @@ export const TEMPLATES: FlowTemplate[] = [
     category: "Sales",
     build: () => ({
       greeting: "Hi {first_name}, it's {agent}, the AI assistant at {business}. This call is recorded. You just asked about us online, is now a good time?",
-      knowledge: "",
       steps: [
         text("What made you reach out today?", "need"),
         choice("When are you hoping to get started?", "timeline", ["This month", "In 1 to 3 months", "Just looking"]),
@@ -76,7 +74,6 @@ export const TEMPLATES: FlowTemplate[] = [
     category: "Front desk",
     build: () => ({
       greeting: "Thanks for calling {business}, this is {agent}, the AI assistant. This call is recorded. How can I help?",
-      knowledge: "Opening hours: Monday to Friday 9am to 6pm, Saturday 9am to 1pm.\nWe're at 12 Main Street, parking at the back.",
       steps: [
         choice("Is this about a booking, a question, or something else?", "reason", ["Booking", "Question", "Something else"]),
         yesno("Would you like to speak with someone on the team?", "wants_person"),
@@ -96,7 +93,6 @@ export const TEMPLATES: FlowTemplate[] = [
     category: "Front desk",
     build: () => ({
       greeting: "Hi, you've reached {business}, this is {agent}, the AI assistant. This call is recorded. Are you booking, moving or cancelling an appointment?",
-      knowledge: "",
       steps: [
         choice("What would you like to do?", "request", ["Book", "Move", "Cancel"]),
         text("Can I get your full name?", "full_name"),
@@ -114,7 +110,6 @@ export const TEMPLATES: FlowTemplate[] = [
     category: "Billing",
     build: () => ({
       greeting: "Hi {first_name}, this is {agent}, the AI assistant at {business}. This call is recorded. Just a quick call about invoice {invoice_number}.",
-      knowledge: "",
       steps: [
         say("Our records show {amount} is still open, due on {due_date}."),
         yesno("Would a payment link by text help?", "wants_link"),
@@ -132,7 +127,6 @@ export const TEMPLATES: FlowTemplate[] = [
     category: "Service",
     build: () => ({
       greeting: "Hi {first_name}, it's {agent}, the AI assistant at {business}. This call is recorded. Got 30 seconds for quick feedback?",
-      knowledge: "",
       steps: [
         { id: newId(), kind: "ask", question: "From 1 to 10, how was your visit?", field: "score", answerType: "number" },
         { id: newId(), kind: "branch", condition: { field: "score", op: "less_than", value: "7" }, yes: [text("Sorry about that. What could we have done better?", "feedback"), crm("Create a follow-up task for the manager")], no: [] },
@@ -145,7 +139,7 @@ export const TEMPLATES: FlowTemplate[] = [
 export const DEFAULT_AGENT: AgentVoice = { name: "Ava", voiceId: "v_ava", personality: "friendly", speed: 1, language: "English" };
 
 export function flowFromTemplate(template: FlowTemplate | null, now = new Date()): Flow {
-  const body = template?.build() ?? { greeting: "Hi, this is {agent}, the AI assistant at {business}. This call is recorded.", steps: [], knowledge: "" };
+  const body = template?.build() ?? { greeting: "Hi, this is {agent}, the AI assistant at {business}. This call is recorded.", steps: [] };
   return {
     id: newId("f"),
     name: template?.name ?? "Untitled flow",
@@ -154,6 +148,7 @@ export function flowFromTemplate(template: FlowTemplate | null, now = new Date()
     status: "draft",
     agent: { ...DEFAULT_AGENT },
     updatedAt: now.toISOString(),
+    knowledgeIds: [],
     ...body,
   };
 }

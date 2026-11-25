@@ -56,7 +56,25 @@ export interface Flow {
   agent: AgentVoice;
   greeting: string;
   steps: Step[];
-  knowledge: string; // plain text the agent may answer from
+  knowledgeIds: string[]; // documents attached to this agent (plus every "available to all" one)
+  updatedAt: string;
+}
+
+// ---- Knowledge: what agents answer from ----
+
+export interface KnowledgeDoc {
+  id: string;
+  name: string;
+  kind: "url" | "sitemap" | "site" | "file" | "text";
+  source?: string; // the address, or the file's name
+  content: string; // the text agents read
+  sizeBytes: number;
+  pages?: number; // sitemap / website: pages read
+  status: "ready" | "reading" | "waiting" | "failed"; // waiting = a file type the backend will read
+  error?: string;
+  availableToAll: boolean; // every agent can use it, no need to attach
+  autoRefresh?: boolean; // web documents: re-read daily
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -189,6 +207,7 @@ export interface WorkspaceSettings {
 export interface AppState {
   version: number;
   flows: Flow[];
+  knowledge: KnowledgeDoc[];
   automations: Automation[];
   contacts: Contact[];
   fieldDefs: FieldDef[];

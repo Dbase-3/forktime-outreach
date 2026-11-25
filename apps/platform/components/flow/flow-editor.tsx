@@ -251,7 +251,7 @@ function DetailsTab({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => Fl
         <input className="field" value={flow.description} onChange={(e) => onEdit((f) => ({ ...f, description: e.target.value }))} />
       </Field>
       <Field label="What the agent knows" hint="Opening hours, prices, policies, FAQs. The agent answers only from this and says so when it doesn't know.">
-        <textarea className="field min-h-48" value={flow.knowledge} onChange={(e) => onEdit((f) => ({ ...f, knowledge: e.target.value }))} placeholder={"We're open Monday to Friday, 9am to 6pm.\nA standard service is $249."} />
+        <Link href="/knowledge" className="btn-secondary">Open the knowledge library</Link>
       </Field>
       <div className="flex items-center justify-between rounded-lg bg-subtle p-3 text-sm">
         <span className="text-fg-3">Status</span>

@@ -21,8 +21,9 @@ Outbound voice agent + the web app that runs it. The agent phones restaurants ab
 ## Layout
 
 ```
-apps/web     Next.js 14 (App Router), MongoDB driver, TanStack Query, Tailwind. Port 3100.
-apps/agent   LiveKit Agents JS 1.9.2 worker (CommonJS), official plugins only.
+apps/web       Next.js 14 (App Router), MongoDB driver, TanStack Query, Tailwind. Port 3100.
+apps/agent     LiveKit Agents JS 1.9.2 worker (CommonJS), official plugins only.
+apps/platform  Next.js 14 + Tailwind. Port 3200. The self-serve product (see below). Iteration 1: no backend.
 scripts/setup-env.mjs   writes both env files; copies provider keys BY NAME from ../forktime-core, prints names only.
 ```
 
@@ -54,6 +55,17 @@ scripts/setup-env.mjs   writes both env files; copies provider keys BY NAME from
 - Recording: LiveKit Egress, audio only, to `outreach/<callId>-<attempt>.ogg` in the bucket from `EGRESS_S3_*` (same mechanism as the phone agent).
 - A call the model never filed is filed once from its transcript (`src/wrapup.js`).
 
+### apps/platform (owner, 2026-11-26)
+
+The self-serve AI phone-agent product: any business signs up, gets one phone number, and builds agents that answer and make calls. Started after a teardown of Dialora.ai; built to be simpler. **Product rules:**
+- **Never show the providers.** No model, speech-to-text or voice-company names or pickers anywhere. Voices are picked by name, accent and tone (`lib/voices.ts`); the tuning a customer gets is agent name, voice, personality, speed (0.9 to 1.2) and language.
+- **"Flows", not templates or prompts.** A flow is a tree of steps (`lib/types.ts` `Step`): Say, Ask (saves to a field), Decide (If yes / Otherwise on one condition), Action (book, transfer, text, CRM, webhook), End call (with an outcome). Drawn top to bottom (`components/flow/step-list.tsx`) so it works on a phone; no drag-around canvas. Templates (`lib/templates.ts`) are starter flows copied with fresh ids.
+- **Automations** trigger calls on their own: a date field plus or minus N days, a field change, a new contact, a schedule, or another call's outcome. Plus optional conditions, a flow, a follow-up per outcome ("not now, call again in 3 months") and a per-person weekly cap. `lib/automation.ts` describes them in plain words and previews who is due.
+- **Every greeting says AI assistant and that the call is recorded** (tests/practice.test.ts checks every template). Keep that in new templates.
+- Design: modern, clean, mobile first. Sidebar on `lg`, bottom tabs plus a "More" sheet on phones. Every panel is a `Sheet` (bottom on phones, right on larger screens). Edits apply as you type; nothing should block the user.
+
+Layout: `lib/` holds pure, tested logic (`flow-tree.ts` tree operations and `flowIssues`, `automation.ts`, `practice.ts` the "Try it" run, `csv.ts` contact import) plus `store.ts`. `components/` holds the UI; `app/(app)/` holds thin pages. **Iteration 1 keeps the whole workspace in the browser** (`lib/store.ts`, localStorage key `forktime-platform.v1`, sample car-dealer workspace from `lib/seed.ts`). Integrations "Connect" only flips a flag, and nothing dials. Next iterations: database and sign-in, then the agent running flows on real calls (reuse `apps/agent`), then real integrations.
+
 ## Deploy
 
 - `pnpm setup:prod` writes `apps/web/.env.vercel` (paste into Vercel; root directory `apps/web`) and `apps/agent/.env.prod`. Production has its own login password, session secret and agent key, `DIAL_MODE=live`, and `MONGODB_URI` = the Forktime database server with the database name `forktime_outreach` (`outreachMongoUri` in `scripts/setup-env.mjs`; it keeps the original database as `authSource`, or the sign-in fails on a non-SRV address). That login is the Forktime cluster's admin user: a dedicated user scoped to `forktime_outreach` is owed.
@@ -65,7 +77,7 @@ scripts/setup-env.mjs   writes both env files; copies provider keys BY NAME from
 
 ## Tests and checks
 
-- `pnpm test`: web (vitest, real throwaway MongoDB via mongodb-memory-server; the dial is the one thing mocked) and agent (vitest, no network).
+- `pnpm test`: web (vitest, real throwaway MongoDB via mongodb-memory-server; the dial is the one thing mocked), agent (vitest, no network) and platform (vitest, pure logic).
 - `pnpm --filter @outreach/agent sim:forkmate [<name>]`: the Forkmate line's practice conversations (saves faked; prints each call's median reply time). State of 2026-11-25: 15 of 15, twice. ⚠️ `sim` (Sara's set) checks still expect the older large-booking script and fail against the current Sara prompt; not touched by the Forkmate work.
 - `pnpm --filter @outreach/agent sim [new|all|<name>]`: practice conversations against the real model in text mode. Costs cents; uses `ANTHROPIC_API_KEY_EVAL`. The second set (`new`) exists so a wording fix tuned on the first set is checked elsewhere; run `all` after any prompt change. State of 2026-11-20: 16 of 16.
 - Not yet verified on a real phone line: the voice pipeline end to end, the transfer, the recording. The first real call should be to the owner's own mobile.

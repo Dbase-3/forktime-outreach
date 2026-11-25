@@ -11,6 +11,8 @@
     "db": "pnpm --filter @outreach/web db",
     "dev:web": "pnpm --filter @outreach/web dev",
     "dev:agent": "pnpm --filter @outreach/agent dev",
+    "dev:platform": "pnpm --filter @outreach/platform dev",
+    "build:platform": "pnpm --filter @outreach/platform build",
     "build": "pnpm --filter @outreach/web build",
     "test": "pnpm -r test",
     "typecheck": "pnpm --filter @outreach/web typecheck",

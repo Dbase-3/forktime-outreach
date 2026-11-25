@@ -95,7 +95,18 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
  * Phones: a bottom sheet with dimmed space above it to tap away.
  * Larger screens: a true side drawer, full height and flush to the right edge.
  */
-export function Sheet({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+export function Sheet({ open, onClose, title, children, footer, wide, size, subheader, titleExtra }: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  wide?: boolean;
+  size?: "md" | "lg" | "xl"; // 440 / 560 / 680 px from sm up; `wide` = "lg"
+  /** Fixed between the title and the scrolling body: stays put while the body scrolls and survives tab switches (a recording keeps playing). */
+  subheader?: ReactNode;
+  titleExtra?: ReactNode; // beside the title, e.g. a status badge
+}) {
   const focus = useFocusReturn(open);
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
@@ -111,16 +122,20 @@ export function Sheet({ open, onClose, title, children, footer, wide }: { open: 
             "inset-x-0 bottom-0 max-h-[90dvh] rounded-t-2xl border-t border-line shadow-lift data-[state=closed]:animate-sheet-down data-[state=open]:animate-sheet-up",
             // tablet / desktop: side drawer
             "sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-dvh sm:max-h-none sm:w-full sm:rounded-none sm:border-l sm:border-t-0 sm:shadow-drawer sm:data-[state=closed]:animate-drawer-out sm:data-[state=open]:animate-drawer-in",
-            wide ? "sm:max-w-[560px]" : "sm:max-w-[440px]",
+            { md: "sm:max-w-[440px]", lg: "sm:max-w-[560px]", xl: "sm:max-w-[680px]" }[size ?? (wide ? "lg" : "md")],
           )}
         >
           <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-line-strong sm:hidden" />
           <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-4 sm:h-14 sm:px-6">
-            <Dialog.Title className="truncate text-base font-semibold tracking-[-0.01em]">{title}</Dialog.Title>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Dialog.Title className="truncate text-base font-semibold tracking-[-0.01em]">{title}</Dialog.Title>
+              {titleExtra}
+            </div>
             <Dialog.Close className="btn-icon -mr-1.5" aria-label="Close">
               <X size={16} />
             </Dialog.Close>
           </div>
+          {subheader && <div className="shrink-0 border-b border-line bg-subtle/60 px-4 pt-4 sm:px-6">{subheader}</div>}
           <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">{children}</div>
           {footer && <div className="pb-safe shrink-0 border-t border-line bg-surface px-4 py-3 sm:px-6">{footer}</div>}
         </Dialog.Content>

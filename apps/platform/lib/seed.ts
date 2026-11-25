@@ -6,7 +6,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -51,16 +51,23 @@ export function seedState(now = new Date()): AppState {
       outcome: "service_booked",
       summary: "Priya is happy with the Camry and booked her first service for Tuesday 10am.",
       saved: { all_good: "yes", wants_service: "yes" },
+      recording: { durationSec: 94 },
+      endReason: "agent_ended",
+      actions: ["booked", "texted"],
+      mood: [0.12, 0.05, 0.08, 0.04],
       transcript: [
-        { who: "agent", text: "Hi Priya, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
-        { who: "caller", text: "Yeah sure, what's up?" },
-        { who: "agent", text: "It's been about a month since you picked up your Camry, so we're checking in. Is everything running well so far?" },
-        { who: "caller", text: "Yeah it's been great actually." },
-        { who: "agent", text: "Love to hear it. Would you like to book your first free service?" },
-        { who: "caller", text: "Yes, maybe next Tuesday morning?" },
-        { who: "agent", text: "Tuesday at 10am is free. Shall I lock that in?" },
-        { who: "caller", text: "Perfect." },
-        { who: "agent", text: "You're all set. We'll text you the details. Thanks!" },
+        { who: "agent", at: 0.6, text: "Hi Priya, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
+        { who: "caller", at: 8.4, text: "Yeah sure, what's up?" },
+        { who: "agent", at: 11.2, text: "It's been about a month since you picked up your Camry, so we're checking in. Is everything running well so far?", reason: "Opening the check-in, then the first question in the flow." },
+        { who: "caller", at: 20.5, text: "Yeah it's been great actually." },
+        { who: "agent", at: 23.1, text: "Love to hear it. Would you like to book your first free service?", reason: "All good is yes, so the flow skips the problem questions." },
+        { who: "caller", at: 30.8, text: "Yes, maybe next Tuesday morning?" },
+        { who: "action", text: "Checked the service calendar: Tue 10:00, 10:30 and 11:00 free" },
+        { who: "agent", at: 36.4, text: "Tuesday at 10am is free. Shall I lock that in?", reason: "Offered the earliest morning slot, as asked." },
+        { who: "caller", at: 42.9, text: "Perfect." },
+        { who: "action", text: "Booked on the service calendar: Tue 10:00, 1 hour" },
+        { who: "action", text: "Texted the booking details to Priya" },
+        { who: "agent", at: 46.2, text: "You're all set. We'll text you the details. Thanks!", reason: "Booked, so the flow ends with Service booked." },
       ],
     },
     {
@@ -73,14 +80,18 @@ export function seedState(now = new Date()): AppState {
       outcome: "not_now",
       summary: "Noah is fine with the RAV4 but doesn't want a service yet. Follow-up in 3 months.",
       saved: { all_good: "yes", wants_service: "no" },
+      recording: { durationSec: 51 },
+      endReason: "agent_ended",
+      actions: [],
+      mood: [0.32, 0.18, 0.41],
       transcript: [
-        { who: "agent", text: "Hi Noah, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
-        { who: "caller", text: "Quickly, yeah." },
-        { who: "agent", text: "Is the RAV4 running well so far?" },
-        { who: "caller", text: "All good, no complaints." },
-        { who: "agent", text: "Great. Would you like to book your first free service?" },
-        { who: "caller", text: "Not yet, it's barely done any kilometres." },
-        { who: "agent", text: "No problem at all. We'll check in again in a few months. Have a great day!" },
+        { who: "agent", at: 0.6, text: "Hi Noah, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
+        { who: "caller", at: 7.9, text: "Quickly, yeah." },
+        { who: "agent", at: 9.6, text: "Is the RAV4 running well so far?", reason: "He's short on time, so the intro line was skipped." },
+        { who: "caller", at: 13.2, text: "All good, no complaints." },
+        { who: "agent", at: 15.8, text: "Great. Would you like to book your first free service?" },
+        { who: "caller", at: 21.4, text: "Not yet, it's barely done any kilometres." },
+        { who: "agent", at: 26.0, text: "No problem at all. We'll check in again in a few months. Have a great day!", reason: "Wants service is no, so the call ends Not now; the automation calls again in 3 months." },
       ],
     },
     {
@@ -93,12 +104,17 @@ export function seedState(now = new Date()): AppState {
       outcome: "message_taken",
       summary: "Lucas asked about adding a tow bar to his Kluger. Message passed to the manager.",
       saved: { reason: "Question", wants_person: "no", message: "Wants a quote for a tow bar on his Kluger" },
+      recording: { durationSec: 72 },
+      endReason: "caller_hung_up",
+      actions: ["message", "texted"],
+      mood: [0.22, 0.15],
       transcript: [
-        { who: "agent", text: "Thanks for calling Northside Motors, this is Mia, the AI assistant. This call is recorded. How can I help?" },
-        { who: "caller", text: "Hi, I bought a Kluger last week and want to add a tow bar." },
-        { who: "agent", text: "Nice choice. Would you like to speak with someone on the team, or shall I pass on a message?" },
-        { who: "caller", text: "A message is fine, just get someone to quote me." },
-        { who: "agent", text: "Got it, someone will get back to you today." },
+        { who: "agent", at: 0.4, text: "Thanks for calling Northside Motors, this is Mia, the AI assistant. This call is recorded. How can I help?" },
+        { who: "caller", at: 6.8, text: "Hi, I bought a Kluger last week and want to add a tow bar." },
+        { who: "agent", at: 12.5, text: "Nice choice. Would you like to speak with someone on the team, or shall I pass on a message?", reason: "A question it can't answer from what it knows, so it offers a person or a message." },
+        { who: "caller", at: 20.1, text: "A message is fine, just get someone to quote me." },
+        { who: "action", text: "Texted the manager: Lucas wants a quote for a tow bar on his Kluger" },
+        { who: "agent", at: 25.7, text: "Got it, someone will get back to you today." },
       ],
     },
   ];
@@ -113,6 +129,8 @@ export function seedState(now = new Date()): AppState {
     outcome: "in_progress",
     summary: "On the call now: checking in on James's RAV4.",
     saved: { all_good: "yes" },
+    mood: [0.1, 0.08],
+    actions: [],
     transcript: [
       { who: "agent", text: "Hi James, this is Ava, the AI assistant at Northside Motors. This call is recorded. Have you got a minute?" },
       { who: "caller", text: "Yep, go ahead." },
@@ -238,6 +256,8 @@ function sampleHistory(now: Date, flows: Flow[], contacts: Contact[]): Call[] {
         summary: outcome === "no_answer" ? "No answer." : SUMMARIES[outcome] ?? "Call completed.",
         saved: {},
         transcript: [],
+        endReason: outcome === "no_answer" ? "no_answer" : outcome === "transferred" ? "transferred" : "agent_ended",
+        actions: outcome === "transferred" ? ["transferred"] : /booked|set/.test(outcome) ? ["booked"] : outcome === "message_taken" ? ["message"] : [],
       });
     }
   }

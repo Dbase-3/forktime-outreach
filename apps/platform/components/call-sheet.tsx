@@ -1,60 +1,101 @@
 "use client";
 
-// One call: summary, what was saved, the transcript.
+// One call, for review. Modelled on the Forktime dashboard's conversation
+// drawer: the recording and the feedback sit ABOVE the tabs (in the drawer's
+// fixed subheader), so playback carries on across a tab switch and you can
+// read the transcript while you listen.
 
 import clsx from "clsx";
-import { duration, humanize, relativeTime } from "@/lib/format";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { activeLineAt, hasTimeline } from "@/lib/call-review";
 import type { AppState, Call } from "@/lib/types";
-import { Badge, Sheet, useLastPresent, type Tone } from "./ui";
+import { AudioPlayer, type PlayerHandle } from "./calls/audio-player";
+import { CallFeedbackBar } from "./calls/call-feedback";
+import { CallOverview } from "./calls/call-overview";
+import { CallTranscript } from "./calls/call-transcript";
+import { Badge, Sheet, useLastPresent } from "./ui";
 
-export function outcomeTone(outcome: string): Tone {
-  if (outcome === "no_answer" || outcome === "in_progress") return "gray";
-  if (/booked|set|promise|transferred|given/.test(outcome)) return "green";
-  if (/not_now|needs|message/.test(outcome)) return "amber";
-  if (/not_interested|wrong|failed/.test(outcome)) return "red";
-  return "gray";
-}
+export { outcomeTone } from "./calls/call-overview";
+
+type Tab = "overview" | "transcript";
 
 export function CallSheet({ call: current, app, onClose }: { call: Call | null; app: AppState; onClose: () => void }) {
   const call = useLastPresent(current);
   const contact = call ? app.contacts.find((c) => c.id === call.contactId) : undefined;
   const flow = call ? app.flows.find((f) => f.id === call.flowId) : undefined;
+  const latest = call ? app.calls.find((c) => c.id === call.id) ?? call : null; // feedback edits re-render from the store
+
+  const [tab, setTab] = useState<Tab>("overview");
+  const [following, setFollowing] = useState(true);
+  const [active, setActive] = useState(-1);
+  const player = useRef<PlayerHandle>(null);
+  const lines = useRef(call?.transcript ?? []);
+  lines.current = call?.transcript ?? [];
+
+  // Each call opens on Overview, following on, nothing lit.
+  useEffect(() => {
+    setTab("overview");
+    setFollowing(true);
+    setActive(-1);
+  }, [call?.id]);
+
+  // Playback reports ~60×/s; state changes only when the lit line does.
+  const onTime = useCallback((t: number) => setActive(activeLineAt(lines.current, t)), []);
+  const seek = (sec: number) => {
+    player.current?.seek(sec, { play: true });
+    setFollowing(true);
+  };
+
+  const recorded = Boolean(call?.recording);
+  const transcriptText = (call?.transcript ?? [])
+    .map((l) => `${l.who === "caller" ? "Caller" : l.who === "agent" ? flow?.agent.name ?? "Agent" : "Action"}: ${l.text}`)
+    .join("\n");
+
+  const subheader = call ? (
+    <div>
+      {call.recording && (
+        <AudioPlayer key={call.id} ref={player} callId={call.id} url={call.recording.url} durationSec={call.recording.durationSec} transcriptText={transcriptText} onTime={onTime} />
+      )}
+      {!call.live && latest && <CallFeedbackBar call={latest} />}
+      <div className="mt-3 flex gap-5" role="tablist">
+        {(["overview", "transcript"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={clsx("-mb-px border-b-2 pb-2.5 text-sm font-medium transition-colors", tab === t ? "border-fg text-fg" : "border-transparent text-fg-3 hover:text-fg")}
+          >
+            {t === "overview" ? "Overview" : "Transcript"}
+            {t === "transcript" && call.transcript.length > 0 && <span className="ml-1.5 font-mono text-xs text-fg-4">{call.transcript.filter((l) => l.who !== "action").length}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <Sheet open={current !== null} onClose={onClose} title={contact?.name ?? "Call"} wide>
-      {call && (
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-fg-3">
-            {call.live ? <Badge tone="green" dot>Live now</Badge> : <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>}
-            <span>{call.direction === "inbound" ? "Called in" : "We called"}</span>·<span>{duration(call.durationSec)}</span>·<span>{relativeTime(call.startedAt)}</span>
-          </div>
-          <div className="rounded-lg border border-line bg-subtle p-3.5 text-sm leading-relaxed text-fg">{call.summary}</div>
-          {Object.keys(call.saved).length > 0 && (
-            <div>
-              <h3 className="metric-label mb-2">Saved from the call</h3>
-              <dl className="divide-y divide-line rounded-xl border border-line">
-                {Object.entries(call.saved).map(([key, value]) => (
-                  <div key={key} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
-                    <dt className="text-fg-3">{humanize(key)}</dt>
-                    <dd className="text-right font-medium">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
-          <div>
-            <h3 className="metric-label mb-2">Transcript · {flow?.name}</h3>
-            {call.transcript.length === 0 && <p className="text-sm text-fg-3">No transcript for this call.</p>}
-            <div className="space-y-2.5">
-              {call.transcript.map((line, i) => (
-                <div key={i} className={clsx("flex", line.who === "caller" && "justify-end")}>
-                  <div className={clsx("max-w-[85%] rounded-xl px-3.5 py-2 text-sm leading-snug", line.who === "agent" ? "rounded-tl-md bg-muted" : "rounded-tr-md bg-fg text-background")}>
-                    {line.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+    <Sheet
+      open={current !== null}
+      onClose={onClose}
+      title={contact?.name ?? "Unknown caller"}
+      titleExtra={call?.live ? <Badge tone="green" dot>Live</Badge> : undefined}
+      size="xl"
+      subheader={subheader}
+    >
+      {call && tab === "overview" && <CallOverview call={call} app={app} />}
+      {call && tab === "transcript" && (
+        <CallTranscript
+          lines={call.transcript}
+          agentName={flow?.agent.name ?? "Agent"}
+          activeIndex={recorded ? active : -1}
+          following={following}
+          onFollowingChange={setFollowing}
+          canSeek={recorded && hasTimeline(call.transcript)}
+          onSeek={seek}
+          live={call.live}
+        />
       )}
     </Sheet>
   );

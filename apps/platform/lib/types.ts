@@ -115,6 +115,24 @@ export interface Campaign {
 
 // ---- Calls ----
 
+export interface TranscriptLine {
+  who: "agent" | "caller" | "action"; // "action" = something the agent did (booked, texted…)
+  text: string;
+  at?: number; // seconds into the recording when the line starts
+  reason?: string; // agent lines: its own one-line reason, kept for review
+}
+
+export type FeedbackReason = "misunderstood" | "wrong_info" | "booking_mistake" | "talked_over" | "should_transfer" | "robotic" | "other";
+
+export interface CallFeedback {
+  rating: "up" | "down";
+  reasons: FeedbackReason[];
+  note: string;
+  at: string;
+}
+
+export type EndReason = "caller_hung_up" | "agent_ended" | "transferred" | "no_answer" | "voicemail";
+
 export interface Call {
   id: string;
   contactId: string;
@@ -125,7 +143,12 @@ export interface Call {
   outcome: string;
   summary: string;
   saved: Record<string, string>;
-  transcript: { who: "agent" | "caller"; text: string }[];
+  transcript: TranscriptLine[];
+  recording?: { url?: string; durationSec: number }; // no url = sample call, no audio
+  endReason?: EndReason;
+  actions?: string[]; // what the call did: booked, transferred, texted, crm, message
+  mood?: number[]; // 0..1 per caller line, in order: how upset they sounded
+  feedback?: CallFeedback | null;
   live?: boolean; // the call is happening right now
 }
 

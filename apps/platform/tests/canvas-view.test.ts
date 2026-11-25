@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_Z, MIN_Z, clampZoom, pinch, wheelZoomSpeed, zoomAt } from "@/lib/canvas-view";
+import { MAX_Z, MIN_Z, clampZoom, fitAll, pinch, wheelZoomSpeed, zoomAt } from "@/lib/canvas-view";
 
 /** Where a point of the drawing lands on screen. */
 const onScreen = (v: { x: number; y: number; z: number }, dx: number, dy: number) => ({ x: v.x + dx * v.z, y: v.y + dy * v.z });
@@ -51,5 +51,18 @@ describe("scroll to zoom", () => {
     expect(notch).toBeLessThan(0.85);
     expect(wheelZoomSpeed({ ctrlKey: true, metaKey: false, deltaMode: 0 })).toBe(0.01);
     expect(wheelZoomSpeed({ ctrlKey: false, metaKey: false, deltaMode: 1 })).toBe(0.05);
+  });
+});
+
+describe("fit the whole workflow", () => {
+  it("shrinks a tall workflow until it fits both ways, centred", () => {
+    const v = fitAll({ width: 600, height: 1800 }, { width: 1000, height: 764 });
+    expect(v.z).toBeCloseTo(700 / 1800, 5);
+    expect(v.x + 600 * v.z / 2).toBeCloseTo(500, 5); // centred left to right
+    expect(v.y + 1800 * v.z).toBeLessThanOrEqual(764 - 32 + 0.001); // bottom on screen
+  });
+
+  it("never enlarges a small one past 100%, and centres it", () => {
+    expect(fitAll({ width: 300, height: 200 }, { width: 1000, height: 800 })).toEqual({ z: 1, x: 350, y: 300 });
   });
 });

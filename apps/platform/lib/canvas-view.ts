@@ -59,3 +59,12 @@ export function wheelZoomSpeed(event: { ctrlKey: boolean; metaKey: boolean; delt
   if (event.deltaMode === 2) return 0.5; // pages
   return 0.002;
 }
+
+/**
+ * The whole drawing on screen: as large as fits both ways (never above 100%,
+ * never below the minimum zoom), centred in the box with `pad` px around it.
+ */
+export function fitAll(drawing: { width: number; height: number }, box: { width: number; height: number }, pad = 32): View {
+  const z = clampZoom(Math.min(1, (box.width - pad * 2) / drawing.width, (box.height - pad * 2) / drawing.height));
+  return { z, x: (box.width - drawing.width * z) / 2, y: Math.max(pad, (box.height - drawing.height * z) / 2) };
+}

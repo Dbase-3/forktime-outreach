@@ -7,7 +7,7 @@
 import clsx from "clsx";
 import { AlertCircle, Flag, Maximize2, Minus, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { DRAG_THRESHOLD, distance, midpoint, pinch, wheelZoomSpeed, zoomAt, type Point, type View } from "@/lib/canvas-view";
+import { DRAG_THRESHOLD, distance, fitAll, midpoint, pinch, wheelZoomSpeed, zoomAt, type Point, type View } from "@/lib/canvas-view";
 import { layoutFlow, type InsertAt, type LayoutEdge, type LayoutNode } from "@/lib/flow-layout";
 import type { Step } from "@/lib/types";
 import { footnote, metaOf, summarize } from "./meta";
@@ -51,6 +51,13 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
     fitted.current = true;
     fit();
   }, [fit]);
+
+  /** The whole workflow on screen (the percentage and the fit button). */
+  const showAll = () => {
+    const el = box.current;
+    if (!el) return;
+    setView(fitAll(layout, { width: el.clientWidth, height: el.clientHeight }));
+  };
 
   // Trackpad and mouse wheel (owner, 2026-11-26, like ElevenLabs / React Flow):
   // two-finger scroll and pinch both ZOOM around the pointer; moving is click
@@ -209,10 +216,10 @@ export function FlowCanvas({ steps, greeting, ctx, onAddAt, onEditGreeting }: Pr
 
       <div data-canvas-controls className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 shadow-pop">
         <button type="button" className="btn-icon h-7 w-7" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out"><Minus size={14} /></button>
-        <span className="w-11 text-center font-mono text-2xs tabular-nums text-fg-3">{Math.round(view.z * 100)}%</span>
+        <button type="button" onClick={showAll} title="Fit the whole workflow" aria-label="Fit the whole workflow" className="h-7 w-12 rounded-md text-center font-mono text-2xs tabular-nums text-fg-3 transition-colors hover:bg-muted hover:text-fg">{Math.round(view.z * 100)}%</button>
         <button type="button" className="btn-icon h-7 w-7" onClick={() => zoomBy(1.2)} aria-label="Zoom in"><Plus size={14} /></button>
         <span className="mx-0.5 h-4 w-px bg-line" />
-        <button type="button" className="btn-icon h-7 w-7" onClick={fit} aria-label="Fit to screen"><Maximize2 size={13} /></button>
+        <button type="button" className="btn-icon h-7 w-7" onClick={showAll} aria-label="Fit the whole workflow" title="Fit the whole workflow"><Maximize2 size={13} /></button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 hidden font-mono text-2xs text-fg-4 sm:block">Scroll or pinch to zoom · drag to move</div>
     </div>

@@ -95,9 +95,25 @@ export interface Contact {
   name: string;
   phone: string;
   email?: string;
-  groups: string[];
+  groups: string[]; // the lists it's in
   fields: Record<string, string>;
+  sourceId?: string; // the import or CRM sync it came from
   createdAt: string;
+}
+
+/** Where contacts come from: a CSV import or a CRM / sheet kept in sync. */
+export interface DataSource {
+  id: string;
+  kind: "csv" | "sync";
+  integrationId?: string; // sync: hubspot, salesforce, google_sheets…
+  name: string; // "HubSpot · Contacts", "buyers-2026.csv"
+  object?: string; // sync: which records (Contacts, Leads…)
+  list: string; // contacts land in this list
+  fieldKeys: string[]; // the fields it fills
+  rows: number;
+  syncEvery?: "15m" | "1h" | "1d"; // sync only
+  lastSyncAt: string;
+  status: "synced" | "syncing" | "error";
 }
 
 // ---- Automations: when a call happens on its own ----
@@ -211,6 +227,7 @@ export interface AppState {
   automations: Automation[];
   contacts: Contact[];
   fieldDefs: FieldDef[];
+  sources: DataSource[];
   campaigns: Campaign[];
   calls: Call[];
   integrations: Integration[];

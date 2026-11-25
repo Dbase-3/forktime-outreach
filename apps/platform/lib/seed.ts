@@ -6,7 +6,7 @@ import { TEMPLATES, flowFromTemplate } from "./templates";
 import type { AppState, Call, Contact, Flow } from "./types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
-export const SEED_VERSION = 5;
+export const SEED_VERSION = 6;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -30,15 +30,42 @@ export function seedState(now = new Date()): AppState {
     ["Olivia Taylor", "+61418555074", "Yaris Cross", -19],
     ["Noah Kim", "+61419555085", "RAV4", -60],
   ];
-  const contacts: Contact[] = people.map(([name, phone, model, bought], i) => ({
+  const MODELS = ["Corolla Hybrid", "RAV4", "Camry", "HiLux", "Kluger", "Yaris Cross", "LandCruiser", "C-HR"];
+  const TIERS = ["Standard", "Gold", "Platinum"];
+  const SUBURBS = ["Northside", "Riverview", "Hillcrest", "Bayside", "Oakwood"];
+  const contactFor = (name: string, phone: string, model: string, bought: number, i: number): Contact => ({
     id: `c_${i + 1}`,
     name,
     phone,
-    email: `${name.split(" ")[0].toLowerCase()}@example.com`,
+    email: i % 7 === 5 ? undefined : `${name.split(" ")[0].toLowerCase()}.${name.split(" ")[1]?.toLowerCase() ?? "x"}@example.com`,
     groups: ["Buyers 2026"],
-    fields: { car_model: model, purchase_date: isoDay(now, bought), first_name: name.split(" ")[0] },
+    fields: {
+      first_name: name.split(" ")[0],
+      car_model: model,
+      purchase_date: isoDay(now, bought),
+      km: String(Math.max(150, Math.round(-bought * 46 + (i % 5) * 310))),
+      tier: TIERS[i % 3],
+      service_plan: i % 3 === 0 ? "Yes" : "No",
+      suburb: SUBURBS[i % 5],
+    },
+    sourceId: "src_hubspot",
     createdAt: isoDay(now, bought),
-  }));
+  });
+  const FIRST = ["Mia", "Leo", "Ava", "Jack", "Zoe", "Ethan", "Ruby", "Oscar", "Isla", "Henry", "Chloe", "Max", "Grace", "Liam", "Lily", "Noah", "Ella", "Lucas", "Amelia", "Mason", "Harper", "Logan", "Aria", "Ryan", "Sofia", "Kai", "Layla", "Ari", "Nina", "Theo", "Maya", "Ben"];
+  const LAST = ["Smith", "Brown", "Singh", "Lee", "Martin", "Walker", "Hall", "Young", "King", "Wright", "Green", "Baker", "Adams", "Clark", "Ali", "Khan"];
+  const contacts: Contact[] = [
+    ...people.map(([name, phone, model, bought], i) => contactFor(name, phone, model, bought, i)),
+    ...FIRST.map((first, j) => {
+      const i = people.length + j;
+      return contactFor(`${first} ${LAST[j % LAST.length]}`, `+6142${String(1000000 + j * 7919).slice(0, 7)}`, MODELS[j % MODELS.length], -((j * 11) % 150) - 3, i);
+    }),
+  ];
+  // The last few came in through the website's form, not the CRM.
+  contacts.slice(-6).forEach((c) => {
+    c.groups = ["Web leads"];
+    c.sourceId = "src_web";
+    c.fields = { first_name: c.fields.first_name, suburb: c.fields.suburb };
+  });
 
   const calls: Call[] = [
     {
@@ -208,9 +235,18 @@ export function seedState(now = new Date()): AppState {
     ],
     contacts,
     fieldDefs: [
-      { key: "first_name", label: "First name", type: "text" },
-      { key: "car_model", label: "Car model", type: "text" },
-      { key: "purchase_date", label: "Purchase date", type: "date" },
+      { key: "first_name", label: "First name", type: "text", source: "src_hubspot" },
+      { key: "car_model", label: "Car model", type: "text", source: "src_hubspot" },
+      { key: "purchase_date", label: "Purchase date", type: "date", source: "src_hubspot" },
+      { key: "km", label: "Kilometres", type: "number", source: "src_hubspot" },
+      { key: "tier", label: "Tier", type: "choice", choices: ["Standard", "Gold", "Platinum"], source: "src_hubspot" },
+      { key: "service_plan", label: "Service plan", type: "yesno", source: "src_hubspot" },
+      { key: "suburb", label: "Suburb", type: "text", source: "src_hubspot" },
+      { key: "wants_service", label: "Wants service", type: "yesno", source: "call" },
+    ],
+    sources: [
+      { id: "src_hubspot", kind: "sync", integrationId: "hubspot", name: "HubSpot · Contacts", object: "Contacts", list: "Buyers 2026", fieldKeys: ["first_name", "car_model", "purchase_date", "km", "tier", "service_plan", "suburb"], rows: 34, syncEvery: "15m", lastSyncAt: new Date(now.getTime() - 6 * 60 * 1000).toISOString(), status: "synced" },
+      { id: "src_web", kind: "csv", name: "web-leads-nov.csv", list: "Web leads", fieldKeys: ["first_name", "suburb"], rows: 6, lastSyncAt: isoDay(now, -2), status: "synced" },
     ],
     campaigns: [
       {

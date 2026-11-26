@@ -21,6 +21,7 @@
     "dev:api": "pnpm --filter @outreach/api dev",
     "db:api": "pnpm --filter @outreach/api db",
     "dev:platform-agent": "pnpm --filter @outreach/platform-agent dev",
-    "deploy:api": "bash scripts/deploy-api.sh"
+    "deploy:api": "bash scripts/deploy-api.sh",
+    "deploy:platform-agent": "bash apps/platform-agent/scripts/deploy.sh"
   }
 }

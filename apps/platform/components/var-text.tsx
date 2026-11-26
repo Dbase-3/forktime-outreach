@@ -115,7 +115,7 @@ export function VarText({
               </div>
             ))}
           </div>
-          <p className="border-t border-line px-3 py-2 text-xs text-fg-3">Filled in on each call. A contact without that field leaves it out.</p>
+          <p className="border-t border-line px-3 py-2 text-xs text-fg-3">Filled in on each call; an empty one is left out. To say something else instead, add it after a bar: {"{first_name|there}"}.</p>
         </Popover>
         {unknown.length > 0 && (
           <span className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">

@@ -43,8 +43,8 @@ describe("practice run", () => {
     expect(answerPractice(done, "hello")).toBe(done);
   });
 
-  it("leaves unknown placeholders visible", () => {
-    expect(fill("Hi {first_name}, {nope}", { first_name: "Sam" })).toBe("Hi Sam, {nope}");
+  it("never speaks a raw placeholder: an empty or unknown one is left out (the editor flags typos)", () => {
+    expect(fill("Hi {first_name}, {nope}", { first_name: "Sam" })).toBe("Hi Sam,");
   });
 });
 

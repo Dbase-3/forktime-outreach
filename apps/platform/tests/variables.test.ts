@@ -29,3 +29,21 @@ describe("variables a line can use", () => {
     expect(insertVar("Hi NAME!", 3, 7, "first_name").text).toBe("Hi {first_name}!");
   });
 });
+
+describe("filling variables (B30)", () => {
+  it("uses the value, then the fallback, else leaves the variable out tidily", async () => {
+    const { fill } = await import("@/lib/variables");
+    expect(fill("Hi {first_name}, this is {agent}.", { first_name: "Mia", agent: "Ava" })).toBe("Hi Mia, this is Ava.");
+    expect(fill("Hi {first_name|there}, this is {agent}.", { agent: "Ava" })).toBe("Hi there, this is Ava.");
+    expect(fill("Hi {first_name}, this is {agent}.", { agent: "Ava" })).toBe("Hi, this is Ava.");
+    expect(fill("{first_name} thanks for calling.", {})).toBe("thanks for calling.");
+    expect(fill("How is the {car_model} going?", {})).toBe("How is the going?");
+    expect(fill("Hello, {name}, welcome...", {})).toBe("Hello, welcome...");
+    expect(fill("Wait... what? {x}", {})).toBe("Wait... what?");
+  });
+
+  it("reads a fallback as part of the variable, not a new one", async () => {
+    const { varsIn } = await import("@/lib/variables");
+    expect(varsIn("Hi {first_name|there} and {agent}")).toEqual(["first_name", "agent"]);
+  });
+});

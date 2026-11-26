@@ -171,6 +171,7 @@ function NumberField({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => F
   const app = useApp();
   const [pending, setPending] = useState<string | null>(null);
   const [getting, setGetting] = useState(false);
+  const [liveNote, setLiveNote] = useState(false);
   return (
     <>
       <NumberPicker
@@ -183,11 +184,17 @@ function NumberField({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => F
             setPending(id);
             return;
           }
+          if (!id && flow.status === "live") {
+            setLiveNote(true);
+            return;
+          }
+          setLiveNote(false);
           setPending(null);
           onEdit((f) => ({ ...f, numberId: id }));
         }}
         onGetNumber={() => setGetting(true)}
       />
+      {liveNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">A live agent needs a number. Switch it to draft first, or pick another number.</p>}
       <Modal open={getting} onClose={() => setGetting(false)} title="Get another number" description="Pick where people will see you calling from.">
         <GetNumber
           taken={app.numbers.map((n) => n.e164)}

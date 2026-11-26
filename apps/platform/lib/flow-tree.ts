@@ -1,7 +1,9 @@
 // Pure operations on a flow's step tree. Steps live in lists; a branch step
 // holds two more lists (yes / no). Every operation returns a new tree.
 
-import type { ActionKind, Flow, Step, StepKind } from "./types";
+import { greetingIsHonest } from "./disclosure";
+import { OPS_FOR } from "./conditions";
+import type { ActionKind, AnswerType, FieldType, Flow, Step, StepKind } from "./types";
 
 /** Where a list of steps lives: the flow's top level, or one side of a branch. */
 export interface Container {
@@ -117,41 +119,86 @@ export interface FlowIssue {
   message: string;
 }
 
+/** A field a decision may test without the call asking: the contact's own, with its type when known. */
+export type KnownField = string | { key: string; type: FieldType };
+
+const ANSWER_FIELD: Record<AnswerType, FieldType> = { text: "text", yesno: "yesno", number: "number", date: "date", choice: "choice" };
+
 /**
- * Things that would make the call go wrong. `knownFields` are the contact's own
- * fields, which a branch may test without the call asking for them.
+ * Things that would make the call go wrong. Walks every path in order, so a
+ * decision that comes before its question, a path that never reaches an End,
+ * an operator that doesn't fit the field's type, actions with nothing set up
+ * and steps nothing can reach are all caught (bug B6). The welcome message
+ * must disclose the AI and the recording (B8).
  */
-export function flowIssues(flow: Pick<Flow, "steps" | "greeting">, knownFields: string[] = []): FlowIssue[] {
+export function flowIssues(flow: Pick<Flow, "steps" | "greeting">, knownFields: KnownField[] = []): FlowIssue[] {
   const issues: FlowIssue[] = [];
   if (!flow.greeting.trim()) issues.push({ stepId: null, message: "Add what the agent says first." });
-  if (flow.steps.length === 0) issues.push({ stepId: null, message: "Add at least one step." });
-  const fields = new Set([...askedFields(flow.steps), ...knownFields]);
-  for (const step of allSteps(flow.steps)) issues.push(...stepIssues(step, fields));
-  issues.push(...unreachable(flow.steps));
+  else if (!greetingIsHonest(flow.greeting)) issues.push({ stepId: null, message: "The welcome message must say it's an AI assistant and that the call is recorded." });
+  if (flow.steps.length === 0) {
+    issues.push({ stepId: null, message: "Add at least one step." });
+    return issues;
+  }
+  const known = new Map<string, FieldType | null>(knownFields.map((f) => (typeof f === "string" ? [f, null] : [f.key, f.type])));
+  const askedAnywhere = new Map<string, FieldType>();
+  for (const s of allSteps(flow.steps)) if (s.kind === "ask" && s.field) askedAnywhere.set(s.field, ANSWER_FIELD[s.answerType]);
+
+  const walk = (list: Step[], asked: Map<string, FieldType>): { ends: boolean; asked: Map<string, FieldType> } => {
+    const here = new Map(asked);
+    for (let i = 0; i < list.length; i++) {
+      const step = list[i];
+      issues.push(...stepIssues(step));
+      if (step.kind === "ask" && step.field) here.set(step.field, ANSWER_FIELD[step.answerType]);
+      if (step.kind === "branch" && step.condition.field) {
+        const field = step.condition.field;
+        const type = here.get(field) ?? (known.has(field) ? known.get(field) ?? null : undefined);
+        if (type === undefined) {
+          issues.push({ stepId: step.id, message: askedAnywhere.has(field) ? `This decides on "${field}" before the call asks for it.` : `"${field}" is never asked or known.` });
+        } else if (type && !OPS_FOR[type].includes(step.condition.op)) {
+          issues.push({ stepId: step.id, message: `"${field}" is ${type === "yesno" ? "a yes/no" : `a ${type}`} answer; pick a check that fits it.` });
+        }
+        const yes = walk(step.yes, here);
+        const no = walk(step.no, here);
+        // Only answers asked on both sides are certain afterwards.
+        for (const [k, v] of yes.asked) if (no.asked.has(k)) here.set(k, v);
+        if (yes.ends && no.ends) {
+          if (i < list.length - 1) issues.push({ stepId: list[i + 1].id, message: "Both sides of the decision before this end the call, so it never runs." });
+          return { ends: true, asked: here };
+        }
+      }
+      if (step.kind === "end") {
+        if (i < list.length - 1) issues.push({ stepId: list[i + 1].id, message: "This step comes after the call has ended." });
+        return { ends: true, asked: here };
+      }
+    }
+    return { ends: false, asked: here };
+  };
+
+  if (!walk(flow.steps, new Map()).ends) {
+    issues.push({ stepId: lastLeaf(flow.steps)?.id ?? null, message: "Some calls reach the end of the workflow without an End call step. Add one so every call ends with an outcome." });
+  }
   return issues;
 }
 
-function stepIssues(step: Step, fields: Set<string>): FlowIssue[] {
+/** The last step on a path that doesn't end, for pointing at. */
+function lastLeaf(steps: Step[]): Step | null {
+  const last = steps[steps.length - 1];
+  if (!last) return null;
+  if (last.kind === "branch") return lastLeaf(last.no) ?? lastLeaf(last.yes) ?? last;
+  return last;
+}
+
+function stepIssues(step: Step): FlowIssue[] {
   const issue = (message: string) => [{ stepId: step.id, message }];
   if (step.kind === "say" && !step.text.trim()) return issue("Write what the agent says.");
   if (step.kind === "ask" && !step.question.trim()) return issue("Write the question.");
   if (step.kind === "ask" && !step.field.trim()) return issue("Name where the answer is saved.");
   if (step.kind === "ask" && step.answerType === "choice" && (step.choices ?? []).length < 2) return issue("Give at least two choices.");
   if (step.kind === "branch" && !step.condition.field) return issue("Pick what this decision checks.");
-  if (step.kind === "branch" && !fields.has(step.condition.field)) return issue(`"${step.condition.field}" is never asked or known.`);
+  if (step.kind === "action" && !step.detail.trim()) {
+    const what = { book: "which calendar to book on", transfer: "who to transfer to", text: "what the text says", crm: "what to save in the CRM", webhook: "where to send the answers" }[step.action];
+    return issue(`Say ${what}.`);
+  }
   if (step.kind === "end" && !step.outcome.trim()) return issue("Name the outcome.");
   return [];
-}
-
-/** Steps placed after an ending in the same list can never run. */
-function unreachable(steps: Step[]): FlowIssue[] {
-  const issues: FlowIssue[] = [];
-  const endAt = steps.findIndex((step) => step.kind === "end");
-  if (endAt !== -1 && endAt < steps.length - 1) {
-    issues.push({ stepId: steps[endAt + 1].id, message: "This step comes after the call has ended." });
-  }
-  for (const step of steps) {
-    if (step.kind === "branch") issues.push(...unreachable(step.yes), ...unreachable(step.no));
-  }
-  return issues;
 }

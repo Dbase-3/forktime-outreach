@@ -3,6 +3,7 @@
 // call takes; the live agent adds the natural conversation around it.
 
 import { conditionHolds } from "./automation";
+import { fill } from "./variables";
 import { ACTION_LABELS } from "./action-labels";
 import type { Flow, Step } from "./types";
 
@@ -62,7 +63,4 @@ function run(state: PracticeState): PracticeState {
   return { queue: [], values, lines, waitingFor: null, outcome: "no_ending", currentId: null };
 }
 
-/** Replaces {field} with its value; an unknown field stays visible as {field}. */
-export function fill(text: string, values: Record<string, string>): string {
-  return text.replace(/\{(\w+)\}/g, (match, key: string) => values[key] || match);
-}
+export { fill };

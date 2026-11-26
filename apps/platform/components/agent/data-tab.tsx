@@ -26,8 +26,13 @@ export function DataTab({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) =
   const fromSteps = schema.filter((f) => f.from === "step");
   const setField = (key: string, patch: Partial<DataField>) => onEdit((f) => ({ ...f, dataFields: f.dataFields.map((d) => (d.key === key ? { ...d, ...patch } : d)) }));
   const addField = () => {
-    const n = flow.dataFields.length + 1;
-    onEdit((f) => ({ ...f, dataFields: [...f.dataFields, { key: `field_${n}`, label: "", type: "text", description: "", required: false }] }));
+    onEdit((f) => {
+      // A key no other field has, even after deletes (B19).
+      const used = new Set([...f.dataFields.map((d) => d.key), ...schema.map((d) => d.key)]);
+      let n = f.dataFields.length + 1;
+      while (used.has(`field_${n}`)) n++;
+      return { ...f, dataFields: [...f.dataFields, { key: `field_${n}`, label: "", type: "text", description: "", required: false }] };
+    });
   };
   const example = structuredResult(schema, {});
 
@@ -56,8 +61,9 @@ export function DataTab({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) =
       <section>
         <Head title="Listened for" hint="Picked up from the conversation without a question, e.g. a callback time or what they're interested in." />
         <div className="space-y-2">
-          {flow.dataFields.map((field) => (
-            <div key={field.key} className="rounded-lg border border-line p-3">
+          {/* Keyed by position: the key follows the label as it's typed, and a changing React key would drop focus (B19). */}
+          {flow.dataFields.map((field, i) => (
+            <div key={i} className="rounded-lg border border-line p-3">
               <div className="flex items-center gap-2">
                 <input
                   className="field h-8 min-w-0 flex-1 py-0"

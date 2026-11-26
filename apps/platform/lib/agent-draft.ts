@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { newId } from "./flow-tree";
 import { OPS } from "./conditions";
+import { greetingIsHonest } from "./disclosure";
 import type { ConditionOp, DataField, Direction, FieldType, Flow, Step, SuccessCheck } from "./types";
 
 const OP_KEYS = Object.keys(OPS) as [ConditionOp, ...ConditionOp[]];
@@ -94,10 +95,7 @@ export function toSteps(steps: DraftStep[]): Step[] {
   });
 }
 
-/** Every caller must hear that it's an AI assistant and that the call is recorded. */
-export function greetingIsHonest(greeting: string): boolean {
-  return /\bAI assistant\b/i.test(greeting) && /\brecorded\b/i.test(greeting);
-}
+export { greetingIsHonest } from "./disclosure";
 
 export function honestGreeting(greeting: string, direction: Direction): string {
   if (greetingIsHonest(greeting)) return greeting.trim();

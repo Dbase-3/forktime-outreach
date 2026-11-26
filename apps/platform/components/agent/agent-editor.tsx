@@ -10,6 +10,7 @@
 import clsx from "clsx";
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Loader2, MessageSquareText, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { docsForAgent } from "@/lib/knowledge";
 import { dataSchema } from "@/lib/agent-data";
@@ -28,6 +29,7 @@ import { draftFields, useAgentWriter } from "./agent-writer";
 import { ConfigTab } from "./config-tab";
 import { DataTab } from "./data-tab";
 import { KnowledgeTab } from "./knowledge-tab";
+import { AgentMenu } from "./agent-menu";
 import { PreviewPanel } from "./preview-panel";
 import { ToolsTab } from "./tools-tab";
 
@@ -41,6 +43,7 @@ function saveFlow(id: string, fn: (flow: Flow) => Flow): void {
 
 export function AgentEditor({ id }: { id: string }) {
   const app = useApp();
+  const router = useRouter();
   const flow = app.flows.find((f) => f.id === id);
   const [setupTab, setSetupTab] = useState<SetupTab>("config");
   const [mainTab, setMainTab] = useState<MainTab>("preview");
@@ -49,7 +52,8 @@ export function AgentEditor({ id }: { id: string }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ container: Container; index: number } | null>(null);
   const [view, setView] = useState<View>("list");
-  const [undo, setUndo] = useState<Flow | null>(null);
+  // Undo after Write with AI puts back only what the AI wrote, so edits made meanwhile stay (B28).
+  const [undo, setUndo] = useState<Partial<Flow> | null>(null);
   const [drawn, setDrawn] = useState(0); // bumps when AI (or undo) replaces the workflow, so the canvas refits
   const [focusBrief, setFocusBrief] = useState(false); // "Start from scratch": the cursor waits in "What should this agent do?"
   const writer = useAgentWriter();
@@ -76,7 +80,7 @@ export function AgentEditor({ id }: { id: string }) {
 
   const steps = useMemo(() => flow?.steps ?? [], [flow?.steps]);
   const issues = useMemo(
-    () => (flow ? [...(flow.numberId ? [] : [{ message: "Pick a phone number for it to call from and answer on", stepId: undefined as string | undefined, number: true }]), ...flowIssues(flow, app.fieldDefs.map((d) => d.key))] : []),
+    () => (flow ? [...(flow.numberId ? [] : [{ message: "Pick a phone number for it to call from and answer on", stepId: undefined as string | undefined, number: true }]), ...flowIssues(flow, [...app.fieldDefs.map((d) => ({ key: d.key, type: d.type })), "name", "phone"])] : []),
     [flow, app.fieldDefs],
   );
   const questions = useMemo(() => Object.fromEntries(allSteps(steps).flatMap((s) => (s.kind === "ask" && s.field ? [[s.field, s.question]] : []))), [steps]);
@@ -111,17 +115,16 @@ export function AgentEditor({ id }: { id: string }) {
   };
 
   const writeAgent = async () => {
-    const before = flow;
     const draft = await writer.writeAgent({ brief: flow.brief ?? "", business: app.settings.businessName, fields: draftFields(app) });
     if (!draft) return;
-    setUndo(before);
+    const now = app.flows.find((f) => f.id === id) ?? flow;
+    setUndo({ name: now.name, description: now.description, direction: now.direction, greeting: now.greeting, prompt: now.prompt, steps: now.steps, dataFields: now.dataFields, checks: now.checks, askRequired: now.askRequired });
     setSelectedId(null);
     setDrawn((n) => n + 1);
     edit((f) => ({ ...f, ...draft, name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
     showMain("workflow");
   };
   const rebuildWorkflow = async () => {
-    const before = flow;
     const newSteps = await writer.rebuildWorkflow({
       brief: flow.brief ?? "",
       business: app.settings.businessName,
@@ -129,7 +132,8 @@ export function AgentEditor({ id }: { id: string }) {
       agent: { name: flow.agent.name, prompt: flow.prompt, greeting: flow.greeting, direction: flow.direction },
     });
     if (!newSteps) return;
-    setUndo(before);
+    const now = app.flows.find((f) => f.id === id) ?? flow;
+    setUndo({ steps: now.steps, askRequired: now.askRequired });
     setSelectedId(null);
     setDrawn((n) => n + 1);
     edit((f) => ({ ...f, steps: newSteps, askRequired: {} }));
@@ -156,8 +160,16 @@ export function AgentEditor({ id }: { id: string }) {
           aria-label="Agent name"
         />
         {issues.length > 0 && (
-          <Popover align="end" className="w-80" trigger={<button type="button" className="btn-ghost h-8 px-2 text-amber-700 dark:text-amber-400"><AlertTriangle size={15} /> {issues.length}</button>}>
-            <div className="mb-1.5 text-sm font-medium">Fix before going live</div>
+          <Popover
+            align="end"
+            className="w-80"
+            trigger={
+              <button type="button" className={clsx("h-8 px-2", flow.status === "live" ? "btn-secondary border-amber-500/50 text-amber-800 dark:text-amber-300" : "btn-ghost text-amber-700 dark:text-amber-400")}>
+                <AlertTriangle size={15} /> {flow.status === "live" ? `Live with ${issues.length} ${issues.length === 1 ? "problem" : "problems"}` : issues.length}
+              </button>
+            }
+          >
+            <div className="mb-1.5 text-sm font-medium">{flow.status === "live" ? "This live agent has problems. Calls may go wrong until they're fixed." : "Fix before going live"}</div>
             <ul className="space-y-1">
               {issues.map((issue, i) => (
                 <li key={i}>
@@ -177,6 +189,7 @@ export function AgentEditor({ id }: { id: string }) {
             </ul>
           </Popover>
         )}
+        <AgentMenu flow={flow} afterDelete={() => router.push("/agents")} />
         {flow.status === "live" ? (
           <button type="button" className="btn-secondary h-8 border-emerald-500/40 text-emerald-700 dark:text-emerald-400" onClick={() => edit((f) => ({ ...f, status: "draft" }))} title="Switch back to draft"><CheckCircle2 size={15} /> Live</button>
         ) : (
@@ -217,7 +230,7 @@ export function AgentEditor({ id }: { id: string }) {
                 onRebuild={rebuildWorkflow}
                 canUndo={undo !== null}
                 onUndo={() => {
-                  if (undo) edit(() => undo);
+                  if (undo) edit((f) => ({ ...f, ...undo }));
                   setDrawn((n) => n + 1);
                   setUndo(null);
                   setSelectedId(null);

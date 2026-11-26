@@ -81,28 +81,71 @@ describe("reading a flow", () => {
   });
 });
 
+const G = "Hi, this is {agent}, the AI assistant at {business}. This call is recorded.";
+
 describe("flowIssues", () => {
   it("passes a complete flow", () => {
-    expect(flowIssues({ greeting: "Hi", steps: tree() })).toEqual([]);
+    expect(flowIssues({ greeting: G, steps: tree() })).toEqual([]);
   });
 
   it("needs a greeting and a step", () => {
     expect(flowIssues({ greeting: " ", steps: [] }).map((i) => i.message)).toEqual(["Add what the agent says first.", "Add at least one step."]);
   });
 
+  it("needs the welcome message to disclose the AI and the recording, in any supported language (B8, B9)", () => {
+    expect(flowIssues({ greeting: "Hi, it's Ava from Northside!", steps: tree() })[0].message).toMatch(/AI assistant/);
+    expect(flowIssues({ greeting: "Hola, soy Ava, la asistente de IA de {business}. Esta llamada se graba.", steps: tree() })).toEqual([]);
+    expect(flowIssues({ greeting: "Bonjour, je suis l'assistante IA. Cet appel est enregistré.", steps: tree() })).toEqual([]);
+  });
+
   it("flags a decision on a field nobody asks for, unless the contact already has it", () => {
-    const steps = [branch("c", "car_model", [], [])];
-    expect(flowIssues({ greeting: "Hi", steps })[0]).toMatchObject({ stepId: "c" });
-    expect(flowIssues({ greeting: "Hi", steps }, ["car_model"])).toEqual([]);
+    const steps = [branch("c", "car_model", [end("e1", "a")], [end("e2", "b")])];
+    expect(flowIssues({ greeting: G, steps })[0]).toMatchObject({ stepId: "c" });
+    expect(flowIssues({ greeting: G, steps }, ["car_model"])).toEqual([]);
+  });
+
+  it("flags a decision placed before the question that fills it (B6)", () => {
+    const steps = [branch("c", "x", [end("e1", "a")], [end("e2", "b")]), ask("b", "x")];
+    const issues = flowIssues({ greeting: G, steps });
+    expect(issues.find((i) => i.stepId === "c")?.message).toMatch(/before the call asks/);
   });
 
   it("flags steps after an ending, also inside a branch", () => {
-    const steps = [say("a"), branch("c", "x", [end("e", "done"), say("late")], []), ask("b", "x")];
-    expect(flowIssues({ greeting: "Hi", steps }).map((i) => i.stepId)).toEqual(["late"]);
+    const steps = [ask("b", "x"), branch("c", "x", [end("e", "done"), say("late")], [end("n", "no")])];
+    expect(flowIssues({ greeting: G, steps }).map((i) => i.stepId)).toEqual(["late"]);
+  });
+
+  it("flags steps after a decision whose both sides end (B6)", () => {
+    const steps = [ask("b", "x"), branch("c", "x", [end("e1", "a")], [end("e2", "b")]), say("never")];
+    expect(flowIssues({ greeting: G, steps }).map((i) => i.stepId)).toEqual(["never"]);
+  });
+
+  it("flags a workflow where some calls never reach an End (B6)", () => {
+    const steps = [ask("b", "x"), branch("c", "x", [end("e", "done")], [say("s")])];
+    const issues = flowIssues({ greeting: G, steps });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ stepId: "s" });
+    expect(issues[0].message).toMatch(/without an End/);
+  });
+
+  it("flags a check that doesn't fit the answer's type (B6)", () => {
+    const steps: Step[] = [
+      { id: "q", kind: "ask", question: "Score?", field: "score", answerType: "number" },
+      { id: "c", kind: "branch", condition: { field: "score", op: "is_yes" }, yes: [end("a", "x")], no: [end("b", "y")] },
+    ];
+    expect(flowIssues({ greeting: G, steps })[0]).toMatchObject({ stepId: "c" });
+    expect(flowIssues({ greeting: G, steps: [steps[0], { ...steps[1], condition: { field: "score", op: "less_than", value: "7" } } as Step] })).toEqual([]);
+    // A contact field's type is known too.
+    expect(flowIssues({ greeting: G, steps: [{ id: "c", kind: "branch", condition: { field: "km", op: "is_yes" }, yes: [end("a", "x")], no: [end("b", "y")] }] }, [{ key: "km", type: "number" }])[0]).toMatchObject({ stepId: "c" });
+  });
+
+  it("flags actions with nothing set up (B6)", () => {
+    const steps: Step[] = [{ id: "t", kind: "action", action: "transfer", detail: " " }, end("e", "done")];
+    expect(flowIssues({ greeting: G, steps })[0]).toMatchObject({ stepId: "t", message: "Say who to transfer to." });
   });
 
   it("needs two choices for a choice question", () => {
-    const steps: Step[] = [{ id: "q", kind: "ask", question: "Which?", field: "pick", answerType: "choice", choices: ["one"] }];
-    expect(flowIssues({ greeting: "Hi", steps })[0].message).toMatch(/two choices/);
+    const steps: Step[] = [{ id: "q", kind: "ask", question: "Which?", field: "pick", answerType: "choice", choices: ["one"] }, end("e", "done")];
+    expect(flowIssues({ greeting: G, steps })[0].message).toMatch(/two choices/);
   });
 });

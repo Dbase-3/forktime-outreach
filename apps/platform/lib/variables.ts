@@ -44,9 +44,33 @@ export function variableGroups(fields: Pick<FieldDef, "key" | "label">[], answer
   return groups;
 }
 
+// A variable is {key}, or {key|fallback} to say something else when it's empty,
+// e.g. "Hi {first_name|there}". Keys are letters, numbers and underscores.
+const VAR = /\{(\w+)(?:\|([^{}]*))?\}/g;
+
 /** The variables a text uses, in order, once each. */
 export function varsIn(text: string): string[] {
-  return [...new Set([...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))];
+  return [...new Set([...text.matchAll(VAR)].map((m) => m[1]))];
+}
+
+/**
+ * Fills in variables (bug B30: an empty one used to be spoken as "{first_name}").
+ * Empty with a fallback → the fallback; empty without one → left out, and the
+ * spacing and punctuation around it tidied ("Hi {first_name}, …" → "Hi, …").
+ */
+export function fill(text: string, values: Record<string, string>): string {
+  const out = text.replace(VAR, (_m, key: string, fallback?: string) => {
+    const value = (values[key] ?? "").trim();
+    return value || (fallback ?? "").trim() || "\u0000";
+  });
+  // Tidy only where a variable was left out, so the owner's own punctuation stays as written.
+  return out
+    .replace(/([,;:])\s*\u0000\s*([,.!?;:])/g, "$2") // "Hi, {x}, welcome" → "Hi, welcome"
+    .replace(/\s*\u0000(?=[,.!?;:])/g, "") // "Hi {x}," → "Hi,"
+    .replace(/^\s*\u0000\s*/g, "") // "{x} here" at the start
+    .replace(/\s*\u0000\s*/g, " ") // in the middle of a sentence
+    .replace(/ {2,}/g, " ")
+    .trim();
 }
 
 /** Variables the text uses that nothing fills in (likely a typo). */

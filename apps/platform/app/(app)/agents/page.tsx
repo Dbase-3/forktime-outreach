@@ -13,6 +13,7 @@ import { voiceById } from "@/lib/voices";
 import type { Direction } from "@/lib/types";
 import { Avatar, Badge, EmptyState, PageHeader, Sheet } from "@/components/ui";
 import { CreateAgentModal } from "@/components/agent/create-agent-modal";
+import { AgentMenu } from "@/components/agent/agent-menu";
 
 const DIRECTION: Record<Direction, { label: string; icon: typeof ArrowUpRight }> = {
   outbound: { label: "Makes calls", icon: ArrowUpRight },
@@ -84,6 +85,7 @@ export default function AgentsPage() {
                   <th className="metric-label hidden w-24 px-4 py-2.5 text-right font-normal sm:table-cell">7d calls</th>
                   <th className="metric-label hidden w-28 px-4 py-2.5 font-normal lg:table-cell">Edited</th>
                   <th className="metric-label w-24 px-4 py-2.5 text-right font-normal">Status</th>
+                  <th className="w-12 px-2 py-2.5"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -109,6 +111,7 @@ export default function AgentsPage() {
                       <td className="hidden px-4 py-3 text-right font-mono text-xs sm:table-cell">{agentStats(flow, calls, now).week}</td>
                       <td className="hidden px-4 py-3 text-fg-3 lg:table-cell">{relativeTime(flow.updatedAt)}</td>
                       <td className="px-4 py-3 text-right"><Badge tone={flow.status === "live" ? "green" : "gray"} dot>{flow.status === "live" ? "Live" : "Draft"}</Badge></td>
+                      <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}><AgentMenu flow={flow} /></td>
                     </tr>
                   );
                 })}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { audienceOf, campaignIssues, campaignSummary, daysWords, defaultCampaign, describeTrigger, dueDate, upcomingCalls } from "@/lib/campaign";
+import { audienceBreakdown, audienceOf, callRulesFor, campaignIssues, campaignSummary, daysWords, defaultCampaign, describeTrigger, dueDate, upcomingCalls } from "@/lib/campaign";
+import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
 import { daysLabel } from "@/lib/automation";
 import type { Campaign, Contact, FieldDef } from "@/lib/types";
 
@@ -13,6 +14,9 @@ const people = [
   contact("4", { tier: "Gold" }, ["Web"]),
 ];
 const campaign = (over: Partial<Campaign> = {}): Campaign => ({ ...defaultCampaign("f1", now), ...over });
+
+const allDefs: FieldDef[] = [...defs, { key: "first_name", label: "First name", type: "text" }, { key: "car_model", label: "Car model", type: "text" }];
+const liveAgent = () => ({ ...flowFromTemplate(TEMPLATES.find((t) => t.id === "service_check") ?? null, now, "Australia/Sydney"), id: "f1", name: "Service check-in", status: "live" as const, numberId: "n1" });
 
 describe("audience", () => {
   it("is the list, then the conditions", () => {
@@ -68,10 +72,66 @@ describe("summary and checks", () => {
   });
 
   it("won't start without a live agent, days and sensible hours", () => {
-    expect(campaignIssues(campaign(), flows)).toEqual([]);
-    expect(campaignIssues(campaign({ agentId: "nope" }), flows)).toEqual(["Pick an agent."]);
-    expect(campaignIssues(campaign(), [{ id: "f1", status: "draft" }])).toEqual(["The agent is a draft. Put it live first."]);
-    expect(campaignIssues(campaign({ days: [], startHour: 18, endHour: 9 }), flows)).toEqual(["Pick at least one day to call.", "Calling hours end before they start."]);
-    expect(campaignIssues(campaign({ voicemail: "leave_message" }), flows)).toEqual(["Write the voicemail message."]);
+    const ctx = (over: Partial<Parameters<typeof campaignIssues>[1]> = {}) => ({ flows: [liveAgent()], defs: allDefs, audienceCount: 3, now, ...over });
+    expect(campaignIssues(campaign(), ctx())).toEqual([]);
+    expect(campaignIssues(campaign({ agentId: "nope" }), ctx())[0]).toMatch(/deleted/);
+    expect(campaignIssues(campaign(), ctx({ flows: [{ ...liveAgent(), status: "draft" }] }))[0]).toMatch(/draft/);
+    expect(campaignIssues(campaign({ days: [], startHour: 18, endHour: 9 }), ctx())).toEqual(["Pick at least one day to call.", "Calling hours end before they start."]);
+    expect(campaignIssues(campaign({ voicemail: "leave_message" }), ctx())).toEqual(["Write the voicemail message."]);
+  });
+});
+
+describe("audience skips who can't be called (B25, B34)", () => {
+  it("drops the do-not-call list (however the number was written) and numbers that can't be dialled", () => {
+    const list = [
+      { ...contact("a", {}), phone: "0412 555 019" },
+      { ...contact("b", {}), phone: "+61 412 555 020" },
+      { ...contact("c", {}), phone: "" },
+      { ...contact("d", {}), phone: "12" },
+    ];
+    const rules = callRulesFor({ timezone: "Australia/Sydney", doNotCall: ["+61412555019"] });
+    const out = audienceBreakdown(campaign(), list, now, rules);
+    expect(out.included.map((c) => c.id)).toEqual(["b"]);
+    expect(out.skipped).toEqual({ doNotCall: 1, badPhone: 2 });
+    expect(audienceOf(campaign(), list, now, rules).map((c) => c.id)).toEqual(["b"]);
+  });
+});
+
+describe("date triggers across daylight saving (B4)", () => {
+  it("counts calendar days, so the call lands on the right day", () => {
+    const due = dueDate({ kind: "date_field", field: "d", offsetDays: 7, when: "before" }, contact("x", { d: "2026-10-10" }));
+    expect([due?.getFullYear(), due?.getMonth(), due?.getDate(), due?.getHours()]).toEqual([2026, 9, 3, 0]);
+  });
+});
+
+describe("start checks (audit)", () => {
+  const ctx = (over: Partial<Parameters<typeof campaignIssues>[1]> = {}) => ({ flows: [liveAgent()], defs: allDefs, audienceCount: 3, now, ...over });
+
+  it("needs an agent that can make calls from a number", () => {
+    expect(campaignIssues(campaign(), ctx({ flows: [{ ...liveAgent(), numberId: undefined }] }))[0]).toMatch(/no phone number/);
+    expect(campaignIssues(campaign(), ctx({ flows: [{ ...liveAgent(), direction: "inbound" }] }))[0]).toMatch(/only answers/);
+    expect(campaignIssues(campaign(), ctx({ flows: [{ ...liveAgent(), greeting: "Hi there" }] }))[0]).toMatch(/problems to fix/);
+  });
+
+  it("needs someone to call, a start time ahead, and hours inside the workspace's", () => {
+    expect(campaignIssues(campaign(), ctx({ audienceCount: 0 }))).toContain("Nobody in the audience can be called yet.");
+    expect(campaignIssues(campaign({ startAt: "2026-11-01T09:00" }), ctx()).some((i) => /start time has passed/.test(i))).toBe(true);
+    const ws = { callingDays: [1, 2, 3, 4, 5], callingStart: 10, callingEnd: 17 };
+    expect(campaignIssues(campaign(), ctx({ workspace: ws })).some((i) => /outside your workspace/.test(i))).toBe(true);
+  });
+
+  it("catches follow-ups and saved answers that no longer fit the agent (B22)", () => {
+    const issues = campaignIssues(
+      campaign({
+        followUps: [{ id: "x", outcome: "gone_outcome", action: "text", afterDays: 1 }],
+        writeBacks: [{ from: "removed_answer", to: "car_model" }],
+        webhook: "not a url",
+      }),
+      ctx(),
+    );
+    expect(issues.some((i) => /never ends that way/.test(i))).toBe(true);
+    expect(issues).toContain("Write the follow-up text.");
+    expect(issues.some((i) => /isn't collected/.test(i))).toBe(true);
+    expect(issues).toContain("The webhook needs a full https:// address.");
   });
 });

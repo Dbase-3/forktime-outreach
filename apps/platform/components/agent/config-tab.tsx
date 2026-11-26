@@ -15,6 +15,7 @@ import { VoicePanel } from "../flow/voice-panel";
 import { GetNumber, NumberPicker } from "../numbers/number-picker";
 import { VarText } from "../var-text";
 import { Popover } from "../popover";
+import { Confirm } from "../confirm";
 import { Field, Modal, Segmented } from "../ui";
 
 export function ConfigTab({
@@ -227,27 +228,3 @@ function TimezoneField({ value, onChange }: { value: string; onChange: (zone: st
   );
 }
 
-/** A button that asks first (in a small popover) unless there's nothing to lose. */
-function Confirm({ trigger, title, body, action, onConfirm, skip }: { trigger: ReactNode; title: string; body: string; action: string; onConfirm: () => void; skip: boolean }) {
-  const [open, setOpen] = useState(false);
-  if (skip) return <span onClickCapture={(e) => { if ((e.target as HTMLElement).closest("button:not([disabled])")) onConfirm(); }}>{trigger}</span>;
-  return (
-    <Popover open={open} onOpenChange={setOpen} className="w-72" trigger={trigger}>
-      <div className="text-sm font-medium">{title}</div>
-      <p className="mt-1 text-xs leading-relaxed text-fg-3">{body}</p>
-      <div className="mt-3 flex justify-end gap-2">
-        <button type="button" className="btn-ghost h-8 px-3 text-sm" onClick={() => setOpen(false)}>Cancel</button>
-        <button
-          type="button"
-          className="btn-primary h-8 px-3 text-sm"
-          onClick={() => {
-            setOpen(false);
-            onConfirm();
-          }}
-        >
-          {action}
-        </button>
-      </div>
-    </Popover>
-  );
-}

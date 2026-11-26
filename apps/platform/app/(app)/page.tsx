@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Phone, Plus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
-import { upcomingCalls } from "@/lib/campaign";
+import { callRulesFor, upcomingCalls } from "@/lib/campaign";
 import { dayLabel, duration, humanize, relativeTime } from "@/lib/format";
 import { agentStats, answered, callsPerDay, isWin, totals } from "@/lib/stats";
 import { useApp } from "@/lib/store";
@@ -288,7 +288,7 @@ function Outcomes({ calls }: { calls: Call[] }) {
 function NextUp({ app, now }: { app: AppState; now: Date }) {
   const upcoming = app.campaigns
     .filter((c) => c.status === "running")
-    .flatMap((c) => upcomingCalls(c, app.contacts, now, 30).map((p) => ({ ...p, campaign: c })))
+    .flatMap((c) => upcomingCalls(c, app.contacts, now, 30, callRulesFor(app.settings)).map((p) => ({ ...p, campaign: c })))
     .sort((a, b) => a.due.getTime() - b.due.getTime())
     .slice(0, 5);
   return (

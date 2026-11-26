@@ -8,15 +8,16 @@ import { ArrowLeft, ArrowRight, Pause, Play, Plus, Trash2, X } from "lucide-reac
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { Confirm } from "../confirm";
 import { dataSchema } from "@/lib/agent-data";
 import { daysLabel } from "@/lib/automation";
-import { audienceOf, campaignIssues, campaignSummary, upcomingCalls } from "@/lib/campaign";
+import { audienceBreakdown, audienceOf, callRulesFor, campaignIssues, campaignSummary, upcomingCalls } from "@/lib/campaign";
 import { allColumns } from "@/lib/contacts-table";
 import { newId, outcomesOf } from "@/lib/flow-tree";
 import { WEEKDAYS, dayLabel, hourLabel, humanize } from "@/lib/format";
 import { integrationInfo } from "@/lib/integrations";
 import { update, useApp } from "@/lib/store";
-import type { AppState, Campaign, FollowUp, Trigger } from "@/lib/types";
+import type { AppState, Campaign, FollowUp, Trigger, WriteBack } from "@/lib/types";
 import { IntegrationLogo } from "../integrations";
 import { RulesEditor } from "../rules-editor";
 import { Avatar, Badge, EmptyState, Segmented, Toggle } from "../ui";
@@ -39,8 +40,10 @@ export function CampaignEditor({ id }: { id: string }) {
   if (!c) return <EmptyState icon={<Play size={20} />} title="This campaign isn't here" body="It may have been deleted." action={<Link href="/campaigns" className="btn-primary">Back to campaigns</Link>} />;
 
   const edit = (fn: (c: Campaign) => Campaign) => save(c.id, fn);
-  const issues = campaignIssues(c, app.flows);
-  const audience = audienceOf(c, app.contacts);
+  const rules = callRulesFor(app.settings);
+  const breakdown = audienceBreakdown(c, app.contacts, new Date(), rules);
+  const audience = breakdown.included;
+  const issues = campaignIssues(c, { flows: app.flows, defs: app.fieldDefs, audienceCount: audience.length, workspace: app.settings });
   const remove = () => {
     update((s) => ({ ...s, campaigns: s.campaigns.filter((x) => x.id !== c.id) }));
     router.push("/campaigns");
@@ -62,11 +65,18 @@ export function CampaignEditor({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-3">
           <AgentSection c={c} app={app} edit={edit} />
-          <AudienceSection c={c} app={app} edit={edit} count={audience.length} />
+          <AudienceSection c={c} app={app} edit={edit} count={audience.length} skipped={breakdown.skipped} />
           <WhenSection c={c} app={app} edit={edit} />
           <FollowUpSection c={c} app={app} edit={edit} />
           <AfterCallSection c={c} app={app} edit={edit} />
-          <button type="button" className="btn-ghost text-rose-600 hover:bg-rose-500/10" onClick={remove}><Trash2 size={15} /> Delete campaign</button>
+          <Confirm
+            title={`Delete “${c.name}”?`}
+            body={c.status === "running" ? "It's calling right now. Deleting stops it; calls already made keep their history." : "Calls already made keep their history."}
+            action="Delete"
+            danger
+            onConfirm={remove}
+            trigger={<button type="button" className="btn-ghost text-rose-600 hover:bg-rose-500/10"><Trash2 size={15} /> Delete campaign</button>}
+          />
         </div>
         <aside className="lg:sticky lg:top-20 lg:self-start">
           <Summary c={c} app={app} count={audience.length} issues={issues} />
@@ -125,7 +135,7 @@ function AgentSection({ c, app, edit }: { c: Campaign; app: AppState; edit: Edit
   );
 }
 
-function AudienceSection({ c, app, edit, count }: { c: Campaign; app: AppState; edit: Edit; count: number }) {
+function AudienceSection({ c, app, edit, count, skipped }: { c: Campaign; app: AppState; edit: Edit; count: number; skipped: { doNotCall: number; badPhone: number } }) {
   const lists = [...new Set(app.contacts.flatMap((x) => x.groups))].sort();
   const fields = allColumns(app.fieldDefs).filter((f) => !["lists", "last_call", "last_outcome", "created"].includes(f.key));
   return (
@@ -139,6 +149,12 @@ function AudienceSection({ c, app, edit, count }: { c: Campaign; app: AppState; 
       <div className="mt-1 border-t border-line pt-3">
         <RulesEditor group={c.audience.filter} fields={fields} onChange={(filter) => edit((x) => ({ ...x, audience: { ...x.audience, filter } }))} addLabel="Add a condition" />
       </div>
+      {(skipped.doNotCall > 0 || skipped.badPhone > 0) && (
+        <p className="mt-3 text-xs text-fg-3">
+          Never called:{" "}
+          {[skipped.doNotCall ? `${skipped.doNotCall} on the do-not-call list` : "", skipped.badPhone ? `${skipped.badPhone} without a number that can be dialled` : ""].filter(Boolean).join(", ")}.
+        </p>
+      )}
     </Section>
   );
 }
@@ -165,7 +181,7 @@ function WhenSection({ c, app, edit }: { c: Campaign; app: AppState; edit: Edit 
       <div className="mt-3 divide-y divide-line">
         {c.mode === "once" ? (
           <Row label="Start">
-            <Segmented<"now" | "at"> value={c.startAt ? "at" : "now"} onChange={(v) => edit((x) => ({ ...x, startAt: v === "now" ? null : new Date(Date.now() + 86400000).toISOString().slice(0, 16) }))} options={[{ value: "now", label: "When I start it" }, { value: "at", label: "At a set time" }]} />
+            <Segmented<"now" | "at"> value={c.startAt ? "at" : "now"} onChange={(v) => edit((x) => ({ ...x, startAt: v === "now" ? null : localInput(new Date(Date.now() + 86400000)) }))} options={[{ value: "now", label: "When I start it" }, { value: "at", label: "At a set time" }]} />
             {c.startAt && <input type="datetime-local" className="field w-auto" value={c.startAt.slice(0, 16)} onChange={(e) => edit((x) => ({ ...x, startAt: e.target.value }))} aria-label="Start at" />}
           </Row>
         ) : (
@@ -226,7 +242,7 @@ function WhenSection({ c, app, edit }: { c: Campaign; app: AppState; edit: Edit 
         <Row label="Hours">
           <select className="field h-9 w-auto" value={c.startHour} onChange={(e) => edit((x) => ({ ...x, startHour: Number(e.target.value) }))} aria-label="From">{hours.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}</select>
           <span className="text-sm text-fg-3">to</span>
-          <select className="field h-9 w-auto" value={c.endHour} onChange={(e) => edit((x) => ({ ...x, endHour: Number(e.target.value) }))} aria-label="Until">{hours.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}</select>
+          <select className="field h-9 w-auto" value={c.endHour} onChange={(e) => edit((x) => ({ ...x, endHour: Number(e.target.value) }))} aria-label="Until">{[...hours.slice(1), 24].map((h) => <option key={h} value={h}>{h === 24 ? "midnight" : hourLabel(h)}</option>)}</select>
           <label className="ml-1 flex items-center gap-2 text-sm text-fg-2"><Toggle checked={c.contactTimezone} onChange={(v) => edit((x) => ({ ...x, contactTimezone: v }))} label="In each person's time zone" /> their time zone</label>
         </Row>
         <Row label="No answer">
@@ -259,7 +275,10 @@ function FollowUpSection({ c, app, edit }: { c: Campaign; app: AppState; edit: E
         {c.followUps.map((f) => (
           <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-subtle p-2.5 text-sm">
             <span className="text-fg-3">If it ends</span>
-            <select className="field h-8 w-auto py-0" value={f.outcome} onChange={(e) => set(f.id, { outcome: e.target.value })} aria-label="Outcome">{outcomes.map((o) => <option key={o} value={o}>{humanize(o)}</option>)}</select>
+            <select className="field h-8 w-auto py-0" value={f.outcome} onChange={(e) => set(f.id, { outcome: e.target.value })} aria-label="Outcome">
+              {!outcomes.includes(f.outcome) && <option value={f.outcome}>{humanize(f.outcome || "…")} (not in this agent)</option>}
+              {outcomes.map((o) => <option key={o} value={o}>{humanize(o)}</option>)}
+            </select>
             <select className="field h-8 w-auto py-0" value={f.action} onChange={(e) => set(f.id, { action: e.target.value as FollowUp["action"] })} aria-label="Then">
               <option value="call">call again</option>
               <option value="text">send a text</option>
@@ -283,37 +302,52 @@ function AfterCallSection({ c, app, edit }: { c: Campaign; app: AppState; edit: 
   const agent = app.flows.find((f) => f.id === c.agentId);
   const schema = agent ? dataSchema(agent) : [];
   const connected = app.integrations.filter((i) => i.connected && ["crm", "messaging", "data"].includes(integrationInfo(i.id)?.category ?? ""));
+  const ensureField = (key: string) => {
+    if (app.fieldDefs.some((d) => d.key === key)) return;
+    const field = schema.find((s) => s.key === key);
+    update((s) => ({ ...s, fieldDefs: [...s.fieldDefs, { key, label: field?.label || key.replace(/_/g, " "), type: field?.type ?? "text", source: "call" }] }));
+  };
   const addWriteBack = () => {
     const first = schema.find((s) => !c.writeBacks.some((w) => w.from === s.key));
     if (!first) return;
+    // The contact field exists from the start, so answers never land somewhere the table can't show (B21).
+    ensureField(first.key);
     edit((x) => ({ ...x, writeBacks: [...x.writeBacks, { from: first.key, to: first.key }] }));
   };
-  const setTo = (from: string, to: string) => {
-    if (!app.fieldDefs.some((d) => d.key === to)) {
-      const field = schema.find((s) => s.key === to);
-      update((s) => ({ ...s, fieldDefs: [...s.fieldDefs, { key: to, label: field?.label ?? to, type: field?.type ?? "text", source: "call" }] }));
-    }
-    edit((x) => ({ ...x, writeBacks: x.writeBacks.map((w) => (w.from === from ? { ...w, to } : w)) }));
-  };
+  const setRow = (i: number, patch: Partial<WriteBack>) => edit((x) => ({ ...x, writeBacks: x.writeBacks.map((w, j) => (j === i ? { ...w, ...patch } : w)) }));
   return (
     <Section title="After the call">
       <div className="space-y-4">
         <div>
           <div className="mb-1.5 text-sm text-fg-2">Save answers to the contact</div>
           <div className="space-y-2">
-            {c.writeBacks.map((w) => (
-              <div key={w.from} className="flex flex-wrap items-center gap-2 text-sm">
-                <select className="field h-8 w-auto py-0 font-mono text-xs" value={w.from} onChange={(e) => edit((x) => ({ ...x, writeBacks: x.writeBacks.map((y) => (y.from === w.from ? { ...y, from: e.target.value } : y)) }))} aria-label="Answer">
-                  {schema.map((s) => <option key={s.key} value={s.key}>{s.key}</option>)}
-                </select>
-                <ArrowRight size={14} className="text-fg-4" />
-                <select className="field h-8 w-auto py-0" value={w.to} onChange={(e) => setTo(w.from, e.target.value)} aria-label="Contact field">
-                  {!app.fieldDefs.some((d) => d.key === w.from) && <option value={w.from}>New field: {w.from.replace(/_/g, " ")}</option>}
-                  {app.fieldDefs.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
-                </select>
-                <button type="button" className="btn-icon h-8 w-8" onClick={() => edit((x) => ({ ...x, writeBacks: x.writeBacks.filter((y) => y.from !== w.from) }))} aria-label="Remove"><X size={14} /></button>
-              </div>
-            ))}
+            {c.writeBacks.map((w, i) => {
+              // Each answer can be saved once: other rows' answers aren't offered (B20).
+              const taken = new Set(c.writeBacks.filter((_, j) => j !== i).map((x) => x.from));
+              const known = schema.some((s) => s.key === w.from);
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
+                  <select className="field h-8 w-auto py-0 font-mono text-xs" value={w.from} onChange={(e) => setRow(i, { from: e.target.value })} aria-label="Answer">
+                    {!known && <option value={w.from}>{w.from} (not in this agent)</option>}
+                    {schema.filter((s) => !taken.has(s.key)).map((s) => <option key={s.key} value={s.key}>{s.key}</option>)}
+                  </select>
+                  <ArrowRight size={14} className="text-fg-4" />
+                  <select
+                    className="field h-8 w-auto py-0"
+                    value={w.to}
+                    onChange={(e) => {
+                      ensureField(e.target.value);
+                      setRow(i, { to: e.target.value });
+                    }}
+                    aria-label="Contact field"
+                  >
+                    {!app.fieldDefs.some((d) => d.key === w.from) && <option value={w.from}>New field: {w.from.replace(/_/g, " ")}</option>}
+                    {app.fieldDefs.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+                  </select>
+                  <button type="button" className="btn-icon h-8 w-8" onClick={() => edit((x) => ({ ...x, writeBacks: x.writeBacks.filter((_, j) => j !== i) }))} aria-label="Remove"><X size={14} /></button>
+                </div>
+              );
+            })}
             {schema.length > c.writeBacks.length && <AddButton label="Save an answer" onClick={addWriteBack} />}
           </div>
         </div>
@@ -348,7 +382,7 @@ function AfterCallSection({ c, app, edit }: { c: Campaign; app: AppState; edit: 
 
 function Summary({ c, app, count, issues }: { c: Campaign; app: AppState; count: number; issues: string[] }) {
   const lines = campaignSummary(c, app.flows, app.fieldDefs, count);
-  const next = upcomingCalls(c, app.contacts, new Date(), 60).slice(0, 5);
+  const next = upcomingCalls(c, app.contacts, new Date(), 60, callRulesFor(app.settings)).slice(0, 5);
   return (
     <div className="card overflow-hidden">
       <div className="border-b border-line bg-subtle p-4">
@@ -386,4 +420,10 @@ function Summary({ c, app, count, issues }: { c: Campaign; app: AppState; count:
       )}
     </div>
   );
+}
+
+/** "2026-11-27T09:30" in this browser's time, for a datetime-local input (bug B5: it was UTC). */
+function localInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { WEEKDAYS, hourLabel } from "@/lib/format";
 import { resetWorkspace, update, useApp } from "@/lib/store";
 import type { WorkspaceSettings } from "@/lib/types";
+import { Confirm } from "@/components/confirm";
 import { Field, PageHeader } from "@/components/ui";
 
 const TIMEZONES = ["Australia/Sydney", "Australia/Melbourne", "Australia/Brisbane", "Australia/Perth", "Pacific/Auckland", "America/New_York", "America/Chicago", "America/Los_Angeles", "America/Toronto", "Europe/London", "Asia/Karachi", "Asia/Dubai"];
@@ -50,7 +51,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Calling hours" body="Outgoing calls only go out in these hours, in each person's own time zone.">
+        <Section title="Calling hours" body="The outer limit for every campaign: a campaign can't call outside these hours, in each person's own time zone.">
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAYS.map((day, d) => {
               const on = settings.callingDays.includes(d);
@@ -75,7 +76,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Do-not-call list" body="One number per line. Anyone who asks not to be called is added here automatically.">
+        <Section title="Do-not-call list" body="One number per line, written any way. These numbers are left out of every campaign. Once calls are live, anyone who asks not to be called again is added here automatically.">
           <textarea
             className="field min-h-28 font-mono text-sm"
             value={settings.doNotCall.join("\n")}
@@ -86,9 +87,18 @@ export default function SettingsPage() {
         </Section>
 
         <Section title="Sample data" body="This preview keeps everything in your browser. Start over with the sample workspace any time.">
-          <button type="button" className="btn-secondary" onClick={resetWorkspace}>
-            <RotateCcw size={16} /> Reset to sample workspace
-          </button>
+          <Confirm
+            title="Reset to the sample workspace?"
+            body="Every agent, contact, campaign and setting you've changed is replaced by the sample. This can't be undone."
+            action="Reset"
+            danger
+            onConfirm={resetWorkspace}
+            trigger={
+              <button type="button" className="btn-secondary">
+                <RotateCcw size={16} /> Reset to sample workspace
+              </button>
+            }
+          />
         </Section>
       </div>
     </div>

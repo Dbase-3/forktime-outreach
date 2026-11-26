@@ -4,7 +4,7 @@ import { Megaphone, Pause, Play, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { audienceOf, campaignIssues, defaultCampaign, describeTrigger } from "@/lib/campaign";
+import { audienceOf, callRulesFor, campaignIssues, defaultCampaign, describeTrigger } from "@/lib/campaign";
 import { update, useApp } from "@/lib/store";
 import type { Campaign } from "@/lib/types";
 import { STATUS } from "@/components/campaign/campaign-editor";
@@ -12,6 +12,7 @@ import { Badge, EmptyState, PageHeader } from "@/components/ui";
 
 export default function CampaignsPage() {
   const app = useApp();
+  const rules = callRulesFor(app.settings);
   const router = useRouter();
   const [query, setQuery] = useState("");
 
@@ -60,7 +61,8 @@ export default function CampaignsPage() {
               <tbody className="divide-y divide-line">
                 {shown.map((c) => {
                   const agent = app.flows.find((f) => f.id === c.agentId);
-                  const blocked = campaignIssues(c, app.flows)[0];
+                  const count = audienceOf(c, app.contacts, new Date(), rules).length;
+                  const blocked = campaignIssues(c, { flows: app.flows, defs: app.fieldDefs, audienceCount: count, workspace: app.settings })[0];
                   return (
                     <tr key={c.id} onClick={() => router.push(`/campaigns/${c.id}`)} className="cursor-pointer transition-colors hover:bg-subtle">
                       <td className="px-4 py-3">
@@ -68,7 +70,7 @@ export default function CampaignsPage() {
                         <span className="block truncate text-xs text-fg-3">{agent?.name ?? "No agent"} · {c.audience.list ?? "All contacts"}</span>
                       </td>
                       <td className="hidden truncate px-4 py-3 text-fg-2 lg:table-cell">{c.mode === "always" ? describeTrigger(c.trigger, app.fieldDefs) : "Everyone once"}</td>
-                      <td className="hidden px-4 py-3 font-mono text-xs md:table-cell">{audienceOf(c, app.contacts).length}</td>
+                      <td className="hidden px-4 py-3 font-mono text-xs md:table-cell">{count}</td>
                       <td className="hidden px-4 py-3 font-mono text-xs sm:table-cell">{c.answered} / {c.called}</td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <span className="inline-flex items-center gap-2">

@@ -53,7 +53,20 @@ export function ContactSheet({ contact: current, onClose }: { contact: Contact |
       {contact && (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name"><input className="field" value={contact.name} onChange={(e) => edit({ name: e.target.value })} /></Field>
+            <Field label="Name">
+              <input
+                className="field"
+                value={contact.name}
+                onChange={(e) => {
+                  // {first_name} follows the name unless someone set it to something else (B24).
+                  const oldFirst = contact.name.trim().split(/\s+/)[0] ?? "";
+                  const current = contact.fields.first_name ?? "";
+                  const follows = !current || current === oldFirst;
+                  const name = e.target.value;
+                  edit(follows ? { name, fields: { ...contact.fields, first_name: name.trim().split(/\s+/)[0] ?? "" } } : { name });
+                }}
+              />
+            </Field>
             <Field label="Phone"><input className="field" type="tel" value={contact.phone} onChange={(e) => edit({ phone: e.target.value })} /></Field>
             <Field label="Email"><input className="field" type="email" value={contact.email ?? ""} onChange={(e) => edit({ email: e.target.value })} /></Field>
             <Field label="Groups" hint="Separate with commas.">

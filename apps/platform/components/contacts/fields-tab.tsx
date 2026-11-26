@@ -4,10 +4,12 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { fieldUsage } from "@/lib/field-usage";
 import { toFieldKey } from "@/lib/flow-tree";
 import { integrationInfo } from "@/lib/integrations";
 import { update, useApp } from "@/lib/store";
 import type { FieldType } from "@/lib/types";
+import { Confirm } from "../confirm";
 
 const TYPES: FieldType[] = ["text", "number", "date", "yesno", "choice", "phone", "email"];
 const TYPE_LABEL: Record<FieldType, string> = { text: "Text", number: "Number", date: "Date", yesno: "Yes / No", choice: "Choice", phone: "Phone", email: "Email" };
@@ -60,20 +62,60 @@ export function FieldsTab() {
                   <div className="font-mono text-2xs text-fg-4">{def.key}</div>
                 </td>
                 <td className="px-4 py-2.5">
-                  <select className="field h-8 py-0 text-sm" value={def.type} onChange={(e) => update((s) => ({ ...s, fieldDefs: s.fieldDefs.map((d) => (d.key === def.key ? { ...d, type: e.target.value as FieldType } : d)) }))} aria-label={`${def.label} type`}>
-                    {TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
-                  </select>
+                  <TypePicker def={def} uses={fieldUsage(app, def.key)} />
                 </td>
                 <td className="hidden truncate px-4 py-2.5 text-fg-2 md:table-cell">{sourceName(def.source)}</td>
                 <td className="hidden px-4 py-2.5 font-mono text-xs text-fg-3 sm:table-cell">{used(def.key)} / {app.contacts.length}</td>
                 <td className="px-4 py-2.5 text-right">
-                  <button type="button" className="btn-icon h-8 w-8 hover:text-rose-600" onClick={() => update((s) => ({ ...s, fieldDefs: s.fieldDefs.filter((d) => d.key !== def.key) }))} aria-label={`Remove ${def.label}`}><Trash2 size={14} /></button>
+                  <Confirm
+                    title={`Remove ${def.label || def.key}?`}
+                    body={`Its values on ${used(def.key)} ${used(def.key) === 1 ? "contact" : "contacts"} are kept but hidden.`}
+                    action="Remove"
+                    danger
+                    blocked={(() => {
+                      const uses = fieldUsage(app, def.key);
+                      return uses.length ? <>It&apos;s in use: {uses.join("; ")}. Change those first.</> : undefined;
+                    })()}
+                    onConfirm={() => update((s) => ({ ...s, fieldDefs: s.fieldDefs.filter((d) => d.key !== def.key) }))}
+                    trigger={<button type="button" className="btn-icon h-8 w-8 hover:text-rose-600" aria-label={`Remove ${def.label}`}><Trash2 size={14} /></button>}
+                  />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** Changing a used field's type asks first: rules on it may stop matching (B23). */
+function TypePicker({ def, uses }: { def: { key: string; label: string; type: FieldType }; uses: string[] }) {
+  const [pending, setPending] = useState<FieldType | null>(null);
+  const apply = (type: FieldType) => update((s) => ({ ...s, fieldDefs: s.fieldDefs.map((d) => (d.key === def.key ? { ...d, type } : d)) }));
+  return (
+    <div>
+      <select
+        className="field h-8 py-0 text-sm"
+        value={pending ?? def.type}
+        onChange={(e) => {
+          const type = e.target.value as FieldType;
+          if (uses.length && type !== def.type) setPending(type);
+          else apply(type);
+        }}
+        aria-label={`${def.label} type`}
+      >
+        {TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+      </select>
+      {pending && (
+        <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.07] p-2 text-xs">
+          <p className="text-fg-2">Rules on this field may stop matching: {uses.join("; ")}.</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="btn-primary h-7 px-2.5 text-xs" onClick={() => { apply(pending); setPending(null); }}>Change to {TYPE_LABEL[pending]}</button>
+            <button type="button" className="btn-ghost h-7 px-2.5 text-xs" onClick={() => setPending(null)}>Keep {TYPE_LABEL[def.type]}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,7 +25,7 @@ function bad(status: number, error: string) {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY_EVAL || process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_EVAL; // production key first; local runs have only the eval key
   if (!apiKey) return bad(503, "Writing agents with AI isn't set up on this server yet.");
   if (fromOtherSite(request)) return bad(403, "Not allowed.");
   if (limited(clientIp(request))) return bad(429, "That's a lot of AI writing for one hour. Try again a bit later.");

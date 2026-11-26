@@ -30,17 +30,26 @@ node -e '
   fs.writeFileSync(coreOut+"/package.json", JSON.stringify(c,null,2));
 ' "$PKG" "$STAGE" "$STAGE/core"
 
-value_of() { grep -E "^$1=" "$PKG/.env" | head -1 | cut -d= -f2-; }
+value_of() { grep -E "^$1=" "$PKG/.env" | head -1 | cut -d= -f2- | tr -d '"'; }
+# Lisna's production Anthropic key lives in apps/api/.env as ANTHROPIC_API_KEY_PROD
+# (so local runs keep spending on the eval key).
+PROD_KEY=$(grep -E "^ANTHROPIC_API_KEY_PROD=" "$ROOT/apps/api/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ')
 {
   for k in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET SONIOX_API_KEY ELEVENLABS_API_KEY; do echo "$k=$(value_of $k)"; done
-  # Production AI key when there is one; until then the eval key.
-  if [ -n "$(value_of ANTHROPIC_API_KEY)" ]; then echo "ANTHROPIC_API_KEY=$(value_of ANTHROPIC_API_KEY)"; else echo "ANTHROPIC_API_KEY_EVAL=$(value_of ANTHROPIC_API_KEY_EVAL)"; fi
+  if [ -n "$PROD_KEY" ]; then echo "ANTHROPIC_API_KEY=$PROD_KEY"; else echo "ANTHROPIC_API_KEY_EVAL=$(value_of ANTHROPIC_API_KEY_EVAL)"; fi
   echo "PLATFORM_AGENT_NAME=platform-agent"
   echo "PLATFORM_API_URL=$API_URL"
   echo "TURN_DETECTOR=audio"   # as the outreach agent in production
   ssh -o BatchMode=yes "$HOST" "grep -E '^AGENT_RUNTIME_KEY=' /opt/lisna/apps/api/.env | tr -d '\"'"
 } > "$SECRETS"
 grep -q '^AGENT_RUNTIME_KEY=.\{64\}$' "$SECRETS" || { echo "Couldn't read the signing key from the API server."; exit 1; }
+
+# --secrets-only: replace the running agent's secrets and restart it (no rebuild).
+if [ "${1:-}" = "--secrets-only" ]; then
+  # lk asks to confirm the overwrite, even non-interactively: answer y.
+  cd "$PKG" && expect -c "set timeout 120; spawn lk agent update-secrets --secrets-file $SECRETS --overwrite; expect -re {\[y/N\]|\(y/n\)|\?} { send \"y\r\" }; expect eof" >/dev/null
+  exit 0
+fi
 
 cd "$STAGE"
 if grep -q '^\[agent\]' livekit.toml; then

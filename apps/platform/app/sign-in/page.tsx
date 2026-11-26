@@ -75,7 +75,7 @@ export default function SignInPage() {
             <input className="field h-10" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" autoFocus required />
           </label>
           <button type="submit" className="btn-primary mt-4 h-10 w-full" disabled={busy || !email.includes("@")}>
-            {busy && <Loader2 size={15} className="animate-spin" />} Send code
+            {busy && <Loader2 size={15} className="animate-spin" />} Continue with email
           </button>
           {errorLine}
         </form>

@@ -94,6 +94,9 @@ export default function SignInPage() {
     try {
       await request("/auth/verify", { body: { email, code: value } });
       saveLast({ method: "email", email });
+      // Someone with no workspace yet goes straight to setting one up.
+      const mine = await request<{ workspaces: unknown[] }>("/me").catch(() => null);
+      if (mine && mine.workspaces.length === 0) return router.replace("/welcome");
       const next = new URLSearchParams(window.location.search).get("next");
       router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
     } catch (err) {
@@ -136,11 +139,8 @@ export default function SignInPage() {
       <AuthCard
         title="Sign in"
         footer={
-          <>
-            By continuing you agree to our{" "}
-            <a href="https://forktime.ai/terms" target="_blank" rel="noreferrer" className="text-fg-2 underline underline-offset-2 hover:text-fg">terms of service</a> and{" "}
-            <a href="https://forktime.ai/privacy" target="_blank" rel="noreferrer" className="text-fg-2 underline underline-offset-2 hover:text-fg">privacy policy</a>.
-          </>
+          // Plain text until Lisna's own terms and privacy pages exist (digicoinx.com has none yet).
+          <>By continuing you agree to our terms of service and privacy policy.</>
         }
       >
         <div className="space-y-2.5">

@@ -70,13 +70,18 @@ export function Shell({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useCommandPalette();
   // The agent editor is a full-screen workspace (split screen), not a page.
   const fullBleed = /^\/agents\/[^/]+/.test(pathname);
+  // Redirect only on what this visit's own load found: the status left over from an
+  // earlier load ("no workspace" just before one was created) sent people back to
+  // /welcome in a loop.
+  const [checked, setChecked] = useState(false);
   useEffect(() => {
-    void boot();
+    void boot().finally(() => setChecked(true));
   }, []);
   useEffect(() => {
+    if (!checked) return;
     if (status.phase === "signed_out") router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
     if (status.phase === "no_workspace") router.replace("/welcome");
-  }, [status.phase, router, pathname]);
+  }, [checked, status.phase, router, pathname]);
   const ready = status.phase === "ready";
   return (
     <div className="min-h-dvh lg:pl-60">

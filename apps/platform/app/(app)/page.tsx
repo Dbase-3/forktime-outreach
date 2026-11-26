@@ -4,7 +4,7 @@
 // trend, the recent calls and who's due next. Live calls refresh it.
 
 import clsx from "clsx";
-import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Phone, Plus, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bot, CalendarCheck, CalendarClock, Phone, Plus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { dayLabel, duration, humanize, relativeTime } from "@outreach/core/format";
@@ -15,7 +15,7 @@ import { voiceById } from "@outreach/core/voices";
 import type { Flow } from "@outreach/core/types";
 import { AreaChart, Legend, Sparkline, type Series } from "@/components/charts";
 import { CallSheet, outcomeTone } from "@/components/call-sheet";
-import { Avatar, Badge, Segmented } from "@/components/ui";
+import { Avatar, Badge, EmptyState, Segmented } from "@/components/ui";
 
 const SERIES: Series[] = [
   { key: "calls", label: "Calls", color: "rgb(var(--series-1))" },
@@ -103,6 +103,9 @@ function Agents({ app, data, now, onOpen }: { app: Loaded; data?: HomeData; now:
   return (
     <section>
       <SectionHead title="Your agents" action={<Link href="/agents" className="btn-secondary h-7 px-2.5 text-xs">All agents{app.flows.length > 3 ? ` (${app.flows.length})` : ""}</Link>} />
+      {flows.length === 0 && (
+        <EmptyState icon={<Bot size={18} />} title="No agents yet" body="Create your first agent: describe what it should do, and Lisna writes it for you." action={<Link href="/agents?new=1" className="btn-primary">Create an agent</Link>} />
+      )}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {flows.map((flow, i) => (
           <div key={flow.id} className={clsx("flex", i === 2 && "md:max-xl:hidden")}>

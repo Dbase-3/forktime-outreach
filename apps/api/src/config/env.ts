@@ -11,7 +11,7 @@ const EnvSchema = z.object({
   REDIS_PREFIX: z.string().default("platform"),
   APP_URL: z.string().url().default("http://localhost:3200"),
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default("Lisna <hello@forktime.ai>"), // forktime.ai until Lisna has its own sending domain
+  EMAIL_FROM: z.string().default("Lisna <hello@digicoinx.com>"), // temporary domain (owner 2026-11-27); needs digicoinx.com verified in Resend
   DEV_LOGIN_CODE: z.string().regex(/^\d{6}$/).optional().or(z.literal("")),
   WORKER_IN_PROCESS: z.string().optional(),
   ANTHROPIC_API_KEY_EVAL: z.string().optional(),

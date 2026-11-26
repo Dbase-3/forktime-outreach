@@ -1,15 +1,15 @@
 "use client";
 
-// First run: name the workspace (the business), its time zone, and whether to
-// start with the sample (demo agents, contacts, campaigns and calls).
+// First run: name the workspace (the business) and its time zone. It starts
+// empty (owner 2026-11-27: no sample-data choice here).
 
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ApiError, request } from "@/lib/api";
+import { boot } from "@/lib/store";
 import { allTimezones, offsetLabel, zoneName } from "@outreach/core/timezones";
 import { AuthCard } from "@/components/auth-card";
-import { Toggle } from "@/components/ui";
 
 export default function WelcomePage() {
   const router = useRouter();
@@ -17,7 +17,6 @@ export default function WelcomePage() {
   const guess = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Australia/Sydney";
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState(zones.includes(guess) ? guess : "Australia/Sydney");
-  const [sample, setSample] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,12 +24,8 @@ export default function WelcomePage() {
     setBusy(true);
     setError(null);
     try {
-      const { id } = await request<{ id: string }>("/workspaces", { body: { name: name.trim(), timezone, sample } });
-      try {
-        window.localStorage.setItem("forktime.workspace", id);
-      } catch {
-        // fine
-      }
+      const { id } = await request<{ id: string }>("/workspaces", { body: { name: name.trim(), timezone, sample: false } });
+      await boot(id); // loaded (and remembered) before the dashboard shows, so it never bounces back here
       router.replace("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't create the workspace.");
@@ -51,13 +46,6 @@ export default function WelcomePage() {
             {zones.map((z) => <option key={z} value={z}>{zoneName(z)} · {offsetLabel(z)}</option>)}
           </select>
         </label>
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-line p-3">
-          <span>
-            <span className="block text-sm font-medium">Start with sample data</span>
-            <span className="block text-xs text-fg-3">Three demo agents, contacts, campaigns and calls to explore. Delete them any time.</span>
-          </span>
-          <Toggle checked={sample} onChange={setSample} label="Start with sample data" />
-        </div>
         <button type="submit" className="btn-primary w-full" disabled={busy || !name.trim()}>
           {busy && <Loader2 size={15} className="animate-spin" />} Create workspace
         </button>

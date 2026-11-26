@@ -4,11 +4,15 @@ import { LoggerModule } from "nestjs-pino";
 import { CommonModule } from "./common/common.module";
 import { ConfigModule } from "./config/config.module";
 import { DbModule } from "./db/db.module";
+import { AgentsModule } from "./modules/agents/agents.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { ContactsModule } from "./modules/contacts/contacts.module";
+import { FieldsModule } from "./modules/fields/fields.module";
+import { NumbersModule } from "./modules/numbers/numbers.module";
 import { HealthController } from "./modules/health.controller";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 
-export const FEATURE_MODULES = [AuthModule, WorkspacesModule];
+export const FEATURE_MODULES = [AuthModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule];
 
 @Module({
   imports: [

@@ -23,7 +23,7 @@ it("every route is guarded by sign-in and, where it holds data, by workspace mem
   const routes: { path: string; isPublic: boolean }[] = [];
   for (const wrapper of discovery.getControllers()) {
     const instance = wrapper.instance as Record<string, unknown>;
-    if (!instance) continue;
+    if (!instance || !wrapper.metatype) continue;
     const base = String(Reflect.getMetadata(PATH_METADATA, wrapper.metatype) ?? "").replace(/^\/|\/$/g, "");
     for (const name of scanner.getAllMethodNames(Object.getPrototypeOf(instance))) {
       const handler = instance[name] as object;

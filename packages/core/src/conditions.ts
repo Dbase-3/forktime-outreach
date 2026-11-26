@@ -95,12 +95,10 @@ export function toIsoDate(value: string | undefined, order: DateOrder = "dmy"): 
   return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+/** Only real dates count ("2026-11-26", "26/11/2026"); "7" is not a date (it was read as July 2001). */
 function parseDate(value: string | undefined): Date | null {
   const iso = toIsoDate(value);
-  if (iso) return new Date(`${iso}T00:00:00`);
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
+  return iso ? new Date(`${iso}T00:00:00`) : null;
 }
 
 function startOfDay(d: Date): number {

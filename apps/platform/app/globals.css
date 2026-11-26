@@ -156,6 +156,16 @@ body {
   .orb, .orb-wrap, .orb-wrap::before { animation: none !important; }
 }
 
+/* Sign-in map: soft pings on every city, a stronger ring on the active call. */
+.map-ping, .map-ping-strong { transform-box: fill-box; transform-origin: center; }
+.map-ping { animation: map-ping 4s ease-out infinite; opacity: 0; }
+.map-ping-strong { animation: map-ping-strong 1.8s ease-out infinite; }
+@keyframes map-ping { 0% { opacity: 0.9; transform: scale(1); } 40%, 100% { opacity: 0; transform: scale(4); } }
+@keyframes map-ping-strong { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(4.5); } }
+@media (prefers-reduced-motion: reduce) {
+  .map-ping, .map-ping-strong { animation: none; }
+}
+
 /* Room for the phone's home bar under the bottom tabs. */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);

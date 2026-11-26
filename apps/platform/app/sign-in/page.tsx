@@ -3,11 +3,14 @@
 // Sign in with an emailed 6-digit code (no passwords). New emails get an
 // account on first sign-in; invites are joined then too.
 
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, request } from "@/lib/api";
 import { AuthCard } from "@/components/auth-card";
+import { CodeInput } from "@/components/auth/code-input";
+
+const RESEND_AFTER = 30; // seconds before "Send a new code" works again
 
 export default function SignInPage() {
   const router = useRouter();
@@ -16,6 +19,13 @@ export default function SignInPage() {
   const [step, setStep] = useState<"email" | "code">("email");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wait, setWait] = useState(0);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
 
   const send = async () => {
     setBusy(true);
@@ -23,6 +33,8 @@ export default function SignInPage() {
     try {
       await request("/auth/code", { body: { email } });
       setStep("code");
+      setCode("");
+      setWait(RESEND_AFTER);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't send the code.");
     } finally {
@@ -43,11 +55,16 @@ export default function SignInPage() {
     }
   };
 
-  return (
-    <AuthCard title={step === "email" ? "Sign in" : "Check your email"} subtitle={step === "email" ? "We'll email you a 6-digit code. No password needed." : `We sent a code to ${email}. It works for 10 minutes.`}>
-      {step === "email" ? (
+  const errorLine = error && (
+    <p className="mt-3 text-sm text-rose-700 dark:text-rose-400" role="alert">
+      {error}
+    </p>
+  );
+
+  if (step === "email") {
+    return (
+      <AuthCard title="Continue to Forktime AI" subtitle="Sign in or create your account with your work email. We'll send you a 6-digit code, so there's no password to remember.">
         <form
-          className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
             void send();
@@ -55,46 +72,64 @@ export default function SignInPage() {
         >
           <label className="block">
             <span className="label">Work email</span>
-            <input className="field" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" autoFocus required />
+            <input className="field h-10" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" autoFocus required />
           </label>
-          <button type="submit" className="btn-primary w-full" disabled={busy || !email.includes("@")}>
-            {busy && <Loader2 size={15} className="animate-spin" />} Email me a code
+          <button type="submit" className="btn-primary mt-4 h-10 w-full" disabled={busy || !email.includes("@")}>
+            {busy ? <Loader2 size={15} className="animate-spin" /> : null} Continue with email {!busy && <ArrowRight size={15} />}
           </button>
+          {errorLine}
         </form>
-      ) : (
-        <form
-          className="space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void verify();
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard
+      title="Check your email"
+      subtitle={
+        <>
+          We sent a 6-digit code to <span className="font-medium text-fg">{email}</span>. It works for 10 minutes.
+        </>
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void verify();
+        }}
+      >
+        <CodeInput
+          value={code}
+          disabled={busy}
+          invalid={!!error}
+          onChange={(v) => {
+            setCode(v);
+            setError(null);
+            if (v.length === 6) void verify(v);
           }}
-        >
-          <label className="block">
-            <span className="label">Code</span>
-            <input
-              className="field text-center font-mono text-lg tracking-[0.4em]"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={code}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, "").slice(0, 6);
-                setCode(v);
-                if (v.length === 6) void verify(v);
-              }}
-              autoFocus
-            />
-          </label>
-          <button type="submit" className="btn-primary w-full" disabled={busy || code.length !== 6}>
-            {busy && <Loader2 size={15} className="animate-spin" />} Sign in
+        />
+        <button type="submit" className="btn-primary mt-4 h-10 w-full" disabled={busy || code.length !== 6}>
+          {busy && <Loader2 size={15} className="animate-spin" />} Sign in
+        </button>
+        {errorLine}
+        <p className="mt-4 text-sm text-fg-3">Can&apos;t find it? Check your spam or promotions folder.</p>
+        <div className="mt-6 flex items-center justify-between border-t border-line pt-4 text-sm">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-fg-3 hover:text-fg"
+            onClick={() => {
+              setStep("email");
+              setCode("");
+              setError(null);
+            }}
+          >
+            <ArrowLeft size={14} /> Different email
           </button>
-          <div className="flex justify-between text-sm">
-            <button type="button" className="flex items-center gap-1 text-fg-3 hover:text-fg" onClick={() => { setStep("email"); setCode(""); }}><ArrowLeft size={14} /> Different email</button>
-            <button type="button" className="text-fg-3 hover:text-fg" onClick={() => void send()} disabled={busy}>Send a new code</button>
-          </div>
-        </form>
-      )}
-      {error && <p className="mt-3 text-sm text-rose-700 dark:text-rose-400" role="alert">{error}</p>}
+          <button type="button" className="text-fg-2 hover:text-fg disabled:text-fg-4" onClick={() => void send()} disabled={busy || wait > 0}>
+            {wait > 0 ? `Send a new code in ${wait}s` : "Send a new code"}
+          </button>
+        </div>
+      </form>
     </AuthCard>
   );
 }

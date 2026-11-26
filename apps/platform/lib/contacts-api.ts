@@ -66,7 +66,19 @@ export interface ImportStatus {
   created: number;
   duplicates: number;
   skipped: number;
+  problems: number;
   error: string | null;
+}
+
+/** Downloads the rows an import left out or partly read, with the reason on each. */
+export async function downloadImportReport(id: string, fileName: string) {
+  const res = await fetch(`/api/v1/w/${currentWorkspace()}/imports/${id}/report`, { credentials: "same-origin" });
+  if (!res.ok) throw new Error("Couldn't download the report.");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(await res.blob());
+  a.download = `${fileName.replace(/\.csv$/i, "")}-problems.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 export { request };

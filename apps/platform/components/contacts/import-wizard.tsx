@@ -9,11 +9,11 @@
 import clsx from "clsx";
 import { FileUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { analyzeCsv, planImport, type ImportColumn, type Target } from "@outreach/core/contacts-table";
+import { IMPORT_PROBLEM_TEXT, analyzeCsv, planImport, type ImportColumn, type Target } from "@outreach/core/contacts-table";
 import { toFieldKey } from "@outreach/core/flow-tree";
 import { countryOfZone } from "@outreach/core/phone";
 import { ws } from "@/lib/api";
-import { importStatus, startImport, type ImportStatus } from "@/lib/contacts-api";
+import { downloadImportReport, importStatus, startImport, type ImportStatus } from "@/lib/contacts-api";
 import { patchState, useApp } from "@/lib/store";
 import type { DataSource, FieldDef, FieldType } from "@outreach/core/types";
 import { Field, Sheet } from "../ui";
@@ -189,6 +189,20 @@ export function ImportWizard({ open, onClose, onDone }: { open: boolean; onClose
             <Figure label="Repeated" value={plan.duplicates} hint="same number twice in the file" />
           </dl>
           <p className="text-xs text-fg-3">Numbers already in your contacts are skipped while importing, so no one is added twice.</p>
+          {plan.problems.length > 0 && (
+            <div className="rounded-lg border border-line">
+              <div className="border-b border-line px-3 py-2 text-xs font-medium text-fg-2">{plan.problems.length.toLocaleString()} {plan.problems.length === 1 ? "row needs" : "rows need"} a look</div>
+              <ul className="divide-y divide-line text-xs">
+                {plan.problems.slice(0, 5).map((p, i) => (
+                  <li key={i} className="flex gap-3 px-3 py-2">
+                    <span className="w-14 shrink-0 font-mono text-fg-3">Line {p.row + 2}</span>
+                    <span className="text-fg-2">{IMPORT_PROBLEM_TEXT[p.reason]}{p.column ? ` · ${p.column}: “${p.value}”` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+              {plan.problems.length > 5 && <p className="border-t border-line px-3 py-2 text-xs text-fg-3">The full list can be downloaded after the import.</p>}
+            </div>
+          )}
           {plan.newFields.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {plan.newFields.map((f) => (
@@ -211,6 +225,13 @@ export function ImportWizard({ open, onClose, onDone }: { open: boolean; onClose
             </div>
             {job.error && <p className="mt-2 text-sm text-rose-700 dark:text-rose-400">{job.error}</p>}
           </div>
+          {!running && job.problems > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line px-3 py-2.5 text-sm">
+              <span className="text-fg-2">{job.problems.toLocaleString()} {job.problems === 1 ? "row was" : "rows were"} left out or only partly read.</span>
+              <button type="button" className="btn-secondary h-8" onClick={() => void downloadImportReport(job.id, fileName).catch((err: Error) => setProblem(err.message))}>Download those rows</button>
+            </div>
+          )}
+          {step === 4 && problem && <p className="text-sm text-rose-700 dark:text-rose-400">{problem}</p>}
           <dl className="grid grid-cols-3 gap-3">
             <Figure label="Added" value={job.created} />
             <Figure label="Already here" value={job.duplicates} hint="same number, not added twice" />

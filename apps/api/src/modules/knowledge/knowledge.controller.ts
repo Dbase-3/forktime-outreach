@@ -1,17 +1,20 @@
 // The knowledge library. Web documents are read by a job (safe-fetch: public
 // addresses only, every redirect re-checked, size and time limits, ≤20 pages);
-// text and files are stored as sent (web pages and XML keep only their words).
+// uploaded files (PDF, Word .docx, text) are kept until a job has read them
+// (read-file.ts), then deleted; pasted text is stored as sent.
 // A document an agent uses can't be deleted.
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, type OnModuleInit } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors, type OnModuleInit } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { InjectModel } from "@nestjs/mongoose";
 import { htmlToText, isSitemapIndex, sameSiteLinks, sitemapUrls } from "@outreach/core/knowledge";
 import { KnowledgeInputSchema } from "@outreach/core/schemas";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { Ctx } from "../../common/decorators";
-import { conflict, notFound } from "../../common/errors";
+import { conflict, notFound, unprocessable } from "../../common/errors";
 import { oid } from "../../common/ids";
+import { KnowledgeIndex } from "../../common/knowledge-index";
 import type { RequestContext } from "../../common/request";
 import { FetchProblem, safeFetchText } from "../../common/safe-fetch";
 import { knowledgeOut } from "../../common/serialize";
@@ -19,6 +22,9 @@ import { saveVersioned } from "../../common/versioned";
 import { parse } from "../../common/zod";
 import type { M } from "../../db/models";
 import { JobsService } from "../jobs/jobs.service";
+import { FileProblem, UPLOADABLE, readFileText } from "./read-file";
+
+const MAX_UPLOAD = 15 * 1024 * 1024;
 
 const MAX_PAGES = 20;
 const MAX_TEXT = 400_000;
@@ -60,7 +66,9 @@ export class KnowledgeController implements OnModuleInit {
   constructor(
     @InjectModel("Knowledge") private readonly docs: M<"Knowledge">,
     @InjectModel("Agent") private readonly agents: M<"Agent">,
+    @InjectModel("Upload") private readonly uploads: M<"Upload">,
     private readonly jobs: JobsService,
+    private readonly index: KnowledgeIndex,
   ) {}
 
   onModuleInit() {
@@ -70,11 +78,54 @@ export class KnowledgeController implements OnModuleInit {
       try {
         const out = await readWeb(doc.source, doc.kind as "url" | "sitemap" | "site");
         await this.docs.updateOne({ _id: doc._id }, { $set: { status: "ready", content: out.text, sizeBytes: Buffer.byteLength(out.text), pages: out.pages, error: null, ...(doc.name === doc.source ? { name: out.title } : {}) }, $inc: { version: 1 } });
+        await this.index.reindex(doc._id);
       } catch (err) {
         const message = err instanceof FetchProblem ? err.message : "That address couldn't be read.";
         await this.docs.updateOne({ _id: doc._id }, { $set: { status: "failed", error: message }, $inc: { version: 1 } });
       }
     });
+    this.jobs.register("read-file", async ({ id }) => {
+      const upload = await this.uploads.findOne({ docId: oid(id) }).lean();
+      if (!upload) return;
+      try {
+        const raw = upload.data as unknown; // lean() gives the driver's Binary, not a Buffer
+        const bytes = Buffer.isBuffer(raw) ? raw : Buffer.from((raw as { buffer: Uint8Array }).buffer);
+        const out = await readFileText(upload.name ?? "", bytes);
+        await this.docs.updateOne({ _id: upload.docId, deletedAt: null }, { $set: { status: "ready", content: out.text, sizeBytes: Buffer.byteLength(out.text), pages: out.pages, error: null }, $inc: { version: 1 } });
+        await this.index.reindex(upload.docId);
+      } catch (err) {
+        const message = err instanceof FileProblem ? err.message : "That file couldn't be read.";
+        await this.docs.updateOne({ _id: upload.docId }, { $set: { status: "failed", error: message }, $inc: { version: 1 } });
+      } finally {
+        await this.uploads.deleteOne({ _id: upload._id });
+      }
+    });
+  }
+
+  /** The passages that answer a question: what an agent would find (all documents, or one agent's). */
+  @Post("search")
+  async search(@Ctx() ctx: RequestContext, @Body() body: unknown) {
+    const q = parse(z.object({ query: z.string().min(1).max(300), agentId: z.string().max(64).optional(), limit: z.number().int().min(1).max(10).default(4) }), body);
+    return this.index.search(ctx.workspaceId!, q.query, { agentId: q.agentId, limit: q.limit });
+  }
+
+  /** A file (PDF, Word .docx or text, ≤ 15 MB), sent as multipart field `file`. Read by a job. */
+  @Post("upload")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
+  async upload(@Ctx() ctx: RequestContext, @UploadedFile() file: Express.Multer.File | undefined, @Body() body: unknown) {
+    const ws = ctx.workspaceId!;
+    if (!file) throw unprocessable("Choose a file to add.");
+    const name = Buffer.from(file.originalname, "latin1").toString("utf8").slice(0, 200); // multer reads names as latin1
+    if (/\.doc$/i.test(name)) throw unprocessable("Old Word files (.doc) can't be read. Save it as .docx or PDF and add it again.");
+    if (!UPLOADABLE.test(name)) throw unprocessable("That kind of file can't be read. Use PDF, Word (.docx) or a text file.");
+    const opts = parse(z.object({ availableToAll: z.enum(["true", "false"]).default("false"), attachTo: z.string().max(64).optional() }), body ?? {});
+    const doc = await this.docs.create({ workspaceId: ws, name, kind: "file", source: name, status: "reading", sizeBytes: file.size, availableToAll: opts.availableToAll === "true" });
+    await this.uploads.create({ workspaceId: ws, docId: doc._id, name, data: file.buffer });
+    if (opts.attachTo && Types.ObjectId.isValid(opts.attachTo)) {
+      await this.agents.updateOne({ _id: new Types.ObjectId(opts.attachTo), workspaceId: ws, deletedAt: null }, { $addToSet: { "draft.knowledgeIds": String(doc._id) }, $inc: { version: 1 } });
+    }
+    await this.jobs.enqueue("read-file", { id: String(doc._id) });
+    return knowledgeOut((await this.docs.findById(doc._id).lean())!);
   }
 
   @Get()
@@ -104,6 +155,7 @@ export class KnowledgeController implements OnModuleInit {
       await this.agents.updateOne({ _id: new Types.ObjectId(input.attachTo), workspaceId: ws, deletedAt: null }, { $addToSet: { "draft.knowledgeIds": String(doc._id) }, $inc: { version: 1 } });
     }
     if (doc.status === "reading") await this.jobs.enqueue("ingest-knowledge", { id: String(doc._id) });
+    else await this.index.reindex(doc._id);
     const fresh = await this.docs.findById(doc._id).lean();
     return knowledgeOut(fresh!);
   }
@@ -120,7 +172,9 @@ export class KnowledgeController implements OnModuleInit {
   async save(@Ctx() ctx: RequestContext, @Param("id") id: string, @Body() body: unknown) {
     const { version, ...set } = parse(z.object({ version: z.number().int(), name: z.string().min(1).max(200).optional(), availableToAll: z.boolean().optional(), autoRefresh: z.boolean().optional(), content: z.string().max(400_000).optional() }), body);
     const extra = set.content !== undefined ? { sizeBytes: Buffer.byteLength(set.content) } : {};
-    return knowledgeOut(await saveVersioned(this.docs, { _id: oid(id, "That document"), workspaceId: ctx.workspaceId! }, version, { $set: { ...set, ...extra } }, (d) => knowledgeOut(d as never), "That document"), true);
+    const saved = await saveVersioned(this.docs, { _id: oid(id, "That document"), workspaceId: ctx.workspaceId! }, version, { $set: { ...set, ...extra } }, (d) => knowledgeOut(d as never), "That document");
+    if (set.content !== undefined || set.name !== undefined) await this.index.reindex(saved._id);
+    return knowledgeOut(saved, true);
   }
 
   @Delete(":id")
@@ -130,6 +184,7 @@ export class KnowledgeController implements OnModuleInit {
     if (users.length) throw conflict(`${users.map((a) => (a.draft as { name: string }).name).join(", ")} ${users.length === 1 ? "uses" : "use"} it. Detach it first.`);
     const res = await this.docs.updateOne({ _id, workspaceId: ctx.workspaceId, deletedAt: null }, { $set: { deletedAt: new Date(), content: "" } });
     if (!res.matchedCount) throw notFound("That document");
+    await this.index.reindex(_id); // clears its passages
     return { deleted: true };
   }
 }

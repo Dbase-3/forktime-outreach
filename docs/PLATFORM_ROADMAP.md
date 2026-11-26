@@ -325,9 +325,12 @@ Each phase ends with a working, deployed slice and its tests. Phases 1–2 can o
 
 **Exit:** two people can sign in to one workspace and edit safely; 100k contacts page in under 300 ms.
 
-**Progress (2026-11-26):** built and running locally, not deployed.
-- Done: accounts, email-code sign-in, workspaces + team roles, every API above, imports and knowledge reading as jobs, versioned saves (409 `stale` → reloaded), soft delete, server rules through `packages/core`, sample workspace seeded on the server. The whole front end reads and writes the API (no more localStorage): contacts, calls, Home and Analytics are worked out server-side. 100k contacts: plain 37 ms, filtered 70 ms, sorted ~140 ms (best of three). 32 API tests.
-- Not yet: PDF/Word reading and embeddings (knowledge), virtualised tables, an error-report file for imports, hosting for the API (needs a decision: droplet + production MongoDB + Redis; then Vercel `API_URL`). CSV uploads go through the Next rewrite; on Vercel large files may need to go straight to the API domain.
+**Progress (2026-11-26): code complete, local, not deployed.**
+- Done: accounts, email-code sign-in, workspaces + team roles, every API above, versioned saves (409 `stale` → reloaded), soft delete, server rules through `packages/core`, sample workspace seeded on the server. CSV import as a job with an error report (each left-out or partly read row with its line and reason, downloadable). Knowledge files: PDF (pdf-parse) and Word .docx (mammoth) read by a job, the file deleted after; web pages as before. Knowledge passages (`packages/core` `chunkText`) with search: MongoDB text index + per-word rarity weighting (BM25-style), scoped to what an agent may use; the Knowledge page has "Test a question". The whole front end reads and writes the API. **Exit checked:** two people in one workspace edit the same agent / contact / campaign and the slower save is refused with the newer version (test `auth.test.ts`); 100k contacts: plain 37 ms, filtered 70 ms, sorted ~140 ms. Tests: API 36, core 119, platform 90.
+- Changed from the plan: tables are paged on the server (≤200 rows a page), which makes virtualising them unnecessary.
+- Waits on the owner: **hosting** (a server for the API and worker, production MongoDB, Redis; then Vercel `API_URL`). Until then the live site runs the old in-browser version.
+- Moved to Phase 2: **embeddings** (vector search: Atlas Vector Search if production MongoDB is Atlas, otherwise pgvector; provider and key to pick), since the agent's `search_knowledge` is their first user; the `embedding` field and the search entry point (`common/knowledge-index.ts`) are in place. **BullMQ worker** has only run inline here (no Redis on this machine): run `pnpm worker` against real Redis once at deploy.
+- Note for deploy: CSV and file uploads go through the Next rewrite; on Vercel, check large uploads, or send them straight to the API's domain.
 
 ### Phase 2: agent runtime (`platform-agent`)
 - **Agent base:** fork the lean outreach agent: pickup detection, early audio, line check, runPending, transfer, recording, ordered event emitter.

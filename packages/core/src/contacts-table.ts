@@ -136,12 +136,31 @@ export function analyzeCsv(text: string, defs: FieldDef[]): { columns: ImportCol
   return { columns, rows };
 }
 
+/** One row the import left out or could only partly read. `row` is the index into the rows given. */
+export interface ImportProblem {
+  row: number;
+  reason: "no_phone" | "already_here" | "repeated" | "bad_phone" | "unreadable";
+  column?: string;
+  value?: string;
+}
+
+export const IMPORT_PROBLEM_TEXT: Record<ImportProblem["reason"], string> = {
+  no_phone: "No phone number: not added",
+  already_here: "Number already in your contacts: not added again",
+  repeated: "Same number earlier in the file: not added again",
+  bad_phone: "Phone number can't be dialled: added, but campaigns skip it",
+  unreadable: "Value doesn't fit the field's type: added, kept as written",
+};
+
 export interface ImportPlan {
   contacts: Omit<Contact, "id" | "createdAt">[];
   newFields: FieldDef[];
   skipped: number; // rows with no phone
   duplicates: number; // rows whose number is already a contact, or earlier in the file
+  problems: ImportProblem[]; // every row above, plus rows added with an undiallable number or an unreadable value
 }
+
+const NUMBERISH = /^[-+]?[$€£]?\s*[\d,]*\.?\d+\s*%?$/;
 
 export function planImport(columns: ImportColumn[], rows: string[][], list: string, defs: FieldDef[], sourceId: string, existing: Pick<Contact, "phone">[] = [], country: Parameters<typeof toE164>[1] = "AU"): ImportPlan {
   const fieldCols = columns.filter((c) => c.target.startsWith("field:"));
@@ -149,26 +168,32 @@ export function planImport(columns: ImportColumn[], rows: string[][], list: stri
   const typeOf = (c: ImportColumn) => defs.find((d) => d.key === c.target.slice(6))?.type ?? c.type;
   const dateOrder = new Map(fieldCols.filter((c) => typeOf(c) === "date").map((c) => [c.index, dateOrderOf(rows.map((r) => r[c.index] ?? ""))]));
   // One contact per number: within the file and against contacts already here (audit: re-imports duplicated everyone).
-  const seen = new Set(existing.map((c) => toE164(c.phone, country) ?? c.phone.replace(/\s/g, "")));
+  const already = new Set(existing.map((c) => toE164(c.phone, country) ?? c.phone.replace(/\s/g, "")));
+  const seen = new Set<string>();
+  const problems: ImportProblem[] = [];
   let duplicates = 0;
   const newFields = fieldCols
     .map((c) => ({ key: c.target.slice(6), label: c.label.trim() || c.name, type: c.type, source: sourceId }))
     .filter((f, i, all) => f.key && !defs.some((d) => d.key === f.key) && all.findIndex((x) => x.key === f.key) === i);
   const at = (t: Target) => columns.find((c) => c.target === t)?.index ?? -1;
   let skipped = 0;
-  const contacts = rows.flatMap((row) => {
+  const contacts = rows.flatMap((row, index) => {
     const get = (i: number) => (i < 0 ? "" : (row[i] ?? "").trim());
     const phone = get(at("phone"));
     if (!phone) {
       skipped++;
+      problems.push({ row: index, reason: "no_phone" });
       return [];
     }
-    const phoneKey = toE164(phone, country) ?? phone.replace(/\s/g, "");
-    if (seen.has(phoneKey)) {
+    const e164 = toE164(phone, country);
+    const phoneKey = e164 ?? phone.replace(/\s/g, "");
+    if (already.has(phoneKey) || seen.has(phoneKey)) {
       duplicates++;
+      problems.push({ row: index, reason: already.has(phoneKey) ? "already_here" : "repeated", value: phone });
       return [];
     }
     seen.add(phoneKey);
+    if (!e164) problems.push({ row: index, reason: "bad_phone", value: phone });
     const first = get(at("first_name"));
     const name = get(at("name")) || [first, get(at("last_name"))].filter(Boolean).join(" ") || phone;
     const fields: Record<string, string> = {};
@@ -177,9 +202,12 @@ export function planImport(columns: ImportColumn[], rows: string[][], list: stri
       const value = get(c.index);
       if (!value) continue;
       const order = dateOrder.get(c.index);
-      fields[c.target.slice(6)] = order ? toIsoDate(value, order) ?? value : value;
+      const iso = order ? toIsoDate(value, order) : null;
+      const type = typeOf(c);
+      if ((type === "date" && !iso) || (type === "number" && !NUMBERISH.test(value))) problems.push({ row: index, reason: "unreadable", column: c.label.trim() || c.name, value });
+      fields[c.target.slice(6)] = iso ?? value;
     }
     return [{ name, phone, email: get(at("email")) || undefined, groups: list.trim() ? [list.trim()] : [], fields, sourceId }];
   });
-  return { contacts, newFields, skipped, duplicates };
+  return { contacts, newFields, skipped, duplicates, problems };
 }

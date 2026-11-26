@@ -8,6 +8,7 @@ import { seedState } from "@outreach/core/sample";
 import { toE164 } from "@outreach/core/phone";
 import { countryOfZone } from "@outreach/core/phone";
 import { Types } from "mongoose";
+import { KnowledgeIndex } from "../../common/knowledge-index";
 import type { M } from "../../db/models";
 import { storeFields } from "../contacts/typed-fields";
 
@@ -32,6 +33,7 @@ export class SampleService {
     @InjectModel("Campaign") private readonly campaigns: M<"Campaign">,
     @InjectModel("Call") private readonly calls: M<"Call">,
     @InjectModel("Integration") private readonly integrations: M<"Integration">,
+    private readonly index: KnowledgeIndex,
   ) {}
 
   /** Fills an empty workspace with the sample. Numbers get workspace-unique fictional E.164s. */
@@ -67,6 +69,7 @@ export class SampleService {
     await this.numbers.insertMany(numbers);
     await this.fields.insertMany(s.fieldDefs.map((f) => ({ ...ws, ...f })));
     await this.knowledge.insertMany(s.knowledge.map((k) => ({ ...ws, _id: idOf(k.id), name: k.name, kind: k.kind, source: k.source, content: k.content, sizeBytes: k.sizeBytes, pages: k.pages, status: k.status, error: k.error, availableToAll: k.availableToAll, autoRefresh: k.autoRefresh })));
+    await this.index.reindexWorkspace(workspaceId);
     await this.sources.insertMany(s.sources.map((x) => ({ ...ws, _id: idOf(x.id), kind: x.kind, integrationId: x.integrationId, name: x.name, object: x.object, list: x.list, fieldKeys: x.fieldKeys, rows: x.rows, syncEvery: x.syncEvery, lastSyncAt: new Date(x.lastSyncAt), status: x.status })));
 
     for (const f of s.flows) {

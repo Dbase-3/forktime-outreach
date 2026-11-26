@@ -9,6 +9,7 @@ import { relativeTime } from "@outreach/core/format";
 import { useApp } from "@/lib/store";
 import type { KnowledgeDoc } from "@outreach/core/types";
 import { AddKnowledgeSheet, type AddKind } from "@/components/knowledge/add-sheets";
+import { AskBox } from "@/components/knowledge/ask-box";
 import { DocSheet } from "@/components/knowledge/doc-sheet";
 import { DocIcon, DocStatus } from "@/components/knowledge/doc-status";
 import { EmptyState, PageHeader } from "@/components/ui";
@@ -25,13 +26,13 @@ const FILTERS: { id: Filter; label: string; test: (d: KnowledgeDoc) => boolean }
 
 const ADD: { kind: AddKind; label: string; hint: string; icon: typeof Globe }[] = [
   { kind: "url", label: "Add a web address", hint: "A page, a sitemap or a whole site", icon: Globe },
-  { kind: "files", label: "Add files", hint: "PDF, Word, text, CSV", icon: FileUp },
+  { kind: "files", label: "Add files", hint: "PDF, Word (.docx), text, CSV", icon: FileUp },
   { kind: "text", label: "Write text", hint: "Hours, prices, policies", icon: Type },
 ];
 
 export default function KnowledgePage() {
   const app = useApp();
-  // Web documents are read on the server; check back while any are still reading.
+  // Web documents and files are read on the server; check back while any are still reading.
   const reading = app.knowledge.some((d) => d.status === "reading");
   useEffect(() => {
     if (!reading) return;
@@ -66,6 +67,8 @@ export default function KnowledgePage() {
           </button>
         ))}
       </div>
+
+      {app.knowledge.some((d) => d.status === "ready") && <AskBox onOpen={setOpenId} />}
 
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">

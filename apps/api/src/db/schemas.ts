@@ -155,9 +155,26 @@ export const ImportSchema = new Schema(
     created: { type: Number, default: 0 },
     duplicates: { type: Number, default: 0 },
     skipped: { type: Number, default: 0 },
+    // Rows left out or partly read (first 5,000), with the file line and the row as it was, for the report.
+    problems: { type: Mixed, default: [] }, // [{ line, reason, column?, value?, cells }]
+    problemCount: { type: Number, default: 0 },
+    header: { type: [String], default: [] },
     sourceId: String,
     error: String,
     createdBy: ObjectId,
+  },
+  opts,
+);
+
+// ---- Uploads waiting to be read (deleted once read; a day at most) ----
+
+export const UploadSchema = new Schema(
+  {
+    workspaceId: { type: ObjectId, required: true },
+    docId: { type: ObjectId, required: true, index: true },
+    name: String,
+    data: { type: Buffer, required: true }, // ≤ 15 MB
+    expiresAt: { type: Date, default: () => new Date(Date.now() + 86_400_000), expires: 0 },
   },
   opts,
 );
@@ -183,6 +200,23 @@ export const KnowledgeSchema = new Schema(
   opts,
 );
 KnowledgeSchema.index({ workspaceId: 1, deletedAt: 1, updatedAt: -1 });
+
+// Passages of each ready document, for search during calls (common/knowledge-index.ts).
+// A text index for now; `embedding` is filled once the vector store is chosen (roadmap Phase 2).
+export const KnowledgeChunkSchema = new Schema(
+  {
+    workspaceId: { type: ObjectId, required: true },
+    docId: { type: ObjectId, required: true },
+    index: { type: Number, required: true },
+    docName: { type: String, default: "" },
+    heading: { type: String, default: "" },
+    text: { type: String, required: true },
+    embedding: { type: [Number], default: undefined },
+  },
+  { ...opts, timestamps: false },
+);
+KnowledgeChunkSchema.index({ docId: 1, index: 1 });
+KnowledgeChunkSchema.index({ workspaceId: 1, docName: "text", heading: "text", text: "text" }, { weights: { docName: 2, heading: 3, text: 1 }, default_language: "english", name: "chunk_text" });
 
 // ---- Campaigns ----
 
@@ -256,6 +290,8 @@ export const MODELS = {
   Source: SourceSchema,
   Import: ImportSchema,
   Knowledge: KnowledgeSchema,
+  Upload: UploadSchema,
+  KnowledgeChunk: KnowledgeChunkSchema,
   Campaign: CampaignSchema,
   Call: CallSchema,
   Integration: IntegrationSchema,

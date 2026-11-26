@@ -105,7 +105,7 @@ export function DocSheet({ docId, onClose }: { docId: string | null; onClose: ()
             )}
           </dl>
           {doc.status === "failed" && doc.error && <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-800 dark:text-rose-300">{doc.error}</p>}
-          {doc.status === "waiting" && <p className="rounded-lg border border-line bg-subtle px-3 py-2 text-sm text-fg-2">PDF and Word files are read once the platform&rsquo;s backend is connected. Until then agents can&rsquo;t use this one.</p>}
+          {doc.status === "waiting" && <p className="rounded-lg border border-line bg-subtle px-3 py-2 text-sm text-fg-2">This file was added before files could be read. Remove it and add it again so agents can use it.</p>}
 
           {web && (
             <div className="divide-y divide-line rounded-lg border border-line">

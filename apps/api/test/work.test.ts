@@ -85,6 +85,13 @@ describe("CSV import job", () => {
     const b = (await agent.get(`${ws}/bootstrap`)).body;
     expect(b.fieldDefs.map((f: { key: string }) => f.key)).toEqual(expect.arrayContaining(["bought", "km"]));
     expect(b.sources.find((s: { name: string }) => s.name === "buyers.csv").rows).toBe(2500);
+
+    // The report: the file's own columns plus the line (header = line 1) and what was wrong.
+    expect(done.problems).toBe(2);
+    const report = (await agent.get(`${ws}/imports/${job.id}/report`).expect(200)).text.trim().split("\n");
+    expect(report[0]).toBe("Line,Problem,Name,Phone,Bought,Km");
+    expect(report[1]).toBe("2502,Number already in your contacts: not added again,Dup,0412555099,13/04/2026,5");
+    expect(report[2]).toBe("2503,No phone number: not added,No phone,,01/01/2026,1");
   });
 });
 

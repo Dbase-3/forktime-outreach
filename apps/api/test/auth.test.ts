@@ -64,6 +64,35 @@ describe("workspaces and members", () => {
     await hire.post(`${ws}/invites`).send({ email: "x@example.com" }).expect(403);
   });
 
+  it("two people in one workspace edit safely (Phase 1 exit): the slower save is refused, never lost", async () => {
+    const { agent: owner, ws } = await withWorkspace(app, "pair.owner@example.com", { sample: true });
+    await owner.post(`${ws}/invites`).send({ email: "pair.member@example.com", role: "member" }).expect(201);
+    const member = await signIn(app, "pair.member@example.com");
+
+    // Both open the same agent, the same campaign and the same contact.
+    const agentId = (await owner.get(`${ws}/agents`)).body[0].id;
+    const a1 = (await owner.get(`${ws}/agents/${agentId}`)).body;
+    const a2 = (await member.get(`${ws}/agents/${agentId}`)).body;
+    await owner.patch(`${ws}/agents/${agentId}`).send({ version: a1.version, draft: { greeting: `${a1.greeting} (owner)` } }).expect(200);
+    const late = await member.patch(`${ws}/agents/${agentId}`).send({ version: a2.version, draft: { greeting: "member's take" } }).expect(409);
+    expect(late.body.error.code).toBe("stale");
+    expect(late.body.error.details.current.greeting).toBe(`${a1.greeting} (owner)`); // the screen reloads with this
+    expect((await member.get(`${ws}/agents/${agentId}`)).body.greeting).toBe(`${a1.greeting} (owner)`);
+
+    const contactId = (await owner.post(`${ws}/contacts/query`).send({ pageSize: 1 })).body.rows[0].id;
+    const c1 = (await owner.get(`${ws}/contacts/${contactId}`)).body;
+    const c2 = (await member.get(`${ws}/contacts/${contactId}`)).body;
+    await member.patch(`${ws}/contacts/${contactId}`).send({ version: c2.version, name: "Member Edit" }).expect(200);
+    await owner.patch(`${ws}/contacts/${contactId}`).send({ version: c1.version, name: "Owner Edit" }).expect(409);
+    expect((await owner.get(`${ws}/contacts/${contactId}`)).body.name).toBe("Member Edit");
+
+    const campaignId = (await owner.get(`${ws}/campaigns`)).body[0].id;
+    const k1 = (await owner.get(`${ws}/campaigns/${campaignId}`)).body;
+    const k2 = (await member.get(`${ws}/campaigns/${campaignId}`)).body;
+    await owner.patch(`${ws}/campaigns/${campaignId}`).send({ version: k1.version, name: "Owner's name" }).expect(200);
+    await member.patch(`${ws}/campaigns/${campaignId}`).send({ version: k2.version, name: "Member's name" }).expect(409);
+  });
+
   it("never leaves a workspace without an owner", async () => {
     const { agent, ws } = await withWorkspace(app, "solo@example.com");
     const me = await agent.get("/me");

@@ -12,6 +12,7 @@ export class ErrorFilter implements ExceptionFilter {
   catch(err: unknown, host: ArgumentsHost) {
     const res = host.switchToHttp().getResponse<Response>();
     if (err instanceof HttpException) {
+      if (err.getStatus() === 413) return res.status(413).json({ error: { code: "too_large", message: "That's too big. Files can be up to 15 MB." } });
       const body = err.getResponse();
       const shaped = typeof body === "object" && body && "error" in body ? body : { error: { code: "http_" + err.getStatus(), message: typeof body === "string" ? body : (body as { message?: string }).message ?? err.message } };
       return res.status(err.getStatus()).json(shaped);

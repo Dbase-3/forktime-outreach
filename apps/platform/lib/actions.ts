@@ -84,6 +84,21 @@ export async function addKnowledge(input: { kind: KnowledgeDoc["kind"]; name?: s
   return doc;
 }
 
+/** A file (PDF, Word .docx or text): sent as it is, read on the server. */
+export async function uploadKnowledge(file: File, opts: { availableToAll: boolean; attachTo?: string }): Promise<KnowledgeDoc> {
+  const form = new FormData();
+  form.append("availableToAll", String(opts.availableToAll));
+  if (opts.attachTo) form.append("attachTo", opts.attachTo);
+  form.append("file", file);
+  const doc = await ws<V<KnowledgeDoc>>("/knowledge/upload", { body: form });
+  patchState((s) => ({
+    ...s,
+    knowledge: replaceById(s.knowledge, { ...doc, content: "" }),
+    flows: opts.attachTo ? s.flows.map((f) => (f.id === opts.attachTo && !f.knowledgeIds.includes(doc.id) ? { ...f, knowledgeIds: [...f.knowledgeIds, doc.id], version: (f as V<Flow>).version + 1 } : f)) : s.flows,
+  }));
+  return doc;
+}
+
 export async function refreshKnowledge(id: string): Promise<void> {
   const doc = await ws<V<KnowledgeDoc>>(`/knowledge/${id}/refresh`, { method: "POST" });
   patchState((s) => ({ ...s, knowledge: replaceById(s.knowledge, { ...doc, content: "" }) }));

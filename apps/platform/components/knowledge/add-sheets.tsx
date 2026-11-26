@@ -93,8 +93,8 @@ function FilesForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void
       >
         <FileUp size={22} className="text-fg-3" />
         <span className="mt-2 text-sm font-medium">Drop files or browse</span>
-        <span className="mt-1 text-xs text-fg-3">PDF, Word, text, Markdown, CSV · up to 15 MB each</span>
-        <input type="file" multiple className="sr-only" accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.html" onChange={(e) => pick(e.target.files)} />
+        <span className="mt-1 text-xs text-fg-3">PDF, Word (.docx), text, Markdown, CSV · up to 15 MB each</span>
+        <input type="file" multiple className="sr-only" accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.xml" onChange={(e) => pick(e.target.files)} />
       </label>
       {files.length > 0 && (
         <ul className="divide-y divide-line rounded-lg border border-line text-sm">

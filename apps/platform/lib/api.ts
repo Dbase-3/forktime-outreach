@@ -10,11 +10,12 @@ export class ApiError extends Error {
 
 export async function request<T>(path: string, init: { method?: string; body?: unknown; keepalive?: boolean } = {}): Promise<T> {
   let res: Response;
+  const form = typeof FormData !== "undefined" && init.body instanceof FormData; // files: the browser sets the multipart header
   try {
     res = await fetch(`/api/v1${path}`, {
       method: init.method ?? (init.body === undefined ? "GET" : "POST"),
-      headers: init.body === undefined ? undefined : { "content-type": "application/json" },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      headers: init.body === undefined || form ? undefined : { "content-type": "application/json" },
+      body: init.body === undefined ? undefined : form ? (init.body as FormData) : JSON.stringify(init.body),
       credentials: "same-origin",
       keepalive: init.keepalive,
     });

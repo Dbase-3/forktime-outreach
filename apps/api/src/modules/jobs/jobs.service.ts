@@ -7,7 +7,7 @@ import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } f
 import { Queue, Worker, type Job } from "bullmq";
 import { ENV, type Env } from "../../config/env";
 
-export type JobName = "import-contacts" | "ingest-knowledge";
+export type JobName = "import-contacts" | "ingest-knowledge" | "read-file";
 export type Processor = (data: Record<string, string>) => Promise<void>;
 
 const QUEUE = "platform-jobs";

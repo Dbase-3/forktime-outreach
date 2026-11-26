@@ -1,12 +1,12 @@
 "use client";
 
-// Adding and changing knowledge documents, through the API. Web documents are
-// read on the server by a job (public addresses only); text files are read in
-// the browser and sent as text; PDFs and Word files wait for server reading.
+// Adding and changing knowledge documents, through the API. Web documents and
+// files (PDF, Word .docx, text) are read on the server by a job; the list
+// shows them as "reading" until they're done.
 
-import { MAX_FILE_BYTES, READABLE_FILE } from "@outreach/core/knowledge";
+import { MAX_FILE_BYTES } from "@outreach/core/knowledge";
 import type { KnowledgeDoc } from "@outreach/core/types";
-import { addKnowledge, deleteKnowledge, refreshKnowledge } from "@/lib/actions";
+import { addKnowledge, deleteKnowledge, refreshKnowledge, uploadKnowledge } from "@/lib/actions";
 import { update } from "@/lib/store";
 
 export type UrlMode = "page" | "sitemap" | "site";
@@ -27,9 +27,9 @@ export async function refreshUrl(id: string): Promise<void> {
   await refreshKnowledge(id);
 }
 
-const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+const UPLOADABLE = /\.(pdf|docx|txt|md|markdown|csv|json|html?|xml)$/i;
 
-/** Text files are sent as text; other kinds wait for server reading (a later phase). */
+/** Each file is sent to the server, which reads it. Returns a line per file that couldn't be added. */
 export async function addFiles(files: File[], opts: AddOptions): Promise<string[]> {
   const problems: string[] = [];
   for (const file of files) {
@@ -37,15 +37,19 @@ export async function addFiles(files: File[], opts: AddOptions): Promise<string[
       problems.push(`${file.name}: files can be up to 15 MB.`);
       continue;
     }
-    if (!READABLE_FILE.test(file.name)) {
-      problems.push(`${file.name}: PDF and Word files can be read once server reading is on. Paste the text for now.`);
+    if (/\.doc$/i.test(file.name)) {
+      problems.push(`${file.name}: old Word files can't be read. Save it as .docx or PDF.`);
       continue;
     }
-    if (file.size > MAX_TEXT_BYTES) {
-      problems.push(`${file.name}: text files can be up to 2 MB.`);
+    if (!UPLOADABLE.test(file.name)) {
+      problems.push(`${file.name}: use PDF, Word (.docx) or a text file.`);
       continue;
     }
-    await addKnowledge({ kind: "file", name: file.name, content: await file.text(), availableToAll: opts.availableToAll, attachTo: opts.attachTo });
+    try {
+      await uploadKnowledge(file, opts);
+    } catch (err) {
+      problems.push(`${file.name}: ${err instanceof Error ? err.message : "couldn't be added."}`);
+    }
   }
   return problems;
 }

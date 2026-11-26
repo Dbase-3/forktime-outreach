@@ -109,6 +109,34 @@ describe("import: dates and duplicates (B18, audit)", () => {
     expect(plan.duplicates).toBe(2);
   });
 
+  it("lists every row it left out or could only partly read, with the reason", async () => {
+    const { planImport } = await import("@outreach/core/contacts-table");
+    const columns = [
+      { index: 0, name: "Phone", label: "Phone", target: "phone" as const, type: "phone" as const },
+      { index: 1, name: "Bought", label: "Bought", target: "field:bought" as const, type: "date" as const },
+      { index: 2, name: "Budget", label: "Budget", target: "field:budget" as const, type: "number" as const },
+    ];
+    const rows = [
+      ["0412 555 019", "03/04/2026", "$25,000"],
+      ["", "03/04/2026", "1"],
+      ["0412555019", "", ""],
+      ["+61 412 555 021", "", ""],
+      ["12", "", ""],
+      ["0412 555 030", "next week", "lots"],
+    ];
+    const plan = planImport(columns as never, rows, "List", [], "src", [{ phone: "+61412555021" }], "AU");
+    expect(plan.problems.map((p) => [p.row, p.reason, p.column ?? ""])).toEqual([
+      [1, "no_phone", ""],
+      [2, "repeated", ""],
+      [3, "already_here", ""],
+      [4, "bad_phone", ""],
+      [5, "unreadable", "Bought"],
+      [5, "unreadable", "Budget"],
+    ]);
+    expect(plan.contacts).toHaveLength(3); // row 0, the undiallable one, and the one with unreadable values
+    expect(plan.contacts[2].fields.bought).toBe("next week"); // kept as written
+  });
+
   it("reads month/day when the column shows it", async () => {
     const { dateOrderOf, toIsoDate } = await import("@outreach/core/conditions");
     expect(dateOrderOf(["03/04/2026", "12/25/2025"])).toBe("mdy");

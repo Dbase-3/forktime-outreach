@@ -74,5 +74,8 @@ export function callOut(c: Row<"Call">): Call {
     lead: (c.lead ?? undefined) as Call["lead"],
     engagement: (c.engagement ?? undefined) as Call["engagement"],
     transferTo: (c.transferTo ?? undefined) as Call["transferTo"],
+    test: c.test || undefined,
+    path: c.path?.length ? c.path : undefined,
+    missing: c.missing?.length ? c.missing : undefined,
   };
 }

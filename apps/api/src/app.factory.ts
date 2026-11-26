@@ -6,7 +6,7 @@ import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
 
 export async function createApp(): Promise<NestExpressApplication> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   app.use(cookieParser());
   app.set("trust proxy", 1);

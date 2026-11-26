@@ -22,6 +22,7 @@
     "clsx": "^2.1.1",
     "geist": "1.5.1",
     "libphonenumber-js": "^1.11.14",
+    "livekit-client": "2.15.8",
     "lucide-react": "^0.460.0",
     "next": "^14.2.30",
     "react": "^18.3.1",

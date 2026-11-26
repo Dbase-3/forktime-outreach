@@ -95,7 +95,7 @@ export function CallSheet({ callId, onClose }: { callId: string | null; onClose:
       open={callId !== null}
       onClose={onClose}
       title={call ? contact?.name ?? "Unknown caller" : detail.isError ? "Call" : ""}
-      titleExtra={call?.live ? <Badge tone="green" dot>Live</Badge> : undefined}
+      titleExtra={call?.live ? <Badge tone="green" dot>Live</Badge> : call?.test ? <Badge>Test call</Badge> : undefined}
       size="xl"
       subheader={subheader}
     >

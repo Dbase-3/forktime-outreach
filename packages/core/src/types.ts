@@ -250,6 +250,9 @@ export interface Call {
   lead?: "qualified" | "potential" | "unqualified"; // strong intent / some interest / none
   engagement?: "high" | "medium" | "low"; // asked questions / brief replies / passive
   transferTo?: "person" | "agent"; // a transfer went to a person, or was routed to another agent
+  test?: boolean; // the owner trying the agent from the editor (left out of analytics)
+  path?: string[]; // the workflow steps a real call walked, in order
+  missing?: string[]; // required answers the call didn't get (labels)
 }
 
 // ---- Workspace ----

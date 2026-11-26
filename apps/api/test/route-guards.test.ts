@@ -15,6 +15,8 @@ afterAll(() => stop());
 
 const PERSONAL = new Set(["/me", "/workspaces"]);
 const PUBLIC = new Set(["/auth/code", "/auth/verify", "/auth/logout", "/healthz"]);
+// The voice agent's door: public to the session guard, but each request must be signed (RuntimeGuard, tested in voice.test.ts).
+const SIGNED = new Set(["/runtime/calls/:id", "/runtime/calls/:id/events", "/runtime/calls/:id/search"]);
 
 it("every route is guarded by sign-in and, where it holds data, by workspace membership", () => {
   const discovery = app.get(DiscoveryService);
@@ -35,6 +37,6 @@ it("every route is guarded by sign-in and, where it holds data, by workspace mem
     }
   }
   expect(routes.length).toBeGreaterThan(10);
-  const loose = routes.filter((r) => (r.isPublic ? !PUBLIC.has(r.path) : !(r.path.startsWith("/w/:ws") || PERSONAL.has(r.path))));
+  const loose = routes.filter((r) => (r.isPublic ? !PUBLIC.has(r.path) && !SIGNED.has(r.path) : !(r.path.startsWith("/w/:ws") || PERSONAL.has(r.path))));
   expect(loose).toEqual([]);
 });

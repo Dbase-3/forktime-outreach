@@ -262,6 +262,11 @@ export const CallSchema = new Schema(
     lead: String,
     engagement: String,
     transferTo: String,
+    // Voice runtime (Phase 2):
+    test: { type: Boolean, default: false }, // the owner trying the agent from the editor
+    config: Mixed, // a test call's agent draft, as it was when the call started
+    path: [String], // the workflow steps the call walked
+    missing: [String], // required answers it didn't get
   },
   opts,
 );

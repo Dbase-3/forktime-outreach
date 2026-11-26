@@ -31,7 +31,7 @@ export class AnalyticsController {
   ) {}
 
   private async callsSince(ws: Types.ObjectId, from: Date): Promise<Call[]> {
-    return (await this.calls.find({ workspaceId: ws, $or: [{ startedAt: { $gte: from } }, { live: true }] }, LIGHT).lean()).map(callOut);
+    return (await this.calls.find({ workspaceId: ws, test: { $ne: true }, $or: [{ startedAt: { $gte: from } }, { live: true }] }, LIGHT).lean()).map(callOut);
   }
 
   /** The calls a filter picks (this period and the one before), with what the figures need. */
@@ -97,7 +97,7 @@ export class AnalyticsController {
         outcomes: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([outcome, count]) => ({ outcome, count })),
       };
     };
-    const lastCallAt = async (flowId: string) => (await this.calls.findOne({ workspaceId: ws, agentId: new Types.ObjectId(flowId), live: { $ne: true } }, { startedAt: 1 }).sort({ startedAt: -1 }).lean())?.startedAt?.toISOString() ?? null;
+    const lastCallAt = async (flowId: string) => (await this.calls.findOne({ workspaceId: ws, agentId: new Types.ObjectId(flowId), live: { $ne: true }, test: { $ne: true } }, { startedAt: 1 }).sort({ startedAt: -1 }).lean())?.startedAt?.toISOString() ?? null;
     const agents = Object.fromEntries(
       await Promise.all(
         flows.map(async (f) => {
@@ -106,7 +106,7 @@ export class AnalyticsController {
         }),
       ),
     );
-    const recentRows = await this.calls.find({ workspaceId: ws }, LIGHT).sort({ startedAt: -1 }).limit(5).lean();
+    const recentRows = await this.calls.find({ workspaceId: ws, test: { $ne: true } }, LIGHT).sort({ startedAt: -1 }).limit(5).lean();
     const recent = recentRows.map(callOut);
     const recentPeople = await this.contacts.find({ _id: { $in: recentRows.flatMap((r) => (r.contactId ? [r.contactId] : [])) } }, { name: 1, phone: 1 }).lean();
 

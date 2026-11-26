@@ -147,6 +147,7 @@ function CallRow({ call, person: contact, flows, onOpen }: { call: Call; person?
         <span className="block truncate text-sm text-fg-2">{call.summary}</span>
         <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-fg-3">
           <span>{flow?.name ?? "Deleted agent"}</span>
+          {call.test && <span>· Test call</span>}
           <span>· {call.live ? "in progress" : duration(call.durationSec)}</span>
           {(call.actions ?? []).map((a) => (
             <span key={a}>· {CALL_ACTIONS[a] ?? a}</span>

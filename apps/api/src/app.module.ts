@@ -19,8 +19,9 @@ import { FieldsModule } from "./modules/fields/fields.module";
 import { NumbersModule } from "./modules/numbers/numbers.module";
 import { HealthController } from "./modules/health.controller";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
+import { VoiceModule } from "./modules/voice/voice.module";
 
-export const FEATURE_MODULES = [AuthModule, JobsModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule, KnowledgeModule, ImportsModule, CampaignsModule, CallsModule, AnalyticsModule, IntegrationsModule, SourcesModule];
+export const FEATURE_MODULES = [AuthModule, JobsModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule, KnowledgeModule, ImportsModule, CampaignsModule, CallsModule, AnalyticsModule, IntegrationsModule, SourcesModule, VoiceModule];
 
 @Module({
   imports: [

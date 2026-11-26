@@ -43,6 +43,7 @@
     "bullmq": "^6.7.10",
     "cookie-parser": "^1.4.7",
     "ioredis": "^6.1.0",
+    "livekit-server-sdk": "2.15.2",
     "mammoth": "1.13.0",
     "mongoose": "^8.19.3",
     "nestjs-pino": "^4.6.1",

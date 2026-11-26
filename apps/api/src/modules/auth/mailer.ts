@@ -4,6 +4,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Resend } from "resend";
 import { ENV, type Env } from "../../config/env";
+import { ApiError } from "../../common/errors";
 
 @Injectable()
 export class Mailer {
@@ -21,8 +22,7 @@ export class Mailer {
       this.log.warn(`No RESEND_API_KEY: sign-in code for ${email} is ${code}`);
       return;
     }
-    const { error } = await this.resend.emails.send({ from: this.env.EMAIL_FROM, to: email, subject, text });
-    if (error) throw new Error(`Email failed: ${error.message}`);
+    await this.send(email, subject, text);
   }
 
   async sendInvite(email: string, workspace: string, inviter: string): Promise<void> {
@@ -32,7 +32,14 @@ export class Mailer {
       this.log.warn(`No RESEND_API_KEY: invite for ${email} to ${workspace}`);
       return;
     }
-    const { error } = await this.resend.emails.send({ from: this.env.EMAIL_FROM, to: email, subject, text });
-    if (error) throw new Error(`Email failed: ${error.message}`);
+    await this.send(email, subject, text);
+  }
+
+  /** The email provider refused it (often a mistyped or unreachable address): say so plainly, log why. */
+  private async send(to: string, subject: string, text: string): Promise<void> {
+    const { error } = await this.resend!.emails.send({ from: this.env.EMAIL_FROM, to, subject, text });
+    if (!error) return;
+    this.log.warn(`Email to ${to} refused: ${error.message}`);
+    throw new ApiError(502, "email_failed", "We couldn't send an email to that address. Check it and try again.");
   }
 }

@@ -6,7 +6,7 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Forktime AI",
+  title: "Lisna",
   description: "AI phone agents that answer and make calls for your business.",
   robots: { index: false, follow: false },
 };

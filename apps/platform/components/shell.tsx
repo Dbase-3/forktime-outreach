@@ -5,7 +5,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AudioLines, BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, Phone, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, Phone, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow, type LucideIcon } from "lucide-react";
+import { LisnaLogo } from "./brand";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -105,10 +106,7 @@ function LoadProblem({ message }: { message: string }) {
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2">
-      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-fg text-background">
-        <AudioLines size={14} strokeWidth={2.5} />
-      </span>
-      <span className="text-sm font-semibold tracking-[-0.01em]">Forktime AI</span>
+      <LisnaLogo size={24} />
     </Link>
   );
 }

@@ -16,7 +16,7 @@ export class Mailer {
   }
 
   async sendCode(email: string, code: string): Promise<void> {
-    const subject = `${code} is your Forktime sign-in code`;
+    const subject = `${code} is your Lisna sign-in code`;
     const text = `Your sign-in code is ${code}. It works for 10 minutes.\n\nIf you didn't ask for it, you can ignore this email.`;
     if (!this.resend) {
       this.log.warn(`No RESEND_API_KEY: sign-in code for ${email} is ${code}`);
@@ -26,7 +26,7 @@ export class Mailer {
   }
 
   async sendInvite(email: string, workspace: string, inviter: string): Promise<void> {
-    const subject = `${inviter} invited you to ${workspace} on Forktime`;
+    const subject = `${inviter} invited you to ${workspace} on Lisna`;
     const text = `${inviter} invited you to the ${workspace} workspace.\n\nSign in with this email address to join: ${this.env.APP_URL}/sign-in`;
     if (!this.resend) {
       this.log.warn(`No RESEND_API_KEY: invite for ${email} to ${workspace}`);

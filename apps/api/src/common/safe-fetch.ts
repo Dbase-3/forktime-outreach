@@ -37,7 +37,7 @@ function once(url: URL, timeoutMs: number, maxBytes: number): Promise<{ status: 
       {
         lookup: guardedLookup,
         timeout: timeoutMs,
-        headers: { "user-agent": "ForktimeKnowledgeReader/1.0", accept: "text/html,application/xml,text/xml,text/plain;q=0.9", "accept-encoding": "identity" },
+        headers: { "user-agent": "LisnaKnowledgeReader/1.0", accept: "text/html,application/xml,text/xml,text/plain;q=0.9", "accept-encoding": "identity" },
       },
       (res) => {
         const status = res.statusCode ?? 0;

@@ -7,8 +7,9 @@
 
 // The app's light theme (apps/platform/app/globals.css), as hex.
 const C = { page: "#f7f7f8", card: "#ffffff", line: "#e9e9ec", fg: "#0a0a0b", fg2: "#333339", fg3: "#505056", fg4: "#6b6b71", subtle: "#f7f7f8" };
-const SANS = `Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`;
-const MONO = `"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+// Single quotes only: these go inside style="..." attributes.
+const SANS = `Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif`;
+const MONO = `'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
 
 export interface Email {
   subject: string;

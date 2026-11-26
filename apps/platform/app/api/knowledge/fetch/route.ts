@@ -4,7 +4,7 @@
 // every redirect); each page has a time and size limit; at most 20 pages; rate-limited.
 
 import { NextResponse } from "next/server";
-import { htmlToText, publicUrlProblem, sameSiteLinks, sitemapUrls } from "@/lib/knowledge";
+import { htmlToText, isSitemapIndex, publicUrlProblem, sameSiteLinks, sitemapUrls } from "@/lib/knowledge";
 import { FetchProblem, safeFetchText } from "@/lib/server/safe-fetch";
 import { clientIp, fromOtherSite, makeLimiter } from "@/lib/server/rate-limit";
 
@@ -55,7 +55,13 @@ export async function POST(request: Request) {
     let pages: string[];
     let title: string;
     if (mode === "sitemap") {
-      pages = sitemapUrls(await get(url)).slice(0, MAX_PAGES);
+      const xml = await get(url);
+      if (isSitemapIndex(xml)) {
+        // Follow up to 3 child sitemaps for their pages (an index lists sitemaps, not pages).
+        const children = sitemapUrls(xml).slice(0, 3);
+        const lists = await Promise.allSettled(children.map(async (child) => sitemapUrls(await get(child))));
+        pages = [...new Set(lists.flatMap((r) => (r.status === "fulfilled" ? r.value : [])))].slice(0, MAX_PAGES);
+      } else pages = sitemapUrls(xml).slice(0, MAX_PAGES);
       title = `${new URL(url).hostname} (sitemap)`;
       if (pages.length === 0) return NextResponse.json({ error: "No pages found in that sitemap." }, { status: 422 });
     } else {

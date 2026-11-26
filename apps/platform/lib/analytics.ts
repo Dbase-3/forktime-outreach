@@ -3,7 +3,7 @@
 // outbound, per agent, lead quality, engagement, mood, transfers, and the best
 // time to call in each region's own local time. Pure.
 
-import { isWin } from "./stats";
+import { isWin, pickupOf } from "./stats";
 import type { Call, Contact, Flow } from "./types";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -32,18 +32,31 @@ function startOfDay(t: number): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/** The range, and the same length just before it (for "vs previous period"). */
+/**
+ * The range, and the same stretch before it for "vs previous period" (bug B12):
+ * today so far vs yesterday up to the same time; the last N days vs the N days
+ * before; year to date vs the same dates last year.
+ */
 export function rangeBounds(range: RangeId, now: Date): Bounds {
   const to = now.getTime();
   const today = startOfDay(to);
-  const from =
-    range === "today" ? today
-    : range === "7d" ? today - 6 * DAY
-    : range === "30d" ? today - 29 * DAY
-    : range === "90d" ? today - 89 * DAY
-    : new Date(now.getFullYear(), 0, 1).getTime();
-  const length = to - from;
-  return { from, to, prevFrom: from - length, prevTo: from };
+  const shiftDays = (t: number, days: number) => {
+    const d = new Date(t);
+    d.setDate(d.getDate() - days);
+    return d.getTime();
+  };
+  if (range === "ytd") {
+    const from = new Date(now.getFullYear(), 0, 1).getTime();
+    const lastYear = (t: number) => {
+      const d = new Date(t);
+      d.setFullYear(d.getFullYear() - 1);
+      return d.getTime();
+    };
+    return { from, to, prevFrom: lastYear(from), prevTo: lastYear(to) };
+  }
+  const days = range === "today" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : 90;
+  const from = shiftDays(today, days - 1);
+  return { from, to, prevFrom: shiftDays(from, days), prevTo: shiftDays(to, days) };
 }
 
 export interface CallFilter {
@@ -68,7 +81,8 @@ export function pickCalls(calls: Call[], flows: Flow[], from: number, to: number
 
 // ---- Pickup ----
 
-export type Pickup = "answered" | "voicemail" | "no_answer" | "busy" | "failed";
+export type { Pickup } from "./stats";
+import type { Pickup } from "./stats";
 
 export const PICKUP_LABEL: Record<Pickup, string> = {
   answered: "Answered",
@@ -79,15 +93,7 @@ export const PICKUP_LABEL: Record<Pickup, string> = {
 };
 export const PICKUPS: Pickup[] = ["answered", "voicemail", "no_answer", "busy", "failed"];
 
-/** How a call went at the start. Someone calling us always counts as answered. */
-export function pickupOf(call: Call): Pickup {
-  if (call.direction === "inbound") return "answered";
-  if (call.endReason === "voicemail" || call.outcome === "voicemail") return "voicemail";
-  if (call.endReason === "busy" || call.outcome === "busy") return "busy";
-  if (call.endReason === "failed" || call.outcome === "failed") return "failed";
-  if (call.endReason === "no_answer" || call.outcome === "no_answer") return "no_answer";
-  return "answered";
-}
+export { pickupOf };
 
 export function pickupBreakdown(calls: Call[]): { counts: Record<Pickup, number>; total: number; rate: number | null } {
   const counts = Object.fromEntries(PICKUPS.map((p) => [p, 0])) as Record<Pickup, number>;

@@ -95,3 +95,24 @@ describe("importing a CSV", () => {
     expect(columns[1].type).toBe("text");
   });
 });
+
+describe("import: dates and duplicates (B18, audit)", () => {
+  it("stores dates as YYYY-MM-DD read the way the column shows, and doesn't add a number twice", async () => {
+    const { planImport } = await import("@/lib/contacts-table");
+    const columns = [
+      { index: 0, name: "Phone", label: "Phone", target: "phone" as const, type: "phone" as const },
+      { index: 1, name: "Bought", label: "Bought", target: "field:bought" as const, type: "date" as const },
+    ];
+    const rows = [["0412 555 019", "03/04/2026"], ["+61 412 555 020", "25/12/2025"], ["0412555020", "01/01/2026"], ["0412 555 021", "1/2/2026"]];
+    const plan = planImport(columns as never, rows, "List", [], "src", [{ phone: "+61412555021" }], "AU");
+    expect(plan.contacts.map((c) => c.fields.bought)).toEqual(["2026-04-03", "2025-12-25"]);
+    expect(plan.duplicates).toBe(2);
+  });
+
+  it("reads month/day when the column shows it", async () => {
+    const { dateOrderOf, toIsoDate } = await import("@/lib/conditions");
+    expect(dateOrderOf(["03/04/2026", "12/25/2025"])).toBe("mdy");
+    expect(toIsoDate("03/04/2026", "mdy")).toBe("2026-03-04");
+    expect(toIsoDate("31/02/2026", "dmy")).toBeNull();
+  });
+});

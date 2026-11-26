@@ -59,9 +59,47 @@ export function fitOp(op: ConditionOp, type: FieldType): ConditionOp {
   return OPS_FOR[type].includes(op) ? op : defaultOp(type);
 }
 
+export type DateOrder = "dmy" | "mdy";
+
+/**
+ * Which way round a column of slash dates is: a first part over 12 means
+ * day/month, a second part over 12 means month/day. When nothing settles it,
+ * day/month (Australia first; US workspaces will set it). Bug B18: "03/04/2026"
+ * was read as 4 March.
+ */
+export function dateOrderOf(values: string[], fallback: DateOrder = "dmy"): DateOrder {
+  for (const v of values) {
+    const m = v.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
+    if (!m) continue;
+    if (Number(m[1]) > 12) return "dmy";
+    if (Number(m[2]) > 12) return "mdy";
+  }
+  return fallback;
+}
+
+/** "2026-04-03" from "2026-04-03", "03/04/2026" (dmy) or "4/3/26" (mdy); null if it isn't a date. */
+export function toIsoDate(value: string | undefined, order: DateOrder = "dmy"): string | null {
+  const v = (value ?? "").trim();
+  const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let y: number, mo: number, d: number;
+  if (iso) [y, mo, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  else {
+    const m = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
+    if (!m) return null;
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    [d, mo] = order === "dmy" ? [a, b] : [b, a];
+    y = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+  }
+  const date = new Date(y, mo - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 function parseDate(value: string | undefined): Date | null {
+  const iso = toIsoDate(value);
+  if (iso) return new Date(`${iso}T00:00:00`);
   if (!value) return null;
-  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
+  const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 

@@ -53,6 +53,15 @@ export function deleteBlockedReason(doc: KnowledgeDoc, flows: Flow[]): string | 
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
 
+/** &amp; &#39; &#x27; &#128512; → the character; unknown names stay as written (bug B13: hex and emoji were garbled). */
+function decodeEntity(e: string): string | null {
+  if (e[0] === "#") {
+    const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isFinite(code) && code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : null;
+  }
+  return ENTITIES[e.toLowerCase()] ?? null;
+}
+
 /** The readable text of a page: no scripts, styles, nav chrome or tags; one blank line between blocks. */
 export function htmlToText(html: string): { title: string; text: string } {
   const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
@@ -63,7 +72,7 @@ export function htmlToText(html: string): { title: string; text: string } {
     .replace(/<\/(p|div|section|article|li|ul|ol|h[1-6]|tr|table|br|header|footer|main|nav|aside|form|blockquote|dd|dt)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&(#?\w+);/g, (m, e: string) => ENTITIES[e.toLowerCase()] ?? (e.startsWith("#") ? String.fromCharCode(Number(e.slice(1))) || m : m));
+    .replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) => decodeEntity(e) ?? m);
   const text = body
     .split("\n")
     .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
@@ -79,6 +88,11 @@ function decodeTitle(title: string): string {
 /** Page addresses listed in a sitemap (or a sitemap index), in order, de-duplicated. */
 export function sitemapUrls(xml: string): string[] {
   return [...new Set([...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1].replace(/&amp;/g, "&")))];
+}
+
+/** A sitemap index lists more sitemaps, not pages (bug B15). */
+export function isSitemapIndex(xml: string): boolean {
+  return /<sitemapindex[\s>]/i.test(xml);
 }
 
 /** Links on a page that stay on the same site, absolute, without #fragments, de-duplicated. */

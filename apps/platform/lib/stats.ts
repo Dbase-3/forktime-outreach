@@ -9,8 +9,21 @@ export function isWin(outcome: string): boolean {
   return /booked|_set|promise|transferred|given|taken/.test(outcome);
 }
 
+export type Pickup = "answered" | "voicemail" | "no_answer" | "busy" | "failed";
+
+/** How a call went at the start. Someone calling us always counts as answered. */
+export function pickupOf(call: Call): Pickup {
+  if (call.direction === "inbound") return "answered";
+  if (call.endReason === "voicemail" || call.outcome === "voicemail") return "voicemail";
+  if (call.endReason === "busy" || call.outcome === "busy") return "busy";
+  if (call.endReason === "failed" || call.outcome === "failed") return "failed";
+  if (call.endReason === "no_answer" || call.outcome === "no_answer") return "no_answer";
+  return "answered";
+}
+
+/** One meaning of "answered" everywhere (bug B10: Home counted voicemail and busy as answered). */
 export function answered(call: Call): boolean {
-  return call.outcome !== "no_answer" && call.outcome !== "failed";
+  return pickupOf(call) === "answered";
 }
 
 function startOfDay(date: Date): Date {

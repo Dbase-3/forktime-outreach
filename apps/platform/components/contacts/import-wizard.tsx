@@ -8,6 +8,7 @@ import { FileUp } from "lucide-react";
 import { useState } from "react";
 import { analyzeCsv, planImport, type ImportColumn, type Target } from "@/lib/contacts-table";
 import { newId, toFieldKey } from "@/lib/flow-tree";
+import { countryOfZone } from "@/lib/phone";
 import { nowIso, update, useApp } from "@/lib/store";
 import type { FieldType } from "@/lib/types";
 import { Field, Sheet } from "../ui";
@@ -51,7 +52,7 @@ export function ImportWizard({ open, onClose }: { open: boolean; onClose: () => 
     setStep(2);
   };
   const setCol = (index: number, patch: Partial<ImportColumn>) => setColumns((cs) => cs.map((c) => (c.index === index ? { ...c, ...patch } : c)));
-  const plan = step === 3 ? planImport(columns, rows, list, app.fieldDefs, sourceId) : null;
+  const plan = step === 3 ? planImport(columns, rows, list, app.fieldDefs, sourceId, app.contacts, countryOfZone(app.settings.timezone)) : null;
   const hasPhone = columns.some((c) => c.target === "phone");
 
   const finish = () => {
@@ -133,10 +134,11 @@ export function ImportWizard({ open, onClose }: { open: boolean; onClose: () => 
           <Field label="Put them in a list" hint="Campaigns can call a whole list.">
             <input className="field" value={list} onChange={(e) => setList(e.target.value)} />
           </Field>
-          <dl className="grid grid-cols-3 gap-3">
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Figure label="Contacts" value={plan.contacts.length} />
             <Figure label="New fields" value={plan.newFields.length} />
             <Figure label="Skipped" value={plan.skipped} hint="no phone number" />
+            <Figure label="Already here" value={plan.duplicates} hint="same number, not added twice" />
           </dl>
           {plan.newFields.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

@@ -1,6 +1,7 @@
 // The Contacts table: columns, sorting, filtering, paging and export. Pure.
 
-import { groupHolds } from "./conditions";
+import { dateOrderOf, groupHolds, toIsoDate } from "./conditions";
+import { toE164 } from "./phone";
 import { parseCsv } from "./csv";
 import { toFieldKey } from "./flow-tree";
 import { guessType } from "./conditions";
@@ -139,10 +140,17 @@ export interface ImportPlan {
   contacts: Omit<Contact, "id" | "createdAt">[];
   newFields: FieldDef[];
   skipped: number; // rows with no phone
+  duplicates: number; // rows whose number is already a contact, or earlier in the file
 }
 
-export function planImport(columns: ImportColumn[], rows: string[][], list: string, defs: FieldDef[], sourceId: string): ImportPlan {
+export function planImport(columns: ImportColumn[], rows: string[][], list: string, defs: FieldDef[], sourceId: string, existing: Pick<Contact, "phone">[] = [], country: Parameters<typeof toE164>[1] = "AU"): ImportPlan {
   const fieldCols = columns.filter((c) => c.target.startsWith("field:"));
+  // Date columns are stored as YYYY-MM-DD, read the way round their own values show (B18).
+  const typeOf = (c: ImportColumn) => defs.find((d) => d.key === c.target.slice(6))?.type ?? c.type;
+  const dateOrder = new Map(fieldCols.filter((c) => typeOf(c) === "date").map((c) => [c.index, dateOrderOf(rows.map((r) => r[c.index] ?? ""))]));
+  // One contact per number: within the file and against contacts already here (audit: re-imports duplicated everyone).
+  const seen = new Set(existing.map((c) => toE164(c.phone, country) ?? c.phone.replace(/\s/g, "")));
+  let duplicates = 0;
   const newFields = fieldCols
     .map((c) => ({ key: c.target.slice(6), label: c.label.trim() || c.name, type: c.type, source: sourceId }))
     .filter((f, i, all) => f.key && !defs.some((d) => d.key === f.key) && all.findIndex((x) => x.key === f.key) === i);
@@ -155,12 +163,23 @@ export function planImport(columns: ImportColumn[], rows: string[][], list: stri
       skipped++;
       return [];
     }
+    const phoneKey = toE164(phone, country) ?? phone.replace(/\s/g, "");
+    if (seen.has(phoneKey)) {
+      duplicates++;
+      return [];
+    }
+    seen.add(phoneKey);
     const first = get(at("first_name"));
     const name = get(at("name")) || [first, get(at("last_name"))].filter(Boolean).join(" ") || phone;
     const fields: Record<string, string> = {};
     if (first || name !== phone) fields.first_name = first || name.split(" ")[0];
-    for (const c of fieldCols) if (get(c.index)) fields[c.target.slice(6)] = get(c.index);
+    for (const c of fieldCols) {
+      const value = get(c.index);
+      if (!value) continue;
+      const order = dateOrder.get(c.index);
+      fields[c.target.slice(6)] = order ? toIsoDate(value, order) ?? value : value;
+    }
     return [{ name, phone, email: get(at("email")) || undefined, groups: list.trim() ? [list.trim()] : [], fields, sourceId }];
   });
-  return { contacts, newFields, skipped };
+  return { contacts, newFields, skipped, duplicates };
 }

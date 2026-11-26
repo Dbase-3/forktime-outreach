@@ -60,3 +60,15 @@ describe("reading websites", () => {
     expect(publicUrlProblem("not a url")).toMatch(/isn't a web address/);
   });
 });
+
+describe("decoding and sitemap indexes (B13, B15)", () => {
+  it("decodes numeric, hex and named entities, emoji included", async () => {
+    const { htmlToText } = await import("@/lib/knowledge");
+    expect(htmlToText("<p>It&#x27;s &amp; it&#39;s &#128512; &nbsp;ok &bogus;</p>").text).toBe("It's & it's 😀 ok &bogus;");
+  });
+  it("tells a sitemap index from a sitemap", async () => {
+    const { isSitemapIndex } = await import("@/lib/knowledge");
+    expect(isSitemapIndex('<?xml version="1.0"?><sitemapindex xmlns="x"><sitemap><loc>https://a.com/s1.xml</loc></sitemap></sitemapindex>')).toBe(true);
+    expect(isSitemapIndex('<urlset><url><loc>https://a.com/</loc></url></urlset>')).toBe(false);
+  });
+});

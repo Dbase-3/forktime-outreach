@@ -69,10 +69,11 @@ describe("headline figures", () => {
 });
 
 describe("ranges and filters", () => {
-  it("the previous period is the same length, just before", () => {
+  it("the previous period is the same stretch one period earlier", () => {
     const now = new Date(2026, 10, 26, 15, 0);
     const b = rangeBounds("7d", now);
-    expect(b.prevTo).toBe(b.from);
+    expect(new Date(b.prevFrom)).toEqual(new Date(2026, 10, 13));
+    expect(new Date(b.prevTo)).toEqual(new Date(2026, 10, 19, 15, 0));
     expect(b.to - b.from).toBe(b.prevTo - b.prevFrom);
     expect(new Date(rangeBounds("ytd", now).from).getMonth()).toBe(0);
   });
@@ -149,5 +150,24 @@ describe("the sample workspace", () => {
     expect(regions.find((r) => r.region.id === "AU")?.enough).toBe(true);
     expect(byAgent(calls, state.flows, b.from, b.to).length).toBe(3);
     expect(callsCsv(calls.slice(0, 2), state.flows, state.contacts).split("\n")).toHaveLength(3);
+  });
+});
+
+describe("comparison periods (B12) and one meaning of answered (B10)", () => {
+  it("today so far compares with yesterday up to the same time; ytd with last year", () => {
+    const now = new Date(2026, 10, 26, 10, 0);
+    const t = rangeBounds("today", now);
+    expect(new Date(t.prevFrom)).toEqual(new Date(2026, 10, 25, 0, 0));
+    expect(new Date(t.prevTo)).toEqual(new Date(2026, 10, 25, 10, 0));
+    const y = rangeBounds("ytd", now);
+    expect(new Date(y.prevFrom)).toEqual(new Date(2025, 0, 1));
+    expect(new Date(y.prevTo)).toEqual(new Date(2025, 10, 26, 10, 0));
+  });
+
+  it("Home and Analytics agree that voicemail and busy aren't answered", async () => {
+    const { answered } = await import("@/lib/stats");
+    expect(answered(call({ endReason: "voicemail", outcome: "voicemail" }))).toBe(false);
+    expect(answered(call({ endReason: "busy", outcome: "busy" }))).toBe(false);
+    expect(answered(call({}))).toBe(true);
   });
 });

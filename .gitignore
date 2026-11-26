@@ -11,3 +11,4 @@ out
 *.tsbuildinfo
 .vercel
 packages/core/dist
+apps/api/.data

@@ -1,4 +1,10 @@
 import "reflect-metadata";
+// Local development reads apps/api/.env; production sets real environment variables.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // no .env: use the environment as it is
+}
 import { createApp } from "./app.factory";
 import { loadEnv } from "./config/env";
 

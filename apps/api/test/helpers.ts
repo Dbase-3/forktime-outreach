@@ -14,6 +14,7 @@ export async function startApp(): Promise<{ app: INestApplication; stop: () => P
   process.env.DEV_LOGIN_CODE = DEV_CODE;
   process.env.RESEND_API_KEY = "";
   process.env.WORKER_IN_PROCESS = "false";
+  process.env.JOBS_INLINE = "true"; // jobs run straight away, no Redis
   // Loaded after the environment is set, so the app reads these values.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createApp } = require("../src/app.factory") as typeof import("../src/app.factory");

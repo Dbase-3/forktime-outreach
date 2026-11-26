@@ -37,7 +37,7 @@ value_of() { grep -E "^$1=" "$PKG/.env" | head -1 | cut -d= -f2-; }
   if [ -n "$(value_of ANTHROPIC_API_KEY)" ]; then echo "ANTHROPIC_API_KEY=$(value_of ANTHROPIC_API_KEY)"; else echo "ANTHROPIC_API_KEY_EVAL=$(value_of ANTHROPIC_API_KEY_EVAL)"; fi
   echo "PLATFORM_AGENT_NAME=platform-agent"
   echo "PLATFORM_API_URL=$API_URL"
-  echo "TURN_DETECTOR=stt"
+  echo "TURN_DETECTOR=audio"   # as the outreach agent in production
   ssh -o BatchMode=yes "$HOST" "grep -E '^AGENT_RUNTIME_KEY=' /opt/lisna/apps/api/.env | tr -d '\"'"
 } > "$SECRETS"
 grep -q '^AGENT_RUNTIME_KEY=.\{64\}$' "$SECRETS" || { echo "Couldn't read the signing key from the API server."; exit 1; }

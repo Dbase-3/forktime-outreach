@@ -1,6 +1,8 @@
 "use strict";
 
-const { voice, llm } = require("@livekit/agents");
+const { voice, llm, inference } = require("@livekit/agents");
+const { ParticipantKind } = require("@livekit/rtc-node");
+const { BackgroundVoiceCancellation, TelephonyBackgroundVoiceCancellation } = require("@livekit/noise-cancellation-node");
 const anthropic = require("@livekit/agents-plugin-anthropic");
 const elevenlabs = require("@livekit/agents-plugin-elevenlabs");
 const soniox = require("@livekit/agents-plugin-soniox");
@@ -12,6 +14,18 @@ const { integrationName, needsConnection } = require("@outreach/core/connections
 
 const { VOICE, TIMING, VOICE_IDS, LANGUAGE_CODES, env, ttsOptions } = require("./config");
 const { wrapUp } = require("./wrapup");
+const { asksForPhoneNumber, isIncompletePhoneReply } = require("./phone-input");
+
+/** The model's side of the call: a caller turn that's only part of a phone number waits for the rest. */
+class PlatformAgent extends voice.Agent {
+  constructor(call, options) {
+    super(options);
+    this.call = call;
+  }
+  async onUserTurnCompleted(_chatCtx, newMessage) {
+    if (!this.call.acceptCallerTurn(newMessage)) throw new voice.StopResponse();
+  }
+}
 
 // One call with an agent the owner built: say the welcome, then let the model
 // talk while the workflow runs in code. The model notes answers; `nextStep`
@@ -60,6 +74,8 @@ class PlatformCall {
     this.startedAt = null;
     this.timers = new Set();
     this.lines = [];
+    this.awaitingPhone = false;
+    this.phoneFragments = [];
   }
 
   after(ms, fn) {
@@ -94,6 +110,19 @@ class PlatformCall {
     const { cfg } = this;
     const language = LANGUAGE_CODES[cfg.voice.language] || "en";
     this.llm = new anthropic.LLM({ ...VOICE.llm, apiKey: env.anthropicKey() });
+    // Turn detection as on the outreach agent: LiveKit's audio model, with its smaller one as the fallback.
+    const detector = env.turnDetector();
+    let turnDetection = "stt";
+    if (detector === "audio") {
+      try {
+        turnDetection = new inference.TurnDetector({ version: "v1" });
+      } catch (err) {
+        this.log.warn(`[Call] audio turn detector unavailable: ${err.message}`);
+        turnDetection = new inference.TurnDetector({ version: "v1-mini" });
+      }
+    } else if (detector === "multilingual") {
+      turnDetection = new (require("@livekit/agents-plugin-livekit").turnDetector.MultilingualModel)(0.15);
+    }
     this.session = new voice.AgentSession({
       vad: this.vad,
       stt: new soniox.STT({
@@ -104,7 +133,7 @@ class PlatformCall {
       }),
       tts: new elevenlabs.TTS({ ...ttsOptions(cfg.voice.speed), voiceId: VOICE_IDS[cfg.voice.voiceId] || VOICE_IDS.v_ava, apiKey: process.env.ELEVENLABS_API_KEY }),
       llm: this.llm,
-      turnHandling: { turnDetection: "stt", endpointing: VOICE.endpointing, interruption: VOICE.interruption },
+      turnHandling: { turnDetection, endpointing: VOICE.endpointing, interruption: VOICE.interruption },
       maxToolSteps: VOICE.session.maxToolSteps,
       transcriptionTimeout: VOICE.session.transcriptionTimeout,
       userAwayTimeout: VOICE.session.userAwayTimeoutSec,
@@ -131,11 +160,13 @@ class PlatformCall {
     this.session.on(Events.Error, (e) => this.log.warn(`[Call] session error: ${e.error && e.error.message}`));
     this.session.on(Events.Close, (e) => this.finalize(e.error ? "failed" : "agent_ended"));
 
-    this.agent = new voice.Agent({ instructions: this.instructions(), tools: this.tools() });
+    this.agent = new PlatformAgent(this, { instructions: this.instructions(), tools: this.tools() });
+    // Background voices and noise removed from the caller's audio: the phone model for phone calls (as on outreach), the general one for browsers.
+    const noiseCancellation = participant.kind === ParticipantKind.SIP ? TelephonyBackgroundVoiceCancellation() : BackgroundVoiceCancellation();
     await this.session.start({
       agent: this.agent,
       room: this.ctx.room,
-      inputOptions: { audioSampleRate: 16000, audioNumChannels: 1, participantIdentity: participant.identity, closeOnDisconnect: false },
+      inputOptions: { audioSampleRate: 16000, audioNumChannels: 1, noiseCancellation, participantIdentity: participant.identity, closeOnDisconnect: false },
       // Captions go out as soon as the words are known: waiting to sync them with
       // ElevenLabs' timings left playout unfinished (the outreach agent does the same).
       outputOptions: { audioSampleRate: 16000, audioNumChannels: 1, syncTranscription: false },
@@ -151,8 +182,36 @@ class PlatformCall {
     const text = item && typeof item.textContent === "string" ? item.textContent.trim() : "";
     if (!who || !text) return;
     this.agentSpokeLast = who === "agent";
+    if (who === "agent" && asksForPhoneNumber(text)) this.setAwaitingPhone(true);
     this.lines.push({ who, text });
     this.api.report({ type: "line", line: { who, text: text.slice(0, 4000), at: Math.round(this.secondsIn()) } });
+  }
+
+  setAwaitingPhone(enabled) {
+    if (this.awaitingPhone === enabled || !this.session) return;
+    this.awaitingPhone = enabled;
+    this.session.updateOptions({ turnHandling: { endpointing: enabled ? VOICE.phoneEndpointing : VOICE.endpointing } });
+  }
+
+  /** Keep listening if a pause split a phone number into separate turns (from the outreach agent). */
+  acceptCallerTurn(message) {
+    if (!this.awaitingPhone) return true;
+    const text = message.textContent.trim();
+    const pause = text.match(/\b(?:wait (?:a |one )?(?:second|sec|moment)|give me (?:a |one )?(?:second|sec|moment)|hold on)\b/i);
+    const answer = pause ? text.replace(pause[0], "").trim() : text;
+    if (pause && !/\d|\b(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/i.test(answer)) {
+      this.onItem({ role: "user", textContent: text });
+      return false;
+    }
+    const combined = [...this.phoneFragments, answer].join(" ").trim();
+    if (isIncompletePhoneReply(combined)) {
+      if (answer) this.phoneFragments.push(answer);
+      return false;
+    }
+    if (this.phoneFragments.length) message.content = [combined];
+    this.phoneFragments = [];
+    this.setAwaitingPhone(false);
+    return true;
   }
 
   tools() {
@@ -277,6 +336,10 @@ class PlatformCall {
     if (this.ended || this.pending || this.userState === "speaking") return;
     this.silences += 1;
     if (this.silences >= 2) return this.finalize("agent_ended");
+    if (this.awaitingPhone) {
+      this.phoneFragments = [];
+      return this.session.generateReply({ instructions: "Ask once for the full phone number. Then wait for the answer." });
+    }
     this.session.generateReply({ instructions: NUDGES.stillThere });
   }
 
@@ -291,6 +354,7 @@ class PlatformCall {
     if (this.ended) return;
     this.ended = true;
     for (const t of this.timers) clearTimeout(t);
+    if (this.phoneFragments.length) this.onItem({ role: "user", textContent: this.phoneFragments.join(" ") });
     const lines = this.lines;
     const missingListen = this.cfg.schema.filter((f) => f.from === "listen" && !this.saved[f.key]);
     let filed = this.filed;

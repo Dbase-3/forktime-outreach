@@ -24,7 +24,8 @@ const VOICE_IDS = {
 const LANGUAGE_CODES = { English: "en", Spanish: "es", French: "fr", German: "de", Italian: "it", Portuguese: "pt", Hindi: "hi", Arabic: "ar", Mandarin: "zh" };
 
 const VOICE = {
-  stt: { model: "stt-rt-v6", sampleRate: 16000, maxEndpointDelayMs: 800, enableSpeakerDiarization: false, enableLanguageIdentification: true },
+  // Everything below matches the outreach agent (apps/agent/src/config.js, owner 2026-11-27).
+  stt: { model: "stt-rt-v6", languageHintsStrict: true, sampleRate: 16000, maxEndpointDelayMs: 800, enableSpeakerDiarization: false, enableLanguageIdentification: true },
   tts: {
     encoding: "pcm_16000",
     natural: { model: "eleven_v4_turbo", voiceSettings: { stability: 0.6 } },
@@ -40,8 +41,9 @@ const VOICE = {
   })(),
   vad: { activationThreshold: 0.5 },
   endpointing: { mode: "fixed", minDelay: 750, maxDelay: 1500 },
+  phoneEndpointing: { minDelay: 2400, maxDelay: 3000 },
   interruption: { enabled: true, mode: "vad", minDuration: 400, minWords: 2, discardAudioIfUninterruptible: false, resumeFalseInterruption: true },
-  session: { maxToolSteps: 3, transcriptionTimeout: 1500, llmTimeoutMs: 15000, userAwayTimeoutSec: 12 },
+  session: { maxToolSteps: 2, transcriptionTimeout: 1500, llmTimeoutMs: 15000, userAwayTimeoutSec: 12 },
 };
 
 const TIMING = {
@@ -70,6 +72,11 @@ const env = {
   agentName: () => process.env.PLATFORM_AGENT_NAME || "platform-agent-local",
   apiUrl: () => (process.env.PLATFORM_API_URL || "http://localhost:4300").replace(/\/$/, ""),
   runtimeKey: () => required("AGENT_RUNTIME_KEY"),
+  /** LiveKit's audio turn detector by default, as on the outreach agent; "stt" or "multilingual" override it. */
+  turnDetector: () => {
+    const d = process.env.TURN_DETECTOR;
+    return d === "multilingual" || d === "stt" ? d : "audio";
+  },
   /** Local and test calls spend on the eval key; a deployed agent sets ANTHROPIC_API_KEY. */
   anthropicKey: () => process.env.ANTHROPIC_API_KEY || required("ANTHROPIC_API_KEY_EVAL"),
 };

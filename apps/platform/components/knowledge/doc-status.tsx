@@ -1,5 +1,5 @@
 import { FileText, Globe, Map, Network, Type } from "lucide-react";
-import type { KnowledgeDoc } from "@/lib/types";
+import type { KnowledgeDoc } from "@outreach/core/types";
 import { Badge } from "../ui";
 
 export function DocStatus({ doc }: { doc: KnowledgeDoc }) {

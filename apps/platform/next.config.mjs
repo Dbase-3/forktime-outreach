@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // The shared engine is TypeScript source (packages/core); Next compiles it with the app.
+  transpilePackages: ["@outreach/core"],
   // "Flows" became "Agents" (2026-11-26): old links keep working.
   async redirects() {
     return [

@@ -4,10 +4,10 @@
 // server route (app/api/knowledge/fetch); text files are read in the browser;
 // PDFs and Word files wait for the backend.
 
-import { newId } from "@/lib/flow-tree";
-import { MAX_FILE_BYTES, READABLE_FILE, htmlToText } from "@/lib/knowledge";
+import { newId } from "@outreach/core/flow-tree";
+import { MAX_FILE_BYTES, READABLE_FILE, htmlToText } from "@outreach/core/knowledge";
 import { nowIso, update } from "@/lib/store";
-import type { KnowledgeDoc } from "@/lib/types";
+import type { KnowledgeDoc } from "@outreach/core/types";
 
 export type UrlMode = "page" | "sitemap" | "site";
 

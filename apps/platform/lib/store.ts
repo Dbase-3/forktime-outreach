@@ -9,7 +9,7 @@
 import { useSyncExternalStore } from "react";
 import { migrateState, repairStuck } from "./migrations";
 import { SEED_VERSION, seedState } from "./seed";
-import type { AppState } from "./types";
+import type { AppState } from "@outreach/core/types";
 
 const KEY = "forktime-platform.v1";
 const BACKUP_KEY = "forktime-platform.backup";

@@ -24,12 +24,12 @@ import {
   type CallFilter,
   type RangeId,
   type TimeMetric,
-} from "@/lib/analytics";
+} from "@outreach/core/analytics";
 import { useApp } from "@/lib/store";
 import { AreaChart, Legend, type Series } from "@/components/charts";
 import { PageHeader, Segmented } from "@/components/ui";
 import { AgentTable, BestTime, Directions, Kpis, Outcomes, Panel, PickupCard, TierCard, TransferCard } from "@/components/analytics/sections";
-import { ENGAGEMENT_TIERS, LEAD_TIERS, MOOD_TIERS } from "@/lib/analytics";
+import { ENGAGEMENT_TIERS, LEAD_TIERS, MOOD_TIERS } from "@outreach/core/analytics";
 
 type Dir = "all" | "outbound" | "inbound";
 

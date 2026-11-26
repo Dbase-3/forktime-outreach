@@ -3,10 +3,10 @@
 import clsx from "clsx";
 import { BookOpen, FileUp, Globe, Search, Type } from "lucide-react";
 import { useState } from "react";
-import { KIND_LABEL, formatBytes, usedByLabel } from "@/lib/knowledge";
-import { relativeTime } from "@/lib/format";
+import { KIND_LABEL, formatBytes, usedByLabel } from "@outreach/core/knowledge";
+import { relativeTime } from "@outreach/core/format";
 import { useApp } from "@/lib/store";
-import type { KnowledgeDoc } from "@/lib/types";
+import type { KnowledgeDoc } from "@outreach/core/types";
 import { AddKnowledgeSheet, type AddKind } from "@/components/knowledge/add-sheets";
 import { DocSheet } from "@/components/knowledge/doc-sheet";
 import { DocIcon, DocStatus } from "@/components/knowledge/doc-status";

@@ -6,7 +6,7 @@
 import clsx from "clsx";
 import { FileUp } from "lucide-react";
 import { useState } from "react";
-import { publicUrlProblem } from "@/lib/knowledge";
+import { publicUrlProblem } from "@outreach/core/knowledge";
 import { Field, Segmented, Sheet, Toggle } from "../ui";
 import { addFiles, addText, addUrl, type UrlMode } from "./actions";
 

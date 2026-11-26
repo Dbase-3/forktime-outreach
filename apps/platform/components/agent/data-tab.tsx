@@ -6,9 +6,9 @@
 
 import clsx from "clsx";
 import { Plus, Trash2 } from "lucide-react";
-import { dataSchema, structuredResult } from "@/lib/agent-data";
-import { newId, toFieldKey } from "@/lib/flow-tree";
-import type { DataField, FieldType, Flow, SuccessCheck } from "@/lib/types";
+import { dataSchema, structuredResult } from "@outreach/core/agent-data";
+import { newId, toFieldKey } from "@outreach/core/flow-tree";
+import type { DataField, FieldType, Flow, SuccessCheck } from "@outreach/core/types";
 import { Toggle } from "../ui";
 
 const TYPES: { value: FieldType; label: string }[] = [

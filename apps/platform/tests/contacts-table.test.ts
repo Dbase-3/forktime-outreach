@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { analyzeCsv, planImport, rowValues, runQuery, toCsv, type TableQuery } from "@/lib/contacts-table";
+import { analyzeCsv, planImport, rowValues, runQuery, toCsv, type TableQuery } from "@outreach/core/contacts-table";
 import { seedState } from "@/lib/seed";
-import type { Contact, FieldDef } from "@/lib/types";
+import type { Contact, FieldDef } from "@outreach/core/types";
 
 const now = new Date("2026-11-26T12:00:00");
 const defs: FieldDef[] = [{ key: "km", label: "Kilometres", type: "number" }, { key: "bought", label: "Bought", type: "date" }];
@@ -98,7 +98,7 @@ describe("importing a CSV", () => {
 
 describe("import: dates and duplicates (B18, audit)", () => {
   it("stores dates as YYYY-MM-DD read the way the column shows, and doesn't add a number twice", async () => {
-    const { planImport } = await import("@/lib/contacts-table");
+    const { planImport } = await import("@outreach/core/contacts-table");
     const columns = [
       { index: 0, name: "Phone", label: "Phone", target: "phone" as const, type: "phone" as const },
       { index: 1, name: "Bought", label: "Bought", target: "field:bought" as const, type: "date" as const },
@@ -110,7 +110,7 @@ describe("import: dates and duplicates (B18, audit)", () => {
   });
 
   it("reads month/day when the column shows it", async () => {
-    const { dateOrderOf, toIsoDate } = await import("@/lib/conditions");
+    const { dateOrderOf, toIsoDate } = await import("@outreach/core/conditions");
     expect(dateOrderOf(["03/04/2026", "12/25/2025"])).toBe("mdy");
     expect(toIsoDate("03/04/2026", "mdy")).toBe("2026-03-04");
     expect(toIsoDate("31/02/2026", "dmy")).toBeNull();

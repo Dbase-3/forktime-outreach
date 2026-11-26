@@ -7,8 +7,8 @@
 import { Phone, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { relativeTime } from "@/lib/format";
-import { numberOwner } from "@/lib/numbers";
+import { relativeTime } from "@outreach/core/format";
+import { numberOwner } from "@outreach/core/numbers";
 import { update, useApp } from "@/lib/store";
 import { GetNumber, describeNumber } from "@/components/numbers/number-picker";
 import { Popover } from "@/components/popover";

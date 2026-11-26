@@ -2,8 +2,8 @@
 // splitting into two lanes that join again at the next step. Pure, so the
 // canvas only draws what this returns.
 
-import { TOP, type Container } from "./flow-tree";
-import type { Step } from "./types";
+import { TOP, type Container } from "@outreach/core/flow-tree";
+import type { Step } from "@outreach/core/types";
 
 export const NODE_W = 248;
 export const NODE_H = 104;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { answerPractice, fill, startPractice } from "@/lib/practice";
-import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
-import { flowIssues } from "@/lib/flow-tree";
+import { answerPractice, fill, startPractice } from "../src/practice";
+import { TEMPLATES, flowFromTemplate } from "../src/templates";
+import { flowIssues } from "../src/flow-tree";
 
 const ctx = { agentName: "Ava", business: "Northside Motors", contactFields: { first_name: "Sarah", car_model: "RAV4" } };
 const serviceFlow = () => flowFromTemplate(TEMPLATES.find((t) => t.id === "service_check") ?? null);

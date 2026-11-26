@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { insertVar, unknownVars, variableGroups, varsIn } from "@/lib/variables";
+import { insertVar, unknownVars, variableGroups, varsIn } from "../src/variables";
 
 const fields = [
   { key: "first_name", label: "First name" },
@@ -32,7 +32,7 @@ describe("variables a line can use", () => {
 
 describe("filling variables (B30)", () => {
   it("uses the value, then the fallback, else leaves the variable out tidily", async () => {
-    const { fill } = await import("@/lib/variables");
+    const { fill } = await import("../src/variables");
     expect(fill("Hi {first_name}, this is {agent}.", { first_name: "Mia", agent: "Ava" })).toBe("Hi Mia, this is Ava.");
     expect(fill("Hi {first_name|there}, this is {agent}.", { agent: "Ava" })).toBe("Hi there, this is Ava.");
     expect(fill("Hi {first_name}, this is {agent}.", { agent: "Ava" })).toBe("Hi, this is Ava.");
@@ -43,7 +43,7 @@ describe("filling variables (B30)", () => {
   });
 
   it("reads a fallback as part of the variable, not a new one", async () => {
-    const { varsIn } = await import("@/lib/variables");
+    const { varsIn } = await import("../src/variables");
     expect(varsIn("Hi {first_name|there} and {agent}")).toEqual(["first_name", "agent"]);
   });
 });

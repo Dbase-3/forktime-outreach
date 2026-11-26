@@ -6,11 +6,11 @@ import clsx from "clsx";
 import { FileSpreadsheet, Plug, RefreshCw, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { newId, toFieldKey } from "@/lib/flow-tree";
-import { integrationInfo } from "@/lib/integrations";
-import { relativeTime } from "@/lib/format";
+import { newId, toFieldKey } from "@outreach/core/flow-tree";
+import { integrationInfo } from "@outreach/core/integrations";
+import { relativeTime } from "@outreach/core/format";
 import { nowIso, update, useApp } from "@/lib/store";
-import type { DataSource, FieldType } from "@/lib/types";
+import type { DataSource, FieldType } from "@outreach/core/types";
 import { IntegrationLogo } from "../integrations";
 import { Badge, Field, Sheet } from "../ui";
 

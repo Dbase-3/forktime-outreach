@@ -6,11 +6,11 @@
 import clsx from "clsx";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Download, ListFilter, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { describe } from "@/lib/conditions";
-import { allColumns, runQuery, toCsv, type Sort, type TableRow } from "@/lib/contacts-table";
-import { humanize, shortDate } from "@/lib/format";
+import { describe } from "@outreach/core/conditions";
+import { allColumns, runQuery, toCsv, type Sort, type TableRow } from "@outreach/core/contacts-table";
+import { humanize, shortDate } from "@outreach/core/format";
 import { update, useApp } from "@/lib/store";
-import type { ConditionGroup, FieldDef } from "@/lib/types";
+import type { ConditionGroup, FieldDef } from "@outreach/core/types";
 import { outcomeTone } from "../calls/call-overview";
 import { Popover } from "../popover";
 import { RulesEditor } from "../rules-editor";

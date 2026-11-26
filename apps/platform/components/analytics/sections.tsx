@@ -24,8 +24,8 @@ import {
   type bestTimes,
   type directions,
   type transfers,
-} from "@/lib/analytics";
-import { duration, humanize } from "@/lib/format";
+} from "@outreach/core/analytics";
+import { duration, humanize } from "@outreach/core/format";
 import { Sparkline } from "../charts";
 import { Segmented } from "../ui";
 

@@ -8,9 +8,9 @@
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { numberOwner, randomAgentName } from "@/lib/numbers";
+import { numberOwner, randomAgentName } from "@outreach/core/numbers";
 import { update, useApp } from "@/lib/store";
-import { flowFromTemplate, type FlowTemplate } from "@/lib/templates";
+import { flowFromTemplate, type FlowTemplate } from "@outreach/core/templates";
 import { Field, Modal } from "../ui";
 import { GetNumber, NumberPicker } from "../numbers/number-picker";
 

@@ -7,8 +7,8 @@
 
 import clsx from "clsx";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { activeLineAt, hasTimeline } from "@/lib/call-review";
-import type { AppState, Call } from "@/lib/types";
+import { activeLineAt, hasTimeline } from "@outreach/core/call-review";
+import type { AppState, Call } from "@outreach/core/types";
 import { AudioPlayer, type PlayerHandle } from "./calls/audio-player";
 import { CallFeedbackBar } from "./calls/call-feedback";
 import { CallOverview } from "./calls/call-overview";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readAnswer } from "@/lib/spoken";
+import { readAnswer } from "../src/spoken";
 
 describe("reading everyday replies in the preview", () => {
   it("yes and no in many words", () => {

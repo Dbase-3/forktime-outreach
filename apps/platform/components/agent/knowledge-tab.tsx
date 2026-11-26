@@ -6,9 +6,9 @@
 import { BookOpen, FileUp, Globe, Plus, Type, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { formatBytes } from "@/lib/knowledge";
+import { formatBytes } from "@outreach/core/knowledge";
 import { useApp } from "@/lib/store";
-import type { Flow } from "@/lib/types";
+import type { Flow } from "@outreach/core/types";
 import { toggleAttached } from "../knowledge/actions";
 import { AddKnowledgeSheet, type AddKind } from "../knowledge/add-sheets";
 import { DocIcon, DocStatus } from "../knowledge/doc-status";

@@ -14,9 +14,9 @@ import {
   summarize,
   timeline,
   transfers,
-} from "@/lib/analytics";
+} from "@outreach/core/analytics";
 import { seedState } from "@/lib/seed";
-import type { Call, Contact } from "@/lib/types";
+import type { Call, Contact } from "@outreach/core/types";
 
 const call = (over: Partial<Call>): Call => ({
   id: Math.random().toString(36),
@@ -165,7 +165,7 @@ describe("comparison periods (B12) and one meaning of answered (B10)", () => {
   });
 
   it("Home and Analytics agree that voicemail and busy aren't answered", async () => {
-    const { answered } = await import("@/lib/stats");
+    const { answered } = await import("@outreach/core/stats");
     expect(answered(call({ endReason: "voicemail", outcome: "voicemail" }))).toBe(false);
     expect(answered(call({ endReason: "busy", outcome: "busy" }))).toBe(false);
     expect(answered(call({}))).toBe(true);

@@ -6,8 +6,8 @@
 
 import clsx from "clsx";
 import { Plus, X } from "lucide-react";
-import { OPS, OPS_FOR, defaultOp, fitOp } from "@/lib/conditions";
-import type { Condition, ConditionGroup, FieldDef } from "@/lib/types";
+import { OPS, OPS_FOR, defaultOp, fitOp } from "@outreach/core/conditions";
+import type { Condition, ConditionGroup, FieldDef } from "@outreach/core/types";
 
 export function RulesEditor({ group, fields, onChange, addLabel = "Add a rule", compact }: { group: ConditionGroup; fields: FieldDef[]; onChange: (g: ConditionGroup) => void; addLabel?: string; compact?: boolean }) {
   const set = (i: number, rule: Condition) => onChange({ ...group, rules: group.rules.map((r, j) => (j === i ? rule : r)) });

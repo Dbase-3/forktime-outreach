@@ -7,9 +7,9 @@
 import clsx from "clsx";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { FEEDBACK_REASONS, NOTE_MAX } from "@/lib/call-review";
+import { FEEDBACK_REASONS, NOTE_MAX } from "@outreach/core/call-review";
 import { nowIso, update } from "@/lib/store";
-import type { Call, CallFeedback, FeedbackReason } from "@/lib/types";
+import type { Call, CallFeedback, FeedbackReason } from "@outreach/core/types";
 
 function save(callId: string, feedback: CallFeedback | null): void {
   update((s) => ({ ...s, calls: s.calls.map((c) => (c.id === callId ? { ...c, feedback } : c)) }));

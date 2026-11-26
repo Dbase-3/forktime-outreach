@@ -8,8 +8,8 @@
 import clsx from "clsx";
 import { AudioLines, Bot, Lightbulb, User, Zap } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { clock } from "@/lib/call-review";
-import type { TranscriptLine } from "@/lib/types";
+import { clock } from "@outreach/core/call-review";
+import type { TranscriptLine } from "@outreach/core/types";
 
 interface Props {
   lines: TranscriptLine[];

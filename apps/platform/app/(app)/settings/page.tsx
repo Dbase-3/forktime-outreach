@@ -4,9 +4,9 @@ import clsx from "clsx";
 import { Phone, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { WEEKDAYS, hourLabel } from "@/lib/format";
+import { WEEKDAYS, hourLabel } from "@outreach/core/format";
 import { resetWorkspace, update, useApp } from "@/lib/store";
-import type { WorkspaceSettings } from "@/lib/types";
+import type { WorkspaceSettings } from "@outreach/core/types";
 import { Confirm } from "@/components/confirm";
 import { Field, PageHeader } from "@/components/ui";
 

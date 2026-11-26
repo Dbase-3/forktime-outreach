@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { audienceBreakdown, audienceOf, callRulesFor, campaignIssues, campaignSummary, daysWords, defaultCampaign, describeTrigger, dueDate, upcomingCalls } from "@/lib/campaign";
-import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
-import { daysLabel } from "@/lib/automation";
-import type { Campaign, Contact, FieldDef } from "@/lib/types";
+import { audienceBreakdown, audienceOf, callRulesFor, campaignIssues, campaignSummary, daysWords, defaultCampaign, describeTrigger, dueDate, upcomingCalls } from "../src/campaign";
+import { TEMPLATES, flowFromTemplate } from "../src/templates";
+import { daysLabel } from "../src/automation";
+import type { Campaign, Contact, FieldDef } from "../src/types";
 
 const now = new Date("2026-11-26T12:00:00");
 const defs: FieldDef[] = [{ key: "purchase_date", label: "Purchase date", type: "date" }, { key: "tier", label: "Tier", type: "choice" }];

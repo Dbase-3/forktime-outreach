@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dataSchema, structuredResult } from "@/lib/agent-data";
-import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
+import { dataSchema, structuredResult } from "../src/agent-data";
+import { TEMPLATES, flowFromTemplate } from "../src/templates";
 
 const service = () => flowFromTemplate(TEMPLATES.find((t) => t.id === "service_check") ?? null);
 

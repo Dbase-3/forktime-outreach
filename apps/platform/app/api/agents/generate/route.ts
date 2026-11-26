@@ -6,7 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { NextResponse } from "next/server";
 import { clientIp, fromOtherSite, makeLimiter } from "@/lib/server/rate-limit";
-import { AgentDraft, DRAFT_SYSTEM, WorkflowDraft, applyDraft, draftUserMessage, toSteps, type DraftRequest } from "@/lib/agent-draft";
+import { AgentDraft, DRAFT_SYSTEM, WorkflowDraft, applyDraft, draftUserMessage, toSteps, type DraftRequest } from "@outreach/core/agent-draft";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;

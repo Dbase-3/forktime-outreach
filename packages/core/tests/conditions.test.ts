@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from "vitest";
-import { OPS_FOR, describe, fitOp, groupHolds, guessType, holds } from "@/lib/conditions";
-import type { Condition } from "@/lib/types";
+import { OPS_FOR, describe, fitOp, groupHolds, guessType, holds } from "../src/conditions";
+import type { Condition } from "../src/types";
 
 const now = new Date("2026-11-26T15:00:00");
 const c = (op: Condition["op"], value?: string, value2?: string): Condition => ({ field: "f", op, value, value2 });

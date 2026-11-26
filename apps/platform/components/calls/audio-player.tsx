@@ -8,7 +8,7 @@
 import clsx from "clsx";
 import { Check, Copy, Download, MoreHorizontal, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type PointerEvent } from "react";
-import { clock, sampleWaveform } from "@/lib/call-review";
+import { clock, sampleWaveform } from "@outreach/core/call-review";
 
 export interface PlayerHandle {
   seek: (sec: number, opts?: { play?: boolean }) => void;

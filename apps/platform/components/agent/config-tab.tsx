@@ -6,10 +6,10 @@
 
 import { Loader2, Sparkles, Undo2, Workflow, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { allTimezones, offsetLabel, timeIn, zoneName } from "@/lib/timezones";
-import type { Direction, Flow } from "@/lib/types";
-import type { VarGroup } from "@/lib/variables";
-import { numberOwner } from "@/lib/numbers";
+import { allTimezones, offsetLabel, timeIn, zoneName } from "@outreach/core/timezones";
+import type { Direction, Flow } from "@outreach/core/types";
+import type { VarGroup } from "@outreach/core/variables";
+import { numberOwner } from "@outreach/core/numbers";
 import { useApp } from "@/lib/store";
 import { VoicePanel } from "../flow/voice-panel";
 import { GetNumber, NumberPicker } from "../numbers/number-picker";

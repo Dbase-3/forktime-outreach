@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { attachedTo, deleteBlockedReason, docsForAgent, formatBytes, htmlToText, publicUrlProblem, sameSiteLinks, sitemapUrls, usedByLabel } from "@/lib/knowledge";
-import type { Flow, KnowledgeDoc } from "@/lib/types";
+import { attachedTo, deleteBlockedReason, docsForAgent, formatBytes, htmlToText, publicUrlProblem, sameSiteLinks, sitemapUrls, usedByLabel } from "../src/knowledge";
+import type { Flow, KnowledgeDoc } from "../src/types";
 
 const doc = (id: string, over: Partial<KnowledgeDoc> = {}): KnowledgeDoc => ({
   id, name: id, kind: "text", content: "", sizeBytes: 10, status: "ready", availableToAll: false, createdAt: "", updatedAt: "", ...over,
@@ -63,11 +63,11 @@ describe("reading websites", () => {
 
 describe("decoding and sitemap indexes (B13, B15)", () => {
   it("decodes numeric, hex and named entities, emoji included", async () => {
-    const { htmlToText } = await import("@/lib/knowledge");
+    const { htmlToText } = await import("../src/knowledge");
     expect(htmlToText("<p>It&#x27;s &amp; it&#39;s &#128512; &nbsp;ok &bogus;</p>").text).toBe("It's & it's 😀 ok &bogus;");
   });
   it("tells a sitemap index from a sitemap", async () => {
-    const { isSitemapIndex } = await import("@/lib/knowledge");
+    const { isSitemapIndex } = await import("../src/knowledge");
     expect(isSitemapIndex('<?xml version="1.0"?><sitemapindex xmlns="x"><sitemap><loc>https://a.com/s1.xml</loc></sitemap></sitemapindex>')).toBe(true);
     expect(isSitemapIndex('<urlset><url><loc>https://a.com/</loc></url></urlset>')).toBe(false);
   });

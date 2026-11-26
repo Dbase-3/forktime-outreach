@@ -4,9 +4,9 @@ import {
   CalendarCheck, Database, Flag, GitBranch, HelpCircle, MessageCircle, MessageSquareText, PhoneForwarded, Webhook,
   type LucideIcon,
 } from "lucide-react";
-import { describeCondition } from "@/lib/automation";
-import { humanize } from "@/lib/format";
-import type { ActionKind, AnswerType, FieldDef, Step, StepKind } from "@/lib/types";
+import { describeCondition } from "@outreach/core/automation";
+import { humanize } from "@outreach/core/format";
+import type { ActionKind, AnswerType, FieldDef, Step, StepKind } from "@outreach/core/types";
 
 interface Meta {
   label: string;

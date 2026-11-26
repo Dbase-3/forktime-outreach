@@ -8,9 +8,9 @@
 import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { newId } from "@/lib/flow-tree";
+import { newId } from "@outreach/core/flow-tree";
 import { nowIso, update, useApp } from "@/lib/store";
-import type { Flow } from "@/lib/types";
+import type { Flow } from "@outreach/core/types";
 import { Popover } from "../popover";
 
 export function duplicateAgent(flow: Flow, takenNames: string[]): Flow {

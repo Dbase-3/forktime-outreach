@@ -4,8 +4,8 @@
 // the tuning a customer gets; the models behind it are ours to choose.
 // Compact dropdowns (owner 2026-11-26: "voices need to be a dropdown").
 
-import { LANGUAGES, PERSONALITIES, VOICES } from "@/lib/voices";
-import type { AgentVoice, Personality } from "@/lib/types";
+import { LANGUAGES, PERSONALITIES, VOICES } from "@outreach/core/voices";
+import type { AgentVoice, Personality } from "@outreach/core/types";
 import { Field } from "../ui";
 
 export function VoicePanel({ agent, onChange }: { agent: AgentVoice; onChange: (patch: Partial<AgentVoice>) => void }) {

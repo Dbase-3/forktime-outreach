@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp, useSaveProblem } from "@/lib/store";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
-import type { AppState } from "@/lib/types";
+import type { AppState } from "@outreach/core/types";
 import { CommandPalette, useCommandPalette } from "./command-palette";
 import { SkeletonFor } from "./skeleton";
 import { Sheet } from "./ui";

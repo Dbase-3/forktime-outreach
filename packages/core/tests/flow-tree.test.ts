@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   TOP, askedFields, findStep, flowIssues, insertStep, makeStep, moveStep, outcomesOf, removeStep, toFieldKey, updateStep,
-} from "@/lib/flow-tree";
-import type { Step } from "@/lib/types";
+} from "../src/flow-tree";
+import type { Step } from "../src/types";
 
 const say = (id: string, text = "hi"): Step => ({ id, kind: "say", text });
 const ask = (id: string, field: string): Step => ({ id, kind: "ask", question: `${field}?`, field, answerType: "yesno" });

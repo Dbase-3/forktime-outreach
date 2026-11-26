@@ -8,10 +8,10 @@ import clsx from "clsx";
 import { AlertTriangle, Check, Phone, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { COUNTRIES, KIND_LABEL, availableNumbers, countryOf, numberOwner, type NumberKind, type Offer } from "@/lib/numbers";
-import { newId } from "@/lib/flow-tree";
+import { COUNTRIES, KIND_LABEL, availableNumbers, countryOf, numberOwner, type NumberKind, type Offer } from "@outreach/core/numbers";
+import { newId } from "@outreach/core/flow-tree";
 import { nowIso, update } from "@/lib/store";
-import type { Flow, PhoneNumber } from "@/lib/types";
+import type { Flow, PhoneNumber } from "@outreach/core/types";
 import { Segmented } from "../ui";
 
 export function describeNumber(n: PhoneNumber): string {

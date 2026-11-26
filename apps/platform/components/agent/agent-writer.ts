@@ -4,8 +4,8 @@
 // rebuild just its workflow from its instructions.
 
 import { useState } from "react";
-import type { DraftParts, DraftRequest } from "@/lib/agent-draft";
-import type { AppState, Step } from "@/lib/types";
+import type { DraftParts, DraftRequest } from "@outreach/core/agent-draft";
+import type { AppState, Step } from "@outreach/core/types";
 
 export function draftFields(app: AppState): DraftRequest["fields"] {
   return app.fieldDefs.map((d) => ({ key: d.key, label: d.label, type: d.type }));

@@ -7,7 +7,7 @@
 
 import { AlertTriangle, Braces, Search } from "lucide-react";
 import { useRef, useState, type FocusEventHandler } from "react";
-import { insertVar, unknownVars, type VarGroup } from "@/lib/variables";
+import { insertVar, unknownVars, type VarGroup } from "@outreach/core/variables";
 import { Popover } from "./popover";
 
 export function VarText({

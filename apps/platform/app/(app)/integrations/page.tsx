@@ -6,7 +6,7 @@
 import clsx from "clsx";
 import { Search } from "lucide-react";
 import { useState } from "react";
-import { CATEGORIES, INTEGRATIONS, type IntegrationCategory } from "@/lib/integrations";
+import { CATEGORIES, INTEGRATIONS, type IntegrationCategory } from "@outreach/core/integrations";
 import { useApp } from "@/lib/store";
 import { ConnectSheet, IntegrationLogo } from "@/components/integrations";
 import { PageHeader } from "@/components/ui";

@@ -5,12 +5,12 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, FilePlus2, Plu
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { relativeTime } from "@/lib/format";
-import { agentStats } from "@/lib/stats";
+import { relativeTime } from "@outreach/core/format";
+import { agentStats } from "@outreach/core/stats";
 import { useApp } from "@/lib/store";
-import { TEMPLATES, type FlowTemplate } from "@/lib/templates";
-import { voiceById } from "@/lib/voices";
-import type { Direction } from "@/lib/types";
+import { TEMPLATES, type FlowTemplate } from "@outreach/core/templates";
+import { voiceById } from "@outreach/core/voices";
+import type { Direction } from "@outreach/core/types";
 import { Avatar, Badge, EmptyState, PageHeader, Sheet } from "@/components/ui";
 import { CreateAgentModal } from "@/components/agent/create-agent-modal";
 import { AgentMenu } from "@/components/agent/agent-menu";

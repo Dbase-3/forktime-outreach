@@ -4,10 +4,10 @@
 
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
-import { newId } from "@/lib/flow-tree";
-import { humanize, relativeTime } from "@/lib/format";
+import { newId } from "@outreach/core/flow-tree";
+import { humanize, relativeTime } from "@outreach/core/format";
 import { nowIso, update, useApp } from "@/lib/store";
-import type { Contact, FieldDef, FieldType } from "@/lib/types";
+import type { Contact, FieldDef, FieldType } from "@outreach/core/types";
 import { outcomeTone } from "../call-sheet";
 import { Badge, Field, Sheet, useLastPresent } from "../ui";
 

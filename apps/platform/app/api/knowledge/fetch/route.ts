@@ -4,7 +4,7 @@
 // every redirect); each page has a time and size limit; at most 20 pages; rate-limited.
 
 import { NextResponse } from "next/server";
-import { htmlToText, isSitemapIndex, publicUrlProblem, sameSiteLinks, sitemapUrls } from "@/lib/knowledge";
+import { htmlToText, isSitemapIndex, publicUrlProblem, sameSiteLinks, sitemapUrls } from "@outreach/core/knowledge";
 import { FetchProblem, safeFetchText } from "@/lib/server/safe-fetch";
 import { clientIp, fromOtherSite, makeLimiter } from "@/lib/server/rate-limit";
 

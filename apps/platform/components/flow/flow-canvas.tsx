@@ -9,7 +9,7 @@ import { AlertCircle, Flag, Maximize2, Minus, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { DRAG_THRESHOLD, distance, fitAll, midpoint, pinch, wheelZoomSpeed, zoomAt, type Point, type View } from "@/lib/canvas-view";
 import { layoutFlow, type InsertAt, type LayoutEdge, type LayoutNode } from "@/lib/flow-layout";
-import type { Step } from "@/lib/types";
+import type { Step } from "@outreach/core/types";
 import { footnote, metaOf, summarize } from "./meta";
 import type { StepListContext } from "./step-list";
 

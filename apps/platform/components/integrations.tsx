@@ -6,7 +6,7 @@
 import clsx from "clsx";
 import { Check, Webhook } from "lucide-react";
 import { useState } from "react";
-import { CATEGORIES, integrationInfo, logoUrl, type IntegrationInfo } from "@/lib/integrations";
+import { CATEGORIES, integrationInfo, logoUrl, type IntegrationInfo } from "@outreach/core/integrations";
 import { nowIso, update, useApp } from "@/lib/store";
 import { Sheet } from "./ui";
 

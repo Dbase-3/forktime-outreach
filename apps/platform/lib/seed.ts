@@ -1,10 +1,10 @@
 // A sample workspace so every page has something real-looking to show.
 // Dates are relative to "now" so the automation preview always has upcoming calls.
 
-import { defaultCampaign } from "./campaign";
-import { outcomesOf } from "./flow-tree";
-import { TEMPLATES, flowFromTemplate } from "./templates";
-import type { AppState, Call, Contact, Flow } from "./types";
+import { defaultCampaign } from "@outreach/core/campaign";
+import { outcomesOf } from "@outreach/core/flow-tree";
+import { TEMPLATES, flowFromTemplate } from "@outreach/core/templates";
+import type { AppState, Call, Contact, Flow } from "@outreach/core/types";
 
 /** Bump when the sample changes shape, so saved browsers pick up the new one. */
 export const SEED_VERSION = 14;

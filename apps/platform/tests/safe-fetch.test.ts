@@ -2,8 +2,8 @@ import dns from "node:dns";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { publicUrlProblem } from "@/lib/knowledge";
-import { isBlockedAddress } from "@/lib/net-guard";
+import { publicUrlProblem } from "@outreach/core/knowledge";
+import { isBlockedAddress } from "@outreach/core/net-guard";
 import { makeLimiter } from "@/lib/server/rate-limit";
 import { safeFetchText } from "@/lib/server/safe-fetch";
 

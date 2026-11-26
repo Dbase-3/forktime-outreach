@@ -2,10 +2,10 @@
 
 import { ArrowDownLeft, ArrowUpRight, PhoneCall, Search, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useMemo, useState } from "react";
-import { CALL_ACTIONS } from "@/lib/call-review";
-import { duration, humanize, relativeTime } from "@/lib/format";
+import { CALL_ACTIONS } from "@outreach/core/call-review";
+import { duration, humanize, relativeTime } from "@outreach/core/format";
 import { useApp } from "@/lib/store";
-import type { AppState, Call } from "@/lib/types";
+import type { AppState, Call } from "@outreach/core/types";
 import { CallSheet, outcomeTone } from "@/components/call-sheet";
 import { Avatar, Badge, EmptyState, PageHeader, Segmented } from "@/components/ui";
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { activeLineAt, callerMoodLines, clock, flowPath, hasTimeline, moodLevel, moodStats, sampleWaveform } from "@/lib/call-review";
+import { activeLineAt, callerMoodLines, clock, flowPath, hasTimeline, moodLevel, moodStats, sampleWaveform } from "@outreach/core/call-review";
 import { seedState } from "@/lib/seed";
-import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
-import type { TranscriptLine } from "@/lib/types";
+import { TEMPLATES, flowFromTemplate } from "@outreach/core/templates";
+import type { TranscriptLine } from "@outreach/core/types";
 
 const lines: TranscriptLine[] = [
   { who: "agent", text: "Hi", at: 0 },

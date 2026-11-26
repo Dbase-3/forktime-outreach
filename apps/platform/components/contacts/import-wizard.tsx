@@ -6,11 +6,11 @@
 import clsx from "clsx";
 import { FileUp } from "lucide-react";
 import { useState } from "react";
-import { analyzeCsv, planImport, type ImportColumn, type Target } from "@/lib/contacts-table";
-import { newId, toFieldKey } from "@/lib/flow-tree";
-import { countryOfZone } from "@/lib/phone";
+import { analyzeCsv, planImport, type ImportColumn, type Target } from "@outreach/core/contacts-table";
+import { newId, toFieldKey } from "@outreach/core/flow-tree";
+import { countryOfZone } from "@outreach/core/phone";
 import { nowIso, update, useApp } from "@/lib/store";
-import type { FieldType } from "@/lib/types";
+import type { FieldType } from "@outreach/core/types";
 import { Field, Sheet } from "../ui";
 
 const TYPES: { value: FieldType; label: string }[] = [

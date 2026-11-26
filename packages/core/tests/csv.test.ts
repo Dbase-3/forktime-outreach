@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importContacts, parseCsv } from "@/lib/csv";
+import { importContacts, parseCsv } from "../src/csv";
 
 describe("parseCsv", () => {
   it("handles quotes, escaped quotes, commas inside quotes and CRLF", () => {

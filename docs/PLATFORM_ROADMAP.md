@@ -306,7 +306,7 @@ Inbound: number → agent lookup (dispatch rule per number) → the same agent r
 
 Each phase ends with a working, deployed slice and its tests. Phases 1–2 can overlap. Phase 0 is days, not weeks.
 
-### Phase 0: make the prototype safe and honest *(now)*
+### Phase 0: make the prototype safe and honest *(done 2026-11-26)*
 - Fix the SSRF (B14): resolve and pin IPs, re-check every redirect, cap streamed bytes, require a session, rate-limit.
 - Put Write with AI behind a shared secret or sign-in.
 - Fix B1–B3 (storage).

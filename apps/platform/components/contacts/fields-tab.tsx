@@ -4,11 +4,11 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { fieldUsage } from "@/lib/field-usage";
-import { toFieldKey } from "@/lib/flow-tree";
-import { integrationInfo } from "@/lib/integrations";
+import { fieldUsage } from "@outreach/core/field-usage";
+import { toFieldKey } from "@outreach/core/flow-tree";
+import { integrationInfo } from "@outreach/core/integrations";
 import { update, useApp } from "@/lib/store";
-import type { FieldType } from "@/lib/types";
+import type { FieldType } from "@outreach/core/types";
 import { Confirm } from "../confirm";
 
 const TYPES: FieldType[] = ["text", "number", "date", "yesno", "choice", "phone", "email"];

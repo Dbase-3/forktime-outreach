@@ -7,10 +7,10 @@ import clsx from "clsx";
 import { ArrowDownLeft, ArrowUpRight, CircleSlash, Flag } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CALL_ACTIONS, END_REASONS, callerMoodLines, flowPath, moodLevel, moodStats } from "@/lib/call-review";
-import { duration, humanize } from "@/lib/format";
-import type { AppState, Call } from "@/lib/types";
-import { fill } from "@/lib/practice";
+import { CALL_ACTIONS, END_REASONS, callerMoodLines, flowPath, moodLevel, moodStats } from "@outreach/core/call-review";
+import { duration, humanize } from "@outreach/core/format";
+import type { AppState, Call } from "@outreach/core/types";
+import { fill } from "@outreach/core/practice";
 import { metaOf, summarize } from "../flow/meta";
 import { Badge, type Tone } from "../ui";
 

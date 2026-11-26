@@ -7,7 +7,7 @@
 // Rule for the future: bumping SEED_VERSION with a non-additive change means
 // adding a step to MIGRATIONS. Pure, tested.
 
-import type { AppState, Flow } from "./types";
+import type { AppState, Flow } from "@outreach/core/types";
 
 /** Explicit steps: MIGRATIONS[n] turns a version-n workspace into version n+1. */
 export const MIGRATIONS: Record<number, (s: AppState) => AppState> = {};

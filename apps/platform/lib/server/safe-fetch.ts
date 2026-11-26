@@ -9,8 +9,8 @@ import dns from "node:dns";
 import http from "node:http";
 import https from "node:https";
 import type { LookupFunction } from "node:net";
-import { isBlockedAddress } from "../net-guard";
-import { publicUrlProblem } from "../knowledge";
+import { isBlockedAddress } from "@outreach/core/net-guard";
+import { publicUrlProblem } from "@outreach/core/knowledge";
 
 const MAX_REDIRECTS = 4;
 const TEXT_TYPES = /^(text\/|application\/(xhtml\+xml|xml|rss\+xml|atom\+xml)|$)/i;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fieldUsage } from "@/lib/field-usage";
-import { countryOfZone, dncSet, toE164 } from "@/lib/phone";
+import { fieldUsage } from "@outreach/core/field-usage";
+import { countryOfZone, dncSet, toE164 } from "@outreach/core/phone";
 import { seedState } from "@/lib/seed";
 
 describe("where a field is used (B23)", () => {

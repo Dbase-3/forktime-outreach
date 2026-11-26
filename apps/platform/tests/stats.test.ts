@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { agentStats, callsPerDay, isWin, totals } from "@/lib/stats";
+import { agentStats, callsPerDay, isWin, totals } from "@outreach/core/stats";
 import { seedState } from "@/lib/seed";
-import type { Call } from "@/lib/types";
+import type { Call } from "@outreach/core/types";
 
 const now = new Date("2026-11-26T15:00:00");
 const call = (id: string, startedAt: string, outcome: string, over: Partial<Call> = {}): Call => ({

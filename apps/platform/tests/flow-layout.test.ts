@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NODE_W, layoutFlow } from "@/lib/flow-layout";
-import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
-import type { Step } from "@/lib/types";
+import { TEMPLATES, flowFromTemplate } from "@outreach/core/templates";
+import type { Step } from "@outreach/core/types";
 
 const say = (id: string): Step => ({ id, kind: "say", text: id });
 const end = (id: string): Step => ({ id, kind: "end", outcome: id, text: "bye" });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyDraft, fieldKey, greetingIsHonest, type AgentDraftT } from "@/lib/agent-draft";
-import { allSteps } from "@/lib/flow-tree";
-import { TEMPLATES, flowFromTemplate } from "@/lib/templates";
+import { applyDraft, fieldKey, greetingIsHonest, type AgentDraftT } from "../src/agent-draft";
+import { allSteps } from "../src/flow-tree";
+import { TEMPLATES, flowFromTemplate } from "../src/templates";
 
 const draft = (over: Partial<AgentDraftT> = {}): AgentDraftT => ({
   name: " Test drive follow-up ",

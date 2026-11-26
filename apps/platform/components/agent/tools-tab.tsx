@@ -7,10 +7,10 @@
 import { Blocks, Globe, Plug, Plus, Server, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { ACTION_LABELS } from "@/lib/action-labels";
-import { allSteps, newId } from "@/lib/flow-tree";
-import { INTEGRATIONS, type IntegrationCategory } from "@/lib/integrations";
-import type { ActionKind, AgentTool, AppState, Flow } from "@/lib/types";
+import { ACTION_LABELS } from "@outreach/core/action-labels";
+import { allSteps, newId } from "@outreach/core/flow-tree";
+import { INTEGRATIONS, type IntegrationCategory } from "@outreach/core/integrations";
+import type { ActionKind, AgentTool, AppState, Flow } from "@outreach/core/types";
 import { IntegrationLogo } from "../integrations";
 import { Badge, Field, Sheet } from "../ui";
 

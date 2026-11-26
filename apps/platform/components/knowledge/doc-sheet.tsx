@@ -3,10 +3,10 @@
 // One document: where it came from, who uses it, its text.
 
 import { RefreshCw, Trash2 } from "lucide-react";
-import { KIND_LABEL, attachedTo, deleteBlockedReason, formatBytes } from "@/lib/knowledge";
-import { relativeTime } from "@/lib/format";
+import { KIND_LABEL, attachedTo, deleteBlockedReason, formatBytes } from "@outreach/core/knowledge";
+import { relativeTime } from "@outreach/core/format";
 import { useApp } from "@/lib/store";
-import type { KnowledgeDoc } from "@/lib/types";
+import type { KnowledgeDoc } from "@outreach/core/types";
 import { Sheet, Toggle, useLastPresent } from "../ui";
 import { refreshUrl, removeDoc, setDoc, toggleAttached, urlMode } from "./actions";
 import { DocStatus } from "./doc-status";

@@ -4,10 +4,10 @@
 
 import clsx from "clsx";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import { fitOp } from "@/lib/conditions";
-import { allSteps, toFieldKey } from "@/lib/flow-tree";
-import type { ActionKind, FieldDef, Step, StepKind } from "@/lib/types";
-import { variableGroups, type VarGroup } from "@/lib/variables";
+import { fitOp } from "@outreach/core/conditions";
+import { allSteps, toFieldKey } from "@outreach/core/flow-tree";
+import type { ActionKind, FieldDef, Step, StepKind } from "@outreach/core/types";
+import { variableGroups, type VarGroup } from "@outreach/core/variables";
 import { RuleRow } from "../rules-editor";
 import { VarText } from "../var-text";
 import { Field, Sheet, useLastPresent } from "../ui";

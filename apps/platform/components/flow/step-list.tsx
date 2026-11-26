@@ -5,8 +5,8 @@
 
 import clsx from "clsx";
 import { AlertCircle, ChevronRight, Plus } from "lucide-react";
-import type { Container } from "@/lib/flow-tree";
-import type { FieldDef, Step } from "@/lib/types";
+import type { Container } from "@outreach/core/flow-tree";
+import type { FieldDef, Step } from "@outreach/core/types";
 import { footnote, metaOf, summarize } from "./meta";
 
 export interface StepListContext {

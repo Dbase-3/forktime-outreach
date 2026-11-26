@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { migrateState, repairStuck } from "@/lib/migrations";
 import { SEED_VERSION, seedState } from "@/lib/seed";
-import type { AppState } from "@/lib/types";
+import type { AppState } from "@outreach/core/types";
 
 const fresh = () => seedState(new Date(2026, 10, 26));
 

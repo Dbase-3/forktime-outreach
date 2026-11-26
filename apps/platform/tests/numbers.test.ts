@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COUNTRIES, availableNumbers, freeNumbers, numberOwner, randomAgentName } from "@/lib/numbers";
+import { COUNTRIES, availableNumbers, freeNumbers, numberOwner, randomAgentName } from "@outreach/core/numbers";
 import { seedState } from "@/lib/seed";
 
 describe("one agent per number", () => {

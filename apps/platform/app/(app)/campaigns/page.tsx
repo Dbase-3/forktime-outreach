@@ -4,9 +4,9 @@ import { Megaphone, Pause, Play, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { audienceOf, callRulesFor, campaignIssues, defaultCampaign, describeTrigger } from "@/lib/campaign";
+import { audienceOf, callRulesFor, campaignIssues, defaultCampaign, describeTrigger } from "@outreach/core/campaign";
 import { update, useApp } from "@/lib/store";
-import type { Campaign } from "@/lib/types";
+import type { Campaign } from "@outreach/core/types";
 import { STATUS } from "@/components/campaign/campaign-editor";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 

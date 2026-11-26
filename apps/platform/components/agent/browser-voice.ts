@@ -3,8 +3,8 @@
 // The preview talks and listens with the browser's own speech (no backend yet).
 // Real calls use the agent's chosen voice; this is only for trying the flow.
 
-import type { AgentVoice } from "@/lib/types";
-import { voiceById } from "@/lib/voices";
+import type { AgentVoice } from "@outreach/core/types";
+import { voiceById } from "@outreach/core/voices";
 
 const ACCENT_LANG: Record<string, string> = { American: "en-US", Australian: "en-AU", British: "en-GB", Canadian: "en-CA", Indian: "en-IN" };
 const LANGUAGE_LANG: Record<string, string> = { Spanish: "es-ES", French: "fr-FR", German: "de-DE", Italian: "it-IT", Portuguese: "pt-BR", Hindi: "hi-IN", Arabic: "ar-SA", Mandarin: "zh-CN" };

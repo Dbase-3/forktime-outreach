@@ -8,12 +8,12 @@
 import clsx from "clsx";
 import { Keyboard, MessageSquareText, Mic, MicOff, Phone, PhoneOff, RotateCcw, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { dataSchema, structuredResult } from "@/lib/agent-data";
-import { humanize } from "@/lib/format";
-import { answerPractice, startPractice, type PracticeState } from "@/lib/practice";
-import { readAnswer } from "@/lib/spoken";
-import { voiceById } from "@/lib/voices";
-import type { Contact, Flow } from "@/lib/types";
+import { dataSchema, structuredResult } from "@outreach/core/agent-data";
+import { humanize } from "@outreach/core/format";
+import { answerPractice, startPractice, type PracticeState } from "@outreach/core/practice";
+import { readAnswer } from "@outreach/core/spoken";
+import { voiceById } from "@outreach/core/voices";
+import type { Contact, Flow } from "@outreach/core/types";
 import { Badge, Segmented } from "../ui";
 import { langFor, recognizerCtor, speakLines, type Recognizer } from "./browser-voice";
 

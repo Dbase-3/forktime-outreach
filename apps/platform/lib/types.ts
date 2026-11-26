@@ -286,6 +286,7 @@ export interface PhoneNumber {
 
 export interface AppState {
   version: number;
+  edited?: boolean; // someone changed it since it was the sample (a newer version keeps it)
   flows: Flow[];
   numbers: PhoneNumber[];
   knowledge: KnowledgeDoc[];

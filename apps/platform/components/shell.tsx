@@ -8,7 +8,7 @@ import { AudioLines, BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHo
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { useApp } from "@/lib/store";
+import { useApp, useSaveProblem } from "@/lib/store";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
 import type { AppState } from "@/lib/types";
 import { CommandPalette, useCommandPalette } from "./command-palette";
@@ -69,6 +69,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <Sidebar onSearch={() => setSearchOpen(true)} />
       <MobileTopBar onSearch={() => setSearchOpen(true)} />
       {mounted && <Breadcrumbs />}
+      <SaveProblem />
       <main className={fullBleed ? "w-full" : "mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-8"}>{mounted ? children : <SkeletonFor pathname={pathname} />}</main>
       <BottomTabs />
       {mounted && <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} pages={NAV} />}
@@ -300,5 +301,16 @@ function BottomTabs() {
         </div>
       </Sheet>
     </>
+  );
+}
+
+/** Shown when the browser refuses to save (storage full or blocked): nothing is lost silently. */
+function SaveProblem() {
+  const problem = useSaveProblem();
+  if (!problem) return null;
+  return (
+    <div role="alert" className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-800 dark:text-amber-300 sm:px-6 lg:px-10">
+      {problem}
+    </div>
   );
 }

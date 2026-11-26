@@ -5,7 +5,7 @@
 // PDFs and Word files wait for the backend.
 
 import { newId } from "@/lib/flow-tree";
-import { MAX_FILE_BYTES, READABLE_FILE } from "@/lib/knowledge";
+import { MAX_FILE_BYTES, READABLE_FILE, htmlToText } from "@/lib/knowledge";
 import { nowIso, update } from "@/lib/store";
 import type { KnowledgeDoc } from "@/lib/types";
 
@@ -55,6 +55,8 @@ export async function refreshUrl(id: string, url: string, mode: UrlMode, rename 
   }
 }
 
+const MAX_BROWSER_TEXT_BYTES = 2 * 1024 * 1024;
+
 export async function addFiles(files: File[], opts: AddOptions): Promise<void> {
   for (const file of files) {
     const id = newId("k");
@@ -68,9 +70,16 @@ export async function addFiles(files: File[], opts: AddOptions): Promise<void> {
       insert({ ...base, status: "waiting" }, opts.attachTo);
       continue;
     }
+    // The prototype keeps documents in this browser's storage (about 5 MB in all).
+    if (file.size > MAX_BROWSER_TEXT_BYTES) {
+      insert({ ...base, status: "failed", error: "For now, text files can be up to 2 MB. Bigger files wait for the server." }, opts.attachTo);
+      continue;
+    }
     insert(base, opts.attachTo);
-    const text = await file.text();
-    patch(id, { status: "ready", content: text });
+    const raw = await file.text();
+    // Web pages and XML keep only their words, not their tags.
+    const text = /\.(html?|xml)$/i.test(file.name) ? htmlToText(raw).text : raw;
+    patch(id, { status: "ready", content: text, sizeBytes: new Blob([text]).size });
   }
 }
 

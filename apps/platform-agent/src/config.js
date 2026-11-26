@@ -33,7 +33,9 @@ const VOICE = {
   },
   // Claude 5 models refuse a temperature; older ones get the outreach agent's 0.4.
   llm: (() => {
-    const model = process.env.PLATFORM_LLM_MODEL || "claude-haiku-5-5";
+    // Haiku 4.5 (owner 2026-11-27): Haiku 5.5 is slower on calls unless its thinking is turned down,
+    // which this plugin can't set. Same model the outreach agent runs on.
+    const model = process.env.PLATFORM_LLM_MODEL || "claude-haiku-4-5";
     return /-[5-9]-\d/.test(model) ? { model, maxTokens: 300 } : { model, temperature: 0.4, maxTokens: 300 };
   })(),
   vad: { activationThreshold: 0.5 },

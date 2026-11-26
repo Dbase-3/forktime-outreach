@@ -5,6 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { NextResponse } from "next/server";
+import { clientIp, fromOtherSite, makeLimiter } from "@/lib/server/rate-limit";
 import { AgentDraft, DRAFT_SYSTEM, WorkflowDraft, applyDraft, draftUserMessage, toSteps, type DraftRequest } from "@/lib/agent-draft";
 
 export const runtime = "nodejs";
@@ -12,19 +13,11 @@ export const maxDuration = 120;
 
 const MODEL = "claude-opus-5-5";
 
-// The review deploy has no sign-in yet, so cap AI writes per visitor (best effort:
-// per server instance). The backend replaces this with per-workspace limits.
-const LIMIT_PER_HOUR = 20;
-const recent = new Map<string, number[]>();
-function overLimit(request: Request): boolean {
-  const who = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const now = Date.now();
-  const hits = (recent.get(who) ?? []).filter((t) => now - t < 3600_000);
-  if (hits.length >= LIMIT_PER_HOUR) return true;
-  hits.push(now);
-  recent.set(who, hits);
-  return false;
-}
+// The review deploy has no sign-in yet, so AI writes are capped per caller and
+// in total (lib/server/rate-limit.ts); inputs are size-capped so a request
+// can't be stuffed to raise the bill.
+const limited = makeLimiter({ perCaller: 20, total: 300, windowMs: 60 * 60 * 1000 });
+const MAX_TEXT = 8000;
 
 function bad(status: number, error: string) {
   return NextResponse.json({ error }, { status });
@@ -33,7 +26,8 @@ function bad(status: number, error: string) {
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY_EVAL || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return bad(503, "Writing agents with AI isn't set up on this server yet.");
-  if (overLimit(request)) return bad(429, "That's a lot of AI writing for one hour. Try again a bit later.");
+  if (fromOtherSite(request)) return bad(403, "Not allowed.");
+  if (limited(clientIp(request))) return bad(429, "That's a lot of AI writing for one hour. Try again a bit later.");
 
   let body: DraftRequest;
   try {
@@ -50,8 +44,17 @@ export async function POST(request: Request) {
     mode,
     brief,
     business: String(body.business ?? "").slice(0, 120),
-    fields: Array.isArray(body.fields) ? body.fields.slice(0, 60) : [],
-    agent: body.agent,
+    fields: Array.isArray(body.fields)
+      ? body.fields.slice(0, 60).map((f) => ({ key: String(f?.key ?? "").slice(0, 60), label: String(f?.label ?? "").slice(0, 80), type: String(f?.type ?? "text").slice(0, 12) }))
+      : [],
+    agent: body.agent
+      ? {
+          name: String(body.agent.name ?? "").slice(0, 80),
+          prompt: String(body.agent.prompt ?? "").slice(0, MAX_TEXT),
+          greeting: String(body.agent.greeting ?? "").slice(0, 1000),
+          direction: body.agent.direction === "inbound" || body.agent.direction === "both" ? body.agent.direction : "outbound",
+        }
+      : undefined,
   };
   const client = new Anthropic({ apiKey });
   const common = {

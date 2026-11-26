@@ -423,12 +423,15 @@ Each phase ends with a working, deployed slice and its tests. Phases 1–2 can o
 
 ---
 
-## 7. Decisions needed from the owner
+## 7. Owner decisions (2026-11-26)
 
-1. **Database:** MongoDB (recommended, the team knows it) or Postgres? This also decides vector search: Atlas or pgvector.
-2. **Repo:** inside forktime-outreach (recommended, reuses the agent and dialer) or a new repo?
-3. **Sign-in:** our own email OTP (recommended, as in forktime-core) or Auth0?
-4. **First countries:** AU first, then US? This decides compliance work (DNCR vs TCPA consent and 10DLC) and number paperwork.
-5. **Who can call whom at launch:** B2B and existing customers only (simpler consent), or cold outreach (needs register washing and stricter rules)?
-6. **A separate LiveKit project** for the platform (recommended).
-7. **Model for calls:** Haiku with low or no thinking, as on the phone agent today. Confirm it before tuning latency.
+1. **Database: MongoDB.** Vector search for knowledge is decided in Phase 1: Atlas Vector Search if the cluster is Atlas, otherwise a small pgvector instance.
+2. **Repo: inside forktime-outreach.**
+3. **Sign-in: our own email OTP** (forktime-core's local OTP pattern).
+4. **Countries: Australia and the US at the same time.** Both compliance sets are built in Phase 4 together:
+   - AU: DNCR wash, telemarketing hours, public holidays.
+   - US: TCPA consent for AI voices, 8 am–9 pm local, federal DNC.
+   - US texting needs 10DLC before any SMS.
+5. **Data source at launch: CSV import and contacts added by hand, with defined fields.** CRM sync comes later (Phase 6). Campaigns run on whoever is in the list, so every contact carries a consent flag and a do-not-call status, checked before every dial.
+6. **A separate LiveKit project: yes.** The owner creates it in the LiveKit Cloud dashboard (the CLI can't), before Phase 2.
+7. **Model for calls:** still to confirm. The default is Haiku with low or no thinking, as on the phone agent today.

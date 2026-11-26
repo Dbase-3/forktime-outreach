@@ -4,6 +4,7 @@
 // Pure helpers, also used by the server route that reads websites.
 
 import type { AppState, Flow, KnowledgeDoc } from "./types";
+import { isBlockedAddress } from "./net-guard";
 
 export const KIND_LABEL: Record<KnowledgeDoc["kind"], string> = {
   url: "Web page",
@@ -111,9 +112,12 @@ export function publicUrlProblem(raw: string): string | null {
     return "That isn't a web address. It should start with https://";
   }
   if (!/^https?:$/.test(url.protocol)) return "Only http and https addresses can be read.";
-  const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return "That address is on a private network.";
-  if (/^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host === "::1" || host.startsWith("[")) return "That address is on a private network.";
-  if (!host.includes(".")) return "That address needs a full domain, like example.com.";
+  if (url.username || url.password) return "Addresses with a user name or password can't be read.";
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa")) return "That address is on a private network.";
+  const literal = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
+  if (literal && isBlockedAddress(host)) return "That address is on a private network.";
+  if (!literal && !host.includes(".")) return "That address needs a full domain, like example.com.";
+  if (url.port && !["80", "443", "8080", "8443"].includes(url.port)) return "Only normal web ports can be read.";
   return null;
 }

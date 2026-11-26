@@ -19,7 +19,6 @@ import { WorkspaceData } from "../../common/workspace-data";
 import { ENV, type Env } from "../../config/env";
 import type { M } from "../../db/models";
 
-const MODEL = "claude-opus-5-5";
 const PER_HOUR = 60; // changes per workspace per hour
 
 export const BuilderBody = z.object({
@@ -55,7 +54,7 @@ export class BuilderService {
 
   /** Seam for tests: the model client. */
   client(): Anthropic {
-    const apiKey = this.env.ANTHROPIC_API_KEY_EVAL;
+    const apiKey = this.env.ANTHROPIC_API_KEY || this.env.ANTHROPIC_API_KEY_EVAL;
     if (!apiKey) throw new ApiError(503, "ai_off", "Changing agents with AI isn't set up on this server yet.");
     return new Anthropic({ apiKey });
   }
@@ -181,7 +180,7 @@ export class BuilderService {
     let reply = "";
     try {
       const final = await this.client().beta.messages.toolRunner({
-        model: MODEL,
+        model: this.env.BUILDER_MODEL,
         max_tokens: 8000,
         thinking: { type: "adaptive" },
         output_config: { effort: "medium" },

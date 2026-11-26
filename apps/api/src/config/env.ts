@@ -15,6 +15,10 @@ const EnvSchema = z.object({
   DEV_LOGIN_CODE: z.string().regex(/^\d{6}$/).optional().or(z.literal("")),
   WORKER_IN_PROCESS: z.string().optional(),
   ANTHROPIC_API_KEY_EVAL: z.string().optional(),
+  /** Production key; local and test runs use ANTHROPIC_API_KEY_EVAL. */
+  ANTHROPIC_API_KEY: z.string().optional(),
+  /** The model behind "Change with AI". */
+  BUILDER_MODEL: z.string().default("claude-sonnet-5-5"), // matched Opus on real edits at half the price (2026-11-27); Haiku missed workflow logic
   // Voice calls (LiveKit). Unset: test calls say voice isn't set up here.
   LIVEKIT_URL: z.string().optional(),
   LIVEKIT_API_KEY: z.string().optional(),

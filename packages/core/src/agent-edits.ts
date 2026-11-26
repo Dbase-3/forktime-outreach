@@ -97,6 +97,8 @@ export function changeStep<A extends EditableAgent>(agent: A, id: string, patch:
   const clean: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(patch)) if (allowed[current.kind].includes(k) && v !== undefined) clean[k] = k === "field" || k === "outcome" ? toFieldKey(String(v)) : v;
   if (!Object.keys(clean).length) throw new EditError(`Nothing to change on that ${current.kind} step.`);
+  // A different action keeps its integration only if one was given with it.
+  if (current.kind === "action" && clean.action && clean.action !== current.action && !("integration" in clean)) clean.integration = undefined;
   const steps = updateStep(agent.steps, id, clean as Partial<Step>);
   return { agent: { ...agent, steps }, said: `Changed a step: ${describeStep(findStep(steps, id) as Step)}` };
 }

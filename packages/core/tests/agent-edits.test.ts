@@ -50,6 +50,10 @@ describe("steps", () => {
     expect(changed.agent.steps[0]).toMatchObject({ question: "Are you still keen?", field: "interested" });
     expect(changed.said).toBe("Changed a step: Ask “Are you still keen?”");
     expect(() => changeStep(base(), "q1", { text: "x" })).toThrow(EditError);
+    // A CRM step turned into a transfer drops its CRM.
+    const crm = addStep(base(), { before: "e1" }, { kind: "action", action: "crm", detail: "Hot lead", integration: "gohighlevel" }).agent;
+    const crmId = (crm.steps[1] as Extract<Step, { kind: "branch" }>).yes[0].id;
+    expect(changeStep(crm, crmId, { action: "transfer", detail: "Service desk" }).agent.steps[1]).toMatchObject({ yes: [{ action: "transfer", integration: undefined }, { kind: "end" }] });
     const removed = deleteStep(base(), "b1");
     expect(removed.agent.steps).toHaveLength(1);
     expect(removed.said).toMatch(/and the steps inside it/);

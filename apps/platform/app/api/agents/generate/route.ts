@@ -11,7 +11,8 @@ import { AgentDraft, DRAFT_SYSTEM, WorkflowDraft, applyDraft, draftUserMessage, 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MODEL = "claude-opus-5-5";
+// Sonnet 5.5: as good as Opus on agent writing and editing at half the price (owner asked for less cost, 2026-11-27).
+const MODEL = process.env.AGENT_WRITER_MODEL || "claude-sonnet-5-5";
 
 // The review deploy has no sign-in yet, so AI writes are capped per caller and
 // in total (lib/server/rate-limit.ts); inputs are size-capped so a request

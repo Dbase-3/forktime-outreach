@@ -63,7 +63,7 @@ export default function SignInPage() {
 
   if (step === "email") {
     return (
-      <AuthCard title="Continue to Forktime AI" subtitle="Sign in or create your account with your work email. We'll send you a 6-digit code, so there's no password to remember.">
+      <AuthCard title="Sign in">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -75,7 +75,7 @@ export default function SignInPage() {
             <input className="field h-10" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" autoFocus required />
           </label>
           <button type="submit" className="btn-primary mt-4 h-10 w-full" disabled={busy || !email.includes("@")}>
-            {busy ? <Loader2 size={15} className="animate-spin" /> : null} Continue with email {!busy && <ArrowRight size={15} />}
+            {busy ? <Loader2 size={15} className="animate-spin" /> : null} Email me a code {!busy && <ArrowRight size={15} />}
           </button>
           {errorLine}
         </form>

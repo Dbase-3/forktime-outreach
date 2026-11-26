@@ -16,6 +16,7 @@
     "build": "pnpm --filter @outreach/web build",
     "test": "pnpm -r test",
     "typecheck": "pnpm --filter @outreach/web typecheck",
-    "lint": "pnpm --filter @outreach/web lint"
+    "lint": "pnpm --filter @outreach/web lint",
+    "deploy:platform": "bash scripts/deploy-platform.sh"
   }
 }

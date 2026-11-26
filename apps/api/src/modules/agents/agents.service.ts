@@ -74,7 +74,7 @@ export class AgentsService {
     if (!current) throw notFound("That agent");
     if (current.version !== version) throw stale(agentOut(current));
     const flow = agentOut(current);
-    const issues = flowIssues(flow, await this.data.knownFields(ws)).map((i) => i.message);
+    const issues = flowIssues(flow, await this.data.knownFields(ws), await this.data.connected(ws)).map((i) => i.message);
     if (!current.numberId) issues.unshift("Pick a phone number for it to call from and answer on.");
     if (issues.length) throw unprocessable("Fix these before going live.", { issues });
     const last = await this.versions.findOne({ agentId: id }).sort({ n: -1 }).lean();

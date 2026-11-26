@@ -349,6 +349,11 @@ Each phase ends with a working, deployed slice and its tests. Phases 1–2 can o
 - Done: `apps/platform-agent` (LiveKit worker, Soniox + ElevenLabs + Haiku 5.5), signed runtime API (setup, batched events, knowledge search), the workflow run in code (`nextStep` + `note`, early and changed answers, branches, actions in code, the End spoken by code), wrap-up for calls that end early, test calls from the editor's Preview (real voice in the browser over WebRTC, replacing browser speech), test calls kept out of analytics. Checked with scripted calls on two sample agents (service check-in: booked path and problem path; front desk: answers from knowledge).
 - Next in Phase 2: reply speed (3.6–4.4 s now, target 1.2 s: fillers and fewer model rounds), the sim harness per workflow path, then the exit test (needs a phone number, Phase 3 telephony, or the existing outreach trunk to the owner's mobile).
 
+### Phase 2b: Change with AI (agent builder) *(first slice done locally 2026-11-27)*
+- Owner asks for changes in plain words; an AI makes them through checked edits (workflow, instructions, data, after-call actions, tools, knowledge), shows each change with Undo. Docked under the setup side; Preview's Chat renamed Text.
+- Integrations that aren't connected: added and marked, block going live, skipped on test calls with a note.
+- Next: a general "call an API" action with field mapping and a Test button; after-call actions really sent (with Phase 6 connections); builder speed (≈35 s with Opus).
+
 ### Phase 3: telephony
 - **Provisioning:** Telnyx search, buy and release, with spend caps (copy forktime-core). Regulatory bundles for AU/UK. US texting registration (10DLC) before any US SMS.
 - **LiveKit:** a dedicated project. Inbound trunk plus a dispatch rule per number → `platform-agent`. Outbound trunk per country. Caller ID = the agent's number.

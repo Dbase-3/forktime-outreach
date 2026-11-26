@@ -1,11 +1,12 @@
 "use client";
 
-// The agent's setup, first tab on the left: what it should do (written by AI
-// from a description, or by hand), its instructions (persona, tone, rules), the
-// welcome line, direction, time zone and voice. The steps live in the workflow.
+// The agent's setup, first tab on the left: its instructions (persona, tone,
+// rules), the welcome line, direction, time zone, number and voice. The steps
+// live in the workflow. Writing or changing it with AI is the "Change with AI"
+// box under the setup (change-with-ai.tsx).
 
-import { Loader2, Sparkles, Undo2, Workflow, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Loader2, Undo2, Workflow, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { allTimezones, offsetLabel, timeIn, zoneName } from "@outreach/core/timezones";
 import type { Direction, Flow } from "@outreach/core/types";
 import type { VarGroup } from "@outreach/core/variables";
@@ -23,10 +24,8 @@ export function ConfigTab({
   flow,
   onEdit,
   vars,
-  focusBrief,
   busy,
   error,
-  onWrite,
   onRebuild,
   canUndo,
   onUndo,
@@ -35,67 +34,20 @@ export function ConfigTab({
   flow: Flow;
   onEdit: (fn: (f: Flow) => Flow) => void;
   vars: VarGroup[];
-  focusBrief?: boolean;
   busy: null | "agent" | "workflow";
   error: string | null;
-  onWrite: () => void;
   onRebuild: () => void;
   canUndo: boolean;
   onUndo: () => void;
   onDismissUndo: () => void;
 }) {
   const hasWork = flow.steps.length > 0;
-  const brief = flow.brief ?? "";
-  const briefBox = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (focusBrief) briefBox.current?.focus();
-  }, [focusBrief]);
 
   return (
     <div className="space-y-6 p-4">
       <Field label="Description" hint="One line, shown in the agents list.">
         <input className="field" value={flow.description} onChange={(e) => onEdit((f) => ({ ...f, description: e.target.value }))} placeholder="What this agent is for" />
       </Field>
-
-      {/* Describe → AI writes instructions + workflow */}
-      <section className="rounded-xl border border-line bg-subtle/50 p-3">
-        <label htmlFor="agent-brief" className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
-          <Sparkles size={14} className="text-accent" /> What should this agent do?
-        </label>
-        <textarea
-          id="agent-brief"
-          className="field min-h-20 bg-surface text-sm leading-relaxed"
-          value={brief}
-          onChange={(e) => onEdit((f) => ({ ...f, brief: e.target.value }))}
-          placeholder="e.g. Call people who test drove a car yesterday, ask how it went, and book a meeting with sales if they want to buy."
-          disabled={busy !== null}
-          ref={briefBox}
-        />
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Confirm
-            skip={!hasWork}
-            title="Rewrite this agent?"
-            body="Its instructions, welcome message, workflow and data to collect are replaced. You can undo."
-            action="Rewrite"
-            onConfirm={onWrite}
-            trigger={
-              <button type="button" className="btn-primary h-8" disabled={busy !== null || brief.trim().length < 8}>
-                {busy === "agent" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                {busy === "agent" ? "Writing…" : hasWork ? "Rewrite with AI" : "Write with AI"}
-              </button>
-            }
-          />
-          {busy === "agent" && <span className="text-xs text-fg-3">About 20 seconds. Keep editing anything else.</span>}
-        </div>
-        {error && <p className="mt-2 text-xs text-rose-700 dark:text-rose-400">{error}</p>}
-        {canUndo && !busy && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-fg-2">
-            <span className="flex-1">Written by AI. Check the workflow and try it in Preview.</span>
-            <button type="button" className="btn-ghost h-7 px-2 text-xs" onClick={onUndo}><Undo2 size={13} /> Undo</button>
-            <button type="button" className="btn-icon h-7 w-7" onClick={onDismissUndo} aria-label="Dismiss"><X size={13} /></button>
-          </div>
-        )}
-      </section>
 
       {/* Instructions */}
       <div>
@@ -128,6 +80,14 @@ export function ConfigTab({
           {busy === "agent" && <Shimmer />}
         </div>
         <p className="mt-1 text-xs text-fg-3">Who it is, how it sounds and its rules. The steps it follows are in the Workflow.</p>
+        {error && <p className="mt-2 text-xs text-rose-700 dark:text-rose-400">{error}</p>}
+        {canUndo && !busy && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-fg-2">
+            <span className="flex-1">Workflow rebuilt by AI. Check it and try it in Preview.</span>
+            <button type="button" className="btn-ghost h-7 px-2 text-xs" onClick={onUndo}><Undo2 size={13} /> Undo</button>
+            <button type="button" className="btn-icon h-7 w-7" onClick={onDismissUndo} aria-label="Dismiss"><X size={13} /></button>
+          </div>
+        )}
       </div>
 
       <Field label="Welcome message" hint="Keep “AI assistant” and “recorded” in it: callers must be told.">

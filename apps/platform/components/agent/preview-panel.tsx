@@ -55,7 +55,7 @@ export function PreviewPanel({ flow, business, contacts, onActiveStep }: { flow:
     <div className="flex h-full flex-col">
       <div className="shrink-0 space-y-2 border-b border-line px-4 py-2.5">
         <div className="flex items-center justify-between gap-2">
-          <Segmented<Mode> value={mode} onChange={(m) => { setMode(m); onActiveStep(null); setVoiceKey((k) => k + 1); }} options={[{ value: "voice", label: "Voice" }, { value: "chat", label: "Chat" }]} />
+          <Segmented<Mode> value={mode} onChange={(m) => { setMode(m); onActiveStep(null); setVoiceKey((k) => k + 1); }} options={[{ value: "voice", label: "Voice" }, { value: "chat", label: "Text" }]} />
           <button type="button" className="btn-ghost h-8 shrink-0 px-2 text-xs" onClick={() => (mode === "voice" ? setVoiceKey((k) => k + 1) : setState(begin()))}>
             <RotateCcw size={13} /> Restart
           </button>

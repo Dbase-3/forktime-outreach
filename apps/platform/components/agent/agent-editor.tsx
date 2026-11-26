@@ -3,9 +3,9 @@
 // One agent, on a split screen (owner 2026-11-26): its setup on the left
 // (Config first, then Knowledge, Data, Tools) and on the right two tabs,
 // Workflow (canvas or list; a clicked step opens on the left) and
-// Preview (talk to it by voice, ElevenLabs-style, or chat). A blank agent
-// starts in "What should this agent do?": AI writes the instructions and the
-// workflow from it.
+// Preview (talk to it by voice, ElevenLabs-style, or by text). Under the setup
+// sits "Change with AI": a blank agent is written whole from a description,
+// then every change can be asked for in plain words.
 
 import clsx from "clsx";
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Loader2, MessageSquareText, Trash2, X } from "lucide-react";
@@ -36,6 +36,7 @@ import { KnowledgeTab } from "./knowledge-tab";
 import { AgentMenu } from "./agent-menu";
 import { PreviewPanel } from "./preview-panel";
 import { ToolsTab } from "./tools-tab";
+import { ChangeWithAi } from "./change-with-ai";
 
 type SetupTab = "config" | "knowledge" | "data" | "tools" | "step";
 type MainTab = "workflow" | "preview";
@@ -59,7 +60,7 @@ export function AgentEditor({ id }: { id: string }) {
   // Undo after Write with AI puts back only what the AI wrote, so edits made meanwhile stay (B28).
   const [undo, setUndo] = useState<Partial<Flow> | null>(null);
   const [drawn, setDrawn] = useState(0); // bumps when AI (or undo) replaces the workflow, so the canvas refits
-  const [focusBrief, setFocusBrief] = useState(false); // "Start from scratch": the cursor waits in "What should this agent do?"
+  const [focusBrief, setFocusBrief] = useState(false); // "Start from scratch": the cursor waits in "Change with AI"
   const writer = useAgentWriter();
   // Contacts to try the preview as (a few from the server).
   const sampleContacts = useQuery({ queryKey: ["contacts-sample", app.workspace.id], queryFn: () => ws<Contact[]>("/contacts/sample?limit=30") });
@@ -101,8 +102,8 @@ export function AgentEditor({ id }: { id: string }) {
 
   const steps = useMemo(() => flow?.steps ?? [], [flow?.steps]);
   const issues = useMemo(
-    () => (flow ? [...(flow.numberId ? [] : [{ message: "Pick a phone number for it to call from and answer on", stepId: undefined as string | undefined, number: true }]), ...flowIssues(flow, [...app.fieldDefs.map((d) => ({ key: d.key, type: d.type })), "name", "phone"])] : []),
-    [flow, app.fieldDefs],
+    () => (flow ? [...(flow.numberId ? [] : [{ message: "Pick a phone number for it to call from and answer on", stepId: undefined as string | undefined, number: true }]), ...flowIssues(flow, [...app.fieldDefs.map((d) => ({ key: d.key, type: d.type })), "name", "phone"], app.integrations.filter((i) => i.connected).map((i) => i.id))] : []),
+    [flow, app.fieldDefs, app.integrations],
   );
   const questions = useMemo(() => Object.fromEntries(allSteps(steps).flatMap((s) => (s.kind === "ask" && s.field ? [[s.field, s.question]] : []))), [steps]);
   // Everything the instructions can use: the contact's fields and every answer the workflow saves.
@@ -135,15 +136,21 @@ export function AgentEditor({ id }: { id: string }) {
     select(step.id);
   };
 
-  const writeAgent = async () => {
-    const draft = await writer.writeAgent({ brief: flow.brief ?? "", business: app.settings.businessName, fields: draftFields(app) });
-    if (!draft) return;
-    const now = app.flows.find((f) => f.id === id) ?? flow;
-    setUndo({ name: now.name, description: now.description, direction: now.direction, greeting: now.greeting, prompt: now.prompt, steps: now.steps, dataFields: now.dataFields, checks: now.checks, askRequired: now.askRequired });
+  /** A blank agent, written whole from what the owner described. Returns a problem to show, or null. */
+  const writeAgent = async (brief: string): Promise<string | null> => {
+    const draft = await writer.writeAgent({ brief, business: app.settings.businessName, fields: draftFields(app) });
+    if (!draft) return writer.lastError() ?? "Couldn't write the agent. Try describing it differently.";
     setSelectedId(null);
     setDrawn((n) => n + 1);
-    edit((f) => ({ ...f, ...draft, name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
+    edit((f) => ({ ...f, ...draft, brief, name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
     showMain("workflow");
+    return null;
+  };
+  /** A change from "Change with AI" (or its Undo): the workflow redraws, the step panel closes. */
+  const applyParts = (parts: Partial<Flow>) => {
+    setSelectedId(null);
+    setDrawn((n) => n + 1);
+    edit((f) => ({ ...f, ...parts }));
   };
   const rebuildWorkflow = async () => {
     const newSteps = await writer.rebuildWorkflow({
@@ -251,10 +258,8 @@ export function AgentEditor({ id }: { id: string }) {
                 flow={flow}
                 onEdit={edit}
                 vars={vars}
-                focusBrief={focusBrief}
                 busy={writer.busy}
-                error={writer.error}
-                onWrite={writeAgent}
+                error={writer.busy === null && writer.mode === "workflow" ? writer.error : null}
                 onRebuild={rebuildWorkflow}
                 canUndo={undo !== null}
                 onUndo={() => {
@@ -283,6 +288,7 @@ export function AgentEditor({ id }: { id: string }) {
               />
             )}
           </div>
+          <ChangeWithAi flow={flow} onApply={applyParts} onWriteWhole={writeAgent} writing={writer.busy === "agent"} focus={focusBrief} />
         </aside>
 
         {/* Right: Workflow | Preview */}

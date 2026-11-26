@@ -20,8 +20,9 @@ import { NumbersModule } from "./modules/numbers/numbers.module";
 import { HealthController } from "./modules/health.controller";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 import { VoiceModule } from "./modules/voice/voice.module";
+import { BuilderModule } from "./modules/builder/builder.module";
 
-export const FEATURE_MODULES = [AuthModule, JobsModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule, KnowledgeModule, ImportsModule, CampaignsModule, CallsModule, AnalyticsModule, IntegrationsModule, SourcesModule, VoiceModule];
+export const FEATURE_MODULES = [AuthModule, JobsModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule, KnowledgeModule, ImportsModule, CampaignsModule, CallsModule, AnalyticsModule, IntegrationsModule, SourcesModule, VoiceModule, BuilderModule];
 
 @Module({
   imports: [

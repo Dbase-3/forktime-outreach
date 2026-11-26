@@ -3,6 +3,7 @@
 
 import { greetingIsHonest } from "./disclosure";
 import { OPS_FOR } from "./conditions";
+import { missingIntegrations } from "./connections";
 import type { ActionKind, AnswerType, FieldType, Flow, Step, StepKind } from "./types";
 
 /** Where a list of steps lives: the flow's top level, or one side of a branch. */
@@ -131,8 +132,10 @@ const ANSWER_FIELD: Record<AnswerType, FieldType> = { text: "text", yesno: "yesn
  * and steps nothing can reach are all caught (bug B6). The welcome message
  * must disclose the AI and the recording (B8).
  */
-export function flowIssues(flow: Pick<Flow, "steps" | "greeting">, knownFields: KnownField[] = []): FlowIssue[] {
+export function flowIssues(flow: Pick<Flow, "steps" | "greeting"> & Partial<Pick<Flow, "tools" | "afterCall">>, knownFields: KnownField[] = [], connected?: string[]): FlowIssue[] {
   const issues: FlowIssue[] = [];
+  // Something uses an integration that isn't connected: it can't go live like that (owner, 2026-11-27).
+  if (connected) for (const m of missingIntegrations(flow, connected)) issues.push({ stepId: m.stepId, message: `Connect ${m.name}: ${m.where} uses it.` });
   if (!flow.greeting.trim()) issues.push({ stepId: null, message: "Add what the agent says first." });
   else if (!greetingIsHonest(flow.greeting)) issues.push({ stepId: null, message: "The welcome message must say it's an AI assistant and that the call is recorded." });
   if (flow.steps.length === 0) {

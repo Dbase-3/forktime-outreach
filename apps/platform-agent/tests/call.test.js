@@ -61,6 +61,16 @@ describe("the workflow on a call", () => {
   });
 });
 
+describe("integrations that aren't connected", () => {
+  it("skips the step, says so on the transcript, and carries on", () => {
+    const { runAction } = require("../src/call");
+    const skipped = runAction({ action: "crm", integration: "gohighlevel" }, "Save the lead", true, []);
+    expect(skipped).toMatchObject({ line: "Updates the CRM: Save the lead (skipped, GoHighLevel isn't connected)", tag: null });
+    expect(runAction({ action: "crm", integration: "gohighlevel" }, "Save the lead", true, ["gohighlevel"]).tag).toBe("crm");
+    expect(runAction({ action: "webhook", integration: "webhook" }, "https://x.test", true, []).tag).toBe("webhook");
+  });
+});
+
 describe("helpers", () => {
   it("only takes calls the platform sent", () => {
     expect(callIdFrom(JSON.stringify({ kind: "platform", callId: "a".repeat(24) }))).toBe("a".repeat(24));

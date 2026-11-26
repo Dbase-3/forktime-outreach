@@ -9,7 +9,11 @@ import { Plus, Trash2 } from "lucide-react";
 import { dataSchema, structuredResult } from "@outreach/core/agent-data";
 import { newId, toFieldKey } from "@outreach/core/flow-tree";
 import type { DataField, FieldType, Flow, SuccessCheck } from "@outreach/core/types";
-import { Toggle } from "../ui";
+import { AFTER_CALL_LABELS, needsConnection } from "@outreach/core/agent-edits";
+import { integrationInfo } from "@outreach/core/integrations";
+import { useApp } from "@/lib/store";
+import { IntegrationLogo } from "../integrations";
+import { Badge, Toggle } from "../ui";
 
 const TYPES: { value: FieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -99,6 +103,8 @@ export function DataTab({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) =
 
       <Checks checks={flow.checks} onChange={(checks) => onEdit((f) => ({ ...f, checks }))} />
 
+      <AfterCall flow={flow} onEdit={onEdit} />
+
       <section>
         <Head title="Each call hands over" hint="Sent to your CRM, webhook or sheet by the campaign that made the call." />
         <pre className="overflow-x-auto rounded-lg border border-line bg-subtle p-3 font-mono text-xs leading-relaxed text-fg-2">
@@ -153,5 +159,42 @@ function AddRow({ label, onClick }: { label: string; onClick: () => void }) {
     <button type="button" onClick={onClick} className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-fg-3 transition-colors hover:bg-muted hover:text-fg">
       <Plus size={14} /> {label}
     </button>
+  );
+}
+
+/** What happens once a call ends (save the contact to a CRM, add a sheet row, send to a URL). Added with "Change with AI". */
+function AfterCall({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => Flow) => void }) {
+  const app = useApp();
+  const actions = flow.afterCall ?? [];
+  const connected = new Set(app.integrations.filter((i) => i.connected).map((i) => i.id));
+  return (
+    <section>
+      <Head title="After the call" hint="Runs once the call ends, with what it collected. Real sending starts with integrations; test calls show what would happen." />
+      {actions.length === 0 ? (
+        <p className="text-sm text-fg-3">Nothing yet. Ask “Change with AI” below, e.g. “at the end, save them to GoHighLevel”.</p>
+      ) : (
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {actions.map((a) => {
+            const info = integrationInfo(a.integration);
+            const missing = needsConnection(a.integration) && !connected.has(a.integration);
+            return (
+              <li key={a.id} className="flex items-center gap-3 px-3 py-2.5">
+                {info ? <IntegrationLogo info={info} size="sm" /> : null}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {AFTER_CALL_LABELS[a.kind]} · {a.integration === "webhook" ? "your URL" : info?.name ?? a.integration}
+                  </span>
+                  <span className="block truncate text-xs text-fg-3">{[a.fields.length ? a.fields.join(", ") : "everything collected", a.detail].filter(Boolean).join(" · ")}</span>
+                </span>
+                {missing && <Badge tone="amber">Not connected</Badge>}
+                <button type="button" className="btn-icon h-7 w-7 hover:text-rose-600" aria-label="Remove" onClick={() => onEdit((f) => ({ ...f, afterCall: (f.afterCall ?? []).filter((x) => x.id !== a.id) }))}>
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

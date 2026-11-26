@@ -6,6 +6,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { dataSchema, structuredResult } from "@outreach/core/agent-data";
 import { INLINE_KNOWLEDGE_CHARS, callOutcomes, type CallSetup } from "@outreach/core/call-instructions";
+import { AFTER_CALL_LABELS, integrationName, needsConnection } from "@outreach/core/connections";
 import type { AgentDraft } from "@outreach/core/schemas";
 import { fill } from "@outreach/core/variables";
 import { Types } from "mongoose";
@@ -26,6 +27,7 @@ export interface RuntimeConfig extends CallSetup {
   outcomes: string[];
   voice: { voiceId: string; speed: number; language: string; name: string };
   choices: Record<string, string[]>; // per field key, when its answer is one of a list
+  connected: string[]; // integrations the workspace has connected: a step needing another is skipped
   maxCallMinutes: number;
 }
 
@@ -148,6 +150,7 @@ export class VoiceService {
       greeting: fill(draft.greeting, values),
       outcomes: callOutcomes(draft),
       voice: { ...draft.agent, voiceId: draft.agent.voiceId },
+      connected: await this.data.connected(ws),
       maxCallMinutes: call.test ? 10 : 15,
     };
   }
@@ -169,11 +172,27 @@ export class VoiceService {
         let draft = call.config as AgentDraft | undefined;
         if (!draft && call.agentVersionId) draft = (await this.versions.findById(call.agentVersionId).lean())?.config as AgentDraft | undefined;
         const missing = draft ? structuredResult(dataSchema(draft), (done?.saved ?? {}) as Record<string, string>).missingRequired : [];
-        await this.calls.updateOne({ _id: callId }, { $set: { live: false, outcome: e.outcome, summary: e.summary, endReason: e.endReason, durationSec: Math.round(e.durationSec), missing } });
+        const after = draft ? await this.afterCallLines(call.workspaceId, draft, Boolean(call.test)) : [];
+        await this.calls.updateOne({ _id: callId }, { $set: { live: false, outcome: e.outcome, summary: e.summary, endReason: e.endReason, durationSec: Math.round(e.durationSec), missing }, ...(after.length ? { $push: { transcript: { $each: after } } } : {}) });
         this.log.log(`call ${String(callId)} ended: ${e.outcome} (${e.endReason}, ${Math.round(e.durationSec)} s)`);
       }
     }
     return { ok: true };
+  }
+
+  /**
+   * What the agent's after-call actions did, as lines on the transcript. Test
+   * calls send nothing; a real send comes with the integrations (Phase 6).
+   */
+  private async afterCallLines(ws: Types.ObjectId, draft: AgentDraft, test: boolean) {
+    const actions = draft.afterCall ?? [];
+    if (!actions.length) return [];
+    const connected = new Set(await this.data.connected(ws));
+    return actions.map((a) => {
+      const what = `After the call: ${AFTER_CALL_LABELS[a.kind].toLowerCase()} in ${a.integration === "webhook" ? "your URL" : integrationName(a.integration)}`;
+      const how = needsConnection(a.integration) && !connected.has(a.integration) ? `skipped, ${integrationName(a.integration)} isn't connected` : test ? "test call, nothing was sent" : "for the team to do";
+      return { who: "action", text: `${what} (${how})` };
+    });
   }
 
   async search(callId: Types.ObjectId, query: string) {

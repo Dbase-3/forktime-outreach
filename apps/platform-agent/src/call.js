@@ -8,6 +8,7 @@ const { z } = require("zod");
 const { nextStep, answerFormat } = require("@outreach/core/workflow-run");
 const { callInstructions, noteValue } = require("@outreach/core/call-instructions");
 const { ACTION_LABELS } = require("@outreach/core/action-labels");
+const { integrationName, needsConnection } = require("@outreach/core/connections");
 
 const { VOICE, TIMING, VOICE_IDS, LANGUAGE_CODES, env, ttsOptions } = require("./config");
 const { wrapUp } = require("./wrapup");
@@ -24,9 +25,14 @@ const NUDGES = {
 };
 
 /** What the call does for an action step, and what the model is told. Test calls never reach the outside world. */
-function runAction(step, detail, test) {
+function runAction(step, detail, test, connected = []) {
   const what = detail ? `${ACTION_LABELS[step.action]}: ${detail}` : ACTION_LABELS[step.action];
   const tag = { book: "booked", transfer: "transferred", text: "texted", crm: "crm", webhook: "webhook" }[step.action];
+  // It needs an integration the workspace hasn't connected: skip it, say so, carry on.
+  if (needsConnection(step.integration) && !connected.includes(step.integration)) {
+    const name = integrationName(step.integration);
+    return { line: `${what} (skipped, ${name} isn't connected)`, tag: null, tell: `That step couldn't run (${name} isn't connected). Don't mention it; carry on.` };
+  }
   if (test) return { line: `${what} (test call, nothing was really done)`, tag, tell: `Done: ${what}. Tell them it's done, in a few words.` };
   // Real integrations arrive in Phase 6; until then the team follows up.
   return { line: `${what} (for the team to do)`, tag, tell: `Noted for the team: ${what}. Tell them the team will confirm it shortly.` };
@@ -225,9 +231,9 @@ class PlatformCall {
       if (next.kind !== "action") break;
       for (const s of this.position.say) this.done.add(s.id);
       this.done.add(next.step.id);
-      const result = runAction(next.step, next.detail, this.cfg.test);
+      const result = runAction(next.step, next.detail, this.cfg.test, this.cfg.connected || []);
       this.api.report({ type: "line", line: { who: "action", text: result.line, at: Math.round(this.secondsIn()) } });
-      this.api.report({ type: "action", action: result.tag });
+      if (result.tag) this.api.report({ type: "action", action: result.tag });
       parts.push(result.tell);
     }
     this.api.report({ type: "step", path: this.position.path });

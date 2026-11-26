@@ -37,7 +37,7 @@ export const StepSchema: z.ZodType<Step> = z.lazy(() =>
     z.object({ id, kind: z.literal("say"), text: text(2000) }),
     z.object({ id, kind: z.literal("ask"), question: text(1000), field: z.string().max(64), answerType: z.enum(["text", "yesno", "number", "date", "choice"]), choices: z.array(short(100)).max(20).optional() }),
     z.object({ id, kind: z.literal("branch"), condition: ConditionSchema, yes: z.array(StepSchema).max(60), no: z.array(StepSchema).max(60) }),
-    z.object({ id, kind: z.literal("action"), action: z.enum(["book", "transfer", "text", "crm", "webhook"]), detail: text(1000) }),
+    z.object({ id, kind: z.literal("action"), action: z.enum(["book", "transfer", "text", "crm", "webhook"]), detail: text(1000), integration: z.string().max(40).optional() }),
     z.object({ id, kind: z.literal("end"), outcome: z.string().max(64), text: text(1000) }),
   ]),
 ) as z.ZodType<Step>;
@@ -61,7 +61,8 @@ export const DataFieldSchema = z.object({
 });
 
 export const SuccessCheckSchema = z.object({ id, label: short(120), description: text(500) });
-export const AgentToolSchema = z.object({ id, kind: z.enum(["mcp", "api"]), name: short(80), url: z.string().url().max(500), description: text(1000) });
+export const AgentToolSchema = z.object({ id, kind: z.enum(["mcp", "api", "integration"]), name: short(80), url: z.union([z.string().url().max(500), z.literal("")]), description: text(1000), integration: z.string().max(40).optional() });
+export const AfterCallSchema = z.object({ id, kind: z.enum(["save_contact", "add_row", "send_webhook", "post_message"]), integration: z.string().max(40), fields: z.array(z.string().max(64)).max(60), detail: text(1000) });
 
 /** The parts of an agent its owner edits (status, number and ids are set by their own endpoints). */
 export const AgentDraftSchema = z.object({
@@ -79,6 +80,7 @@ export const AgentDraftSchema = z.object({
   dataFields: z.array(DataFieldSchema).max(50),
   askRequired: z.record(z.string().max(64), z.boolean()),
   checks: z.array(SuccessCheckSchema).max(10),
+  afterCall: z.array(AfterCallSchema).max(20).optional(),
 });
 export type AgentDraft = z.infer<typeof AgentDraftSchema>;
 

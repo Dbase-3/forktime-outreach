@@ -4,12 +4,13 @@
 // which connected app runs each), plus MCP servers and APIs, coming soon.
 // Tools added now are saved and connect when the backend lands.
 
+import clsx from "clsx";
 import { Blocks, Globe, Plug, Plus, Server, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ACTION_LABELS } from "@outreach/core/action-labels";
 import { allSteps, newId } from "@outreach/core/flow-tree";
-import { INTEGRATIONS, type IntegrationCategory } from "@outreach/core/integrations";
+import { INTEGRATIONS, integrationInfo, type IntegrationCategory } from "@outreach/core/integrations";
 import type { ActionKind, AgentTool, AppState, Flow } from "@outreach/core/types";
 import { IntegrationLogo } from "../integrations";
 import { Badge, Field, Sheet } from "../ui";
@@ -78,12 +79,16 @@ export function ToolsTab({ flow, app, onEdit }: { flow: Flow; app: AppState; onE
           <ul className="mt-3 divide-y divide-line rounded-xl border border-line">
             {flow.tools.map((tool) => (
               <li key={tool.id} className="flex items-center gap-3 px-3 py-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-fg-2">{tool.kind === "mcp" ? <Server size={15} /> : <Plug size={15} />}</span>
+                {tool.kind === "integration" && integrationInfo(tool.integration ?? "") ? (
+                  <IntegrationLogo info={integrationInfo(tool.integration ?? "")!} size="sm" />
+                ) : (
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-fg-2">{tool.kind === "mcp" ? <Server size={15} /> : <Plug size={15} />}</span>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{tool.name}</span>
-                  <span className="block truncate font-mono text-xs text-fg-3">{tool.url}</span>
+                  <span className={clsx("block truncate text-xs text-fg-3", tool.kind !== "integration" && "font-mono")}>{tool.kind === "integration" ? `${integrationInfo(tool.integration ?? "")?.name ?? tool.integration} · ${tool.description}` : tool.url}</span>
                 </span>
-                <Badge>Connects at launch</Badge>
+                {tool.kind === "integration" && tool.integration && !app.integrations.some((c) => c.id === tool.integration && c.connected) ? <Badge tone="amber">Not connected</Badge> : <Badge>Connects at launch</Badge>}
                 <button type="button" className="btn-icon h-7 w-7 hover:text-rose-600" aria-label={`Remove ${tool.name}`} onClick={() => onEdit((f) => ({ ...f, tools: f.tools.filter((t) => t.id !== tool.id) }))}>
                   <Trash2 size={14} />
                 </button>

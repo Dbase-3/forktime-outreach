@@ -32,7 +32,7 @@ export type Step =
   | { id: string; kind: "say"; text: string }
   | { id: string; kind: "ask"; question: string; field: string; answerType: AnswerType; choices?: string[] }
   | { id: string; kind: "branch"; condition: Condition; yes: Step[]; no: Step[] }
-  | { id: string; kind: "action"; action: ActionKind; detail: string }
+  | { id: string; kind: "action"; action: ActionKind; detail: string; integration?: string } // integration: the connected tool it uses (integrations.ts id)
   | { id: string; kind: "end"; outcome: string; text: string };
 
 export type StepKind = Step["kind"];
@@ -65,13 +65,23 @@ export interface SuccessCheck {
   description: string;
 }
 
-/** Something outside the workflow the agent can call. Saved now, connected when the backend lands. */
+/** Something outside the workflow the agent can call mid-call (e.g. check calendar availability). Saved now, run in Phase 6. */
 export interface AgentTool {
   id: string;
-  kind: "mcp" | "api";
+  kind: "mcp" | "api" | "integration";
   name: string;
-  url: string;
-  description: string;
+  url: string; // mcp / api; "" for an integration
+  description: string; // when the agent should use it
+  integration?: string; // kind "integration": which connected tool (integrations.ts id)
+}
+
+/** What happens once a call has ended, from what it collected (e.g. save the contact to GoHighLevel). */
+export interface AfterCallAction {
+  id: string;
+  kind: "save_contact" | "add_row" | "send_webhook" | "post_message";
+  integration: string; // integrations.ts id ("webhook" for your own URL)
+  fields: string[]; // the collected keys it sends (empty = all)
+  detail: string; // in plain words: where it goes and anything special
 }
 
 /** An agent (the UI says Agent; the code keeps the name Flow). */
@@ -98,6 +108,7 @@ export interface Flow {
   dataFields: DataField[]; // extra things to collect; Ask steps add theirs automatically
   askRequired: Record<string, boolean>; // per Ask field: must the call get it? (default yes)
   checks: SuccessCheck[];
+  afterCall?: AfterCallAction[];
   updatedAt: string;
 }
 

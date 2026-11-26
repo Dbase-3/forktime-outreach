@@ -16,7 +16,13 @@ export class WorkspaceData {
     @InjectModel("Campaign") private readonly campaigns: M<"Campaign">,
     @InjectModel("FieldDef") private readonly fields: M<"FieldDef">,
     @InjectModel("Workspace") private readonly workspaces: M<"Workspace">,
+    @InjectModel("Integration") private readonly integrations: M<"Integration">,
   ) {}
+
+  /** The integrations this workspace has connected (ids from @outreach/core/integrations). */
+  async connected(ws: Types.ObjectId): Promise<string[]> {
+    return (await this.integrations.find({ workspaceId: ws, connected: true }, { providerId: 1 }).lean()).map((i) => i.providerId);
+  }
 
   async flows(ws: Types.ObjectId): Promise<Flow[]> {
     return (await this.agents.find({ workspaceId: ws, deletedAt: null }).lean()).map(agentOut);

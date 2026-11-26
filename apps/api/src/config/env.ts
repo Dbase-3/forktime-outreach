@@ -11,6 +11,8 @@ const EnvSchema = z.object({
   REDIS_PREFIX: z.string().default("platform"),
   APP_URL: z.string().url().default("http://localhost:3200"),
   RESEND_API_KEY: z.string().optional(),
+  /** Base URL for email images (the logo); defaults to APP_URL. Local: the live app's address. */
+  EMAIL_ASSETS_URL: z.string().optional(),
   EMAIL_FROM: z.string().default("Lisna <hello@mail.digicoinx.com>"), // temporary domain (owner 2026-11-27), verified in Resend
   DEV_LOGIN_CODE: z.string().regex(/^\d{6}$/).optional().or(z.literal("")),
   WORKER_IN_PROCESS: z.string().optional(),

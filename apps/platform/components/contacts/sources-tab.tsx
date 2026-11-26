@@ -6,11 +6,12 @@ import clsx from "clsx";
 import { FileSpreadsheet, Plug, RefreshCw, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { newId, toFieldKey } from "@outreach/core/flow-tree";
+import { toFieldKey } from "@outreach/core/flow-tree";
 import { integrationInfo } from "@outreach/core/integrations";
 import { relativeTime } from "@outreach/core/format";
-import { nowIso, update, useApp } from "@/lib/store";
-import type { DataSource, FieldType } from "@outreach/core/types";
+import { ws } from "@/lib/api";
+import { patchState, useApp } from "@/lib/store";
+import type { DataSource, FieldDef, FieldType } from "@outreach/core/types";
 import { IntegrationLogo } from "../integrations";
 import { Badge, Field, Sheet } from "../ui";
 
@@ -35,8 +36,25 @@ const EVERY = { "15m": "Every 15 minutes", "1h": "Every hour", "1d": "Every day"
 export function SourcesTab({ onImport }: { onImport: () => void }) {
   const app = useApp();
   const [syncing, setSyncing] = useState(false);
-  const remove = (src: DataSource) => update((s) => ({ ...s, sources: s.sources.filter((x) => x.id !== src.id) }));
-  const syncNow = (src: DataSource) => update((s) => ({ ...s, sources: s.sources.map((x) => (x.id === src.id ? { ...x, lastSyncAt: nowIso() } : x)) }));
+  const [problem, setProblem] = useState<string | null>(null);
+  const run = async (fn: () => Promise<void>) => {
+    setProblem(null);
+    try {
+      await fn();
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "That didn't work.");
+    }
+  };
+  const remove = (src: DataSource) =>
+    void run(async () => {
+      await ws(`/sources/${src.id}`, { method: "DELETE" });
+      patchState((s) => ({ ...s, sources: s.sources.filter((x) => x.id !== src.id) }));
+    });
+  const syncNow = (src: DataSource) =>
+    void run(async () => {
+      const next = await ws<DataSource>(`/sources/${src.id}/sync`, { method: "POST" });
+      patchState((s) => ({ ...s, sources: s.sources.map((x) => (x.id === src.id ? next : x)) }));
+    });
 
   return (
     <div>
@@ -57,6 +75,7 @@ export function SourcesTab({ onImport }: { onImport: () => void }) {
         </button>
       </div>
 
+      {problem && <p className="mb-3 text-sm text-rose-700 dark:text-rose-400">{problem}</p>}
       <div className="card overflow-hidden">
         <table className="w-full table-fixed text-sm">
           <thead className="bg-subtle/60 text-left">
@@ -116,20 +135,33 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const chosen = integrationId || candidates[0]?.id || "";
   const info = chosen ? integrationInfo(chosen) : undefined;
 
-  const create = () => {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const create = async () => {
     if (!info) return;
-    const id = newId("src");
-    const fields = CRM_PROPERTIES.filter((p) => !p.target && picked[p.name]).map((p) => ({ key: toFieldKey(p.name), label: p.name, type: picked[p.name] as FieldType, source: id }));
-    update((s) => ({
-      ...s,
-      fieldDefs: [...s.fieldDefs, ...fields.filter((f) => !s.fieldDefs.some((d) => d.key === f.key))],
-      sources: [{ id, kind: "sync", integrationId: info.id, name: `${info.name} · ${object}`, object, list: list.trim() || `${info.name} ${object.toLowerCase()}`, fieldKeys: fields.map((f) => f.key), rows: 0, syncEvery: every, lastSyncAt: nowIso(), status: "syncing" }, ...s.sources],
-    }));
-    onClose();
+    setBusy(true);
+    setProblem(null);
+    try {
+      const fields = CRM_PROPERTIES.filter((p) => !p.target && picked[p.name]).map((p) => ({ key: toFieldKey(p.name), label: p.name, type: picked[p.name] as FieldType }));
+      const out = await ws<{ source: DataSource; fieldDefs: FieldDef[] }>("/sources", { body: { integrationId: info.id, object, list: list.trim(), syncEvery: every, fields } });
+      patchState((s) => ({ ...s, fieldDefs: out.fieldDefs, sources: [out.source, ...s.sources] }));
+      onClose();
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Couldn't start syncing.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Sync contacts" size="lg" footer={info && <button type="button" className="btn-primary w-full" onClick={create}>Start syncing</button>}>
+    <Sheet open={open} onClose={onClose} title="Sync contacts" size="lg" footer={
+        info && (
+          <div className="space-y-2">
+            {problem && <p className="text-sm text-rose-700 dark:text-rose-400">{problem}</p>}
+            <button type="button" className="btn-primary w-full" disabled={busy} onClick={() => void create()}>{busy ? "Starting…" : "Start syncing"}</button>
+          </div>
+        )
+      }>
       {candidates.length === 0 ? (
         <div className="space-y-3 text-sm">
           <p className="text-fg-2">Connect a CRM or a sheet first.</p>

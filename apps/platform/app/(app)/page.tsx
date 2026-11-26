@@ -1,15 +1,18 @@
 "use client";
 
+// Home: one request (GET /home) carries the figures, each agent's numbers and
+// trend, the recent calls and who's due next. Live calls refresh it.
+
 import clsx from "clsx";
 import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarClock, Phone, Plus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
-import { callRulesFor, upcomingCalls } from "@outreach/core/campaign";
 import { dayLabel, duration, humanize, relativeTime } from "@outreach/core/format";
-import { agentStats, answered, callsPerDay, isWin, totals } from "@outreach/core/stats";
-import { useApp } from "@/lib/store";
+import { isWin } from "@outreach/core/stats";
+import { useHome, type HomeData } from "@/lib/home";
+import { useApp, type Loaded } from "@/lib/store";
 import { voiceById } from "@outreach/core/voices";
-import type { AppState, Call, Flow } from "@outreach/core/types";
+import type { Flow } from "@outreach/core/types";
 import { AreaChart, Legend, Sparkline, type Series } from "@/components/charts";
 import { CallSheet, outcomeTone } from "@/components/call-sheet";
 import { Avatar, Badge, Segmented } from "@/components/ui";
@@ -21,28 +24,29 @@ const SERIES: Series[] = [
 
 export default function HomePage() {
   const app = useApp();
-  const [open, setOpen] = useState<Call | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const now = useMemo(() => new Date(), []);
+  const home = useHome();
+  const data = home.data;
   return (
     <div className="space-y-10">
-      <StatusStrip app={app} now={now} />
+      <StatusStrip app={app} data={data} />
       <QuickActions />
-      <Agents app={app} now={now} onOpen={setOpen} />
-      <Insights app={app} now={now} onOpen={setOpen} />
-      <CallSheet call={open} app={app} onClose={() => setOpen(null)} />
+      <Agents app={app} data={data} now={now} onOpen={setOpen} />
+      {home.isError ? <p className="text-sm text-fg-2">Couldn&apos;t load the figures. <button type="button" className="text-accent hover:underline" onClick={() => void home.refetch()}>Try again</button></p> : <Insights data={data} now={now} onOpen={setOpen} />}
+      <CallSheet callId={open} onClose={() => setOpen(null)} />
     </div>
   );
 }
 
 // ---- Top strip: the few things you check first ----
 
-function StatusStrip({ app, now }: { app: AppState; now: Date }) {
-  const live = app.calls.filter((c) => c.live).length;
-  const today = callsPerDay(app.calls, 1, now)[0].calls;
+function StatusStrip({ app, data }: { app: Loaded; data?: HomeData }) {
+  const live = data?.liveNow ?? 0;
   const items: { label: string; value: ReactNode }[] = [
     { label: "Agents live", value: app.flows.filter((f) => f.status === "live").length },
-    { label: "On a call now", value: <span className={clsx(live > 0 && "text-emerald-700 dark:text-emerald-400")}>{live}</span> },
-    { label: "Calls today", value: today },
+    { label: "On a call now", value: data ? <span className={clsx(live > 0 && "text-emerald-700 dark:text-emerald-400")}>{live}</span> : "…" },
+    { label: "Calls today", value: data ? data.today : "…" },
     {
       label: "Status",
       value: (
@@ -88,13 +92,13 @@ function QuickActions() {
 
 // ---- Agents: each flow with its voice, live state and recent trend ----
 
-function Agents({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Call) => void }) {
+function Agents({ app, data, now, onOpen }: { app: Loaded; data?: HomeData; now: Date; onOpen: (id: string) => void }) {
   // The three most recent (owner 2026-11-26): on a call now first, then the latest call or edit. "All agents" shows the rest.
   const lastActive = (flow: Flow) => {
-    const lastCall = app.calls.reduce((latest, c) => (c.flowId === flow.id && c.startedAt > latest ? c.startedAt : latest), "");
+    const lastCall = data?.agents[flow.id]?.stats.lastCallAt ?? "";
     return lastCall > flow.updatedAt ? lastCall : flow.updatedAt;
   };
-  const onCall = (flow: Flow) => app.calls.some((c) => c.live && c.flowId === flow.id);
+  const onCall = (flow: Flow) => Boolean(data?.agents[flow.id]?.liveCallId);
   const flows = [...app.flows].sort((a, b) => Number(onCall(b)) - Number(onCall(a)) || lastActive(b).localeCompare(lastActive(a))).slice(0, 3);
   return (
     <section>
@@ -102,7 +106,7 @@ function Agents({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Ca
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {flows.map((flow, i) => (
           <div key={flow.id} className={clsx("flex", i === 2 && "md:max-xl:hidden")}>
-            <AgentCard flow={flow} app={app} now={now} onOpen={onOpen} />
+            <AgentCard flow={flow} app={app} info={data?.agents[flow.id]} now={now} onOpen={onOpen} />
           </div>
         ))}
       </div>
@@ -110,10 +114,10 @@ function Agents({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Ca
   );
 }
 
-function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now: Date; onOpen: (c: Call) => void }) {
-  const stats = agentStats(flow, app.calls, now);
-  const trend = callsPerDay(app.calls.filter((c) => c.flowId === flow.id), 14, now).map((p) => p.calls);
-  const liveCall = app.calls.find((c) => c.live && c.flowId === flow.id);
+function AgentCard({ flow, app, info, now, onOpen }: { flow: Flow; app: Loaded; info?: HomeData["agents"][string]; now: Date; onOpen: (id: string) => void }) {
+  const stats = info?.stats;
+  const trend = info?.trend ?? [];
+  const liveCallId = info?.liveCallId ?? null;
   const voice = voiceById(flow.agent.voiceId);
   const isLive = flow.status === "live";
   const number = app.numbers.find((n) => n.id === flow.numberId);
@@ -135,12 +139,12 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
           <ArrowUpRight size={15} className="shrink-0 text-fg-4" />
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3">
-          <Metric label="Live now" value={stats.liveNow} highlight={stats.liveNow > 0} />
-          <Metric label="Today" value={stats.today} />
-          <Metric label="Answered" value={stats.answerRate === null ? "—" : `${Math.round(stats.answerRate * 100)}%`} />
+          <Metric label="Live now" value={stats ? stats.liveNow : "…"} highlight={(stats?.liveNow ?? 0) > 0} />
+          <Metric label="Today" value={stats ? stats.today : "…"} />
+          <Metric label="Answered" value={!stats ? "…" : stats.answerRate === null ? "—" : `${Math.round(stats.answerRate * 100)}%`} />
         </div>
         <div className="mt-3">
-          <Sparkline values={trend} />
+          {info ? <Sparkline values={trend} /> : <span className="skeleton block h-8 rounded" />}
         </div>
       </Link>
       <div className="mt-auto flex h-10 items-center justify-between gap-2 border-t border-line bg-subtle/60 px-4">
@@ -148,8 +152,8 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
           <span className={clsx("h-1.5 w-1.5 rounded-[1px]", isLive ? "bg-emerald-500" : "bg-fg-4")} />
           {isLive ? "Live" : "Draft"}
         </span>
-        {liveCall ? (
-          <button type="button" onClick={() => onOpen(liveCall)} className="flex items-center gap-1.5 text-xs text-fg-2 hover:text-fg">
+        {liveCallId ? (
+          <button type="button" onClick={() => onOpen(liveCallId)} className="flex items-center gap-1.5 text-xs text-fg-2 hover:text-fg">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
               <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -157,7 +161,7 @@ function AgentCard({ flow, app, now, onOpen }: { flow: Flow; app: AppState; now:
             On a call · listen
           </button>
         ) : (
-          <span className="text-xs text-fg-4">{stats.lastCallAt ? `Last call ${relativeTime(stats.lastCallAt, now)}` : "No calls yet"}</span>
+          <span className="text-xs text-fg-4">{stats?.lastCallAt ? `Last call ${relativeTime(stats.lastCallAt, now)}` : stats ? "No calls yet" : ""}</span>
         )}
       </div>
     </div>
@@ -177,20 +181,14 @@ function Metric({ label, value, highlight }: { label: string; value: ReactNode; 
 
 type Range = "7" | "14";
 
-function Insights({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: Call) => void }) {
+function Insights({ data, now, onOpen }: { data?: HomeData; now: Date; onOpen: (id: string) => void }) {
   const [range, setRange] = useState<Range>("14");
-  const days = Number(range);
-  const points = callsPerDay(app.calls, days, now);
-  const sum = totals(points);
-  const since = now.getTime() - days * 86400000;
-  const inRange = app.calls.filter((c) => !c.live && new Date(c.startedAt).getTime() >= since);
-  const talked = inRange.filter(answered);
-  const minutes = Math.round(talked.reduce((s, c) => s + c.durationSec, 0) / 60);
-  const chartPoints = points.map((p) => ({
-    label: p.day.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
-    tick: p.day.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-    values: { calls: p.calls, wins: p.wins },
-  }));
+  const w = data?.windows[range];
+  const sum = { calls: w?.perDay.reduce((s, p) => s + p.calls, 0) ?? 0, wins: w?.perDay.reduce((s, p) => s + p.wins, 0) ?? 0 };
+  const chartPoints = (w?.perDay ?? []).map((p) => {
+    const day = new Date(p.day);
+    return { label: day.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }), tick: day.toLocaleDateString(undefined, { day: "numeric", month: "short" }), values: { calls: p.calls, wins: p.wins } };
+  });
 
   return (
     <section className="space-y-3">
@@ -203,23 +201,23 @@ function Insights({ app, now, onOpen }: { app: AppState; now: Date; onOpen: (c: 
           <div>
             <div className="metric-label">Calls handled</div>
             <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="text-3xl font-semibold tabular-nums tracking-[-0.03em]">{sum.calls}</span>
-              <span className="text-sm text-fg-3">{sum.calls ? `${Math.round((sum.wins / sum.calls) * 100)}% booked or done` : "no calls yet"}</span>
+              <span className="text-3xl font-semibold tabular-nums tracking-[-0.03em]">{w ? sum.calls : "…"}</span>
+              <span className="text-sm text-fg-3">{!w ? "" : sum.calls ? `${Math.round((sum.wins / sum.calls) * 100)}% booked or done` : "no calls yet"}</span>
             </div>
           </div>
           <Legend series={SERIES} totals={sum} />
         </div>
-        <AreaChart points={chartPoints} series={SERIES} />
+        {w ? <AreaChart points={chartPoints} series={SERIES} /> : <span className="skeleton block h-56 rounded-lg" />}
       </div>
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <Figure label="Average call" value={talked.length ? duration(Math.round(talked.reduce((s, c) => s + c.durationSec, 0) / talked.length)) : "—"} />
-        <Figure label="Minutes used" value={minutes} sub="of 500 this month" />
-        <Figure label="Answered" value={inRange.length ? `${Math.round((talked.length / inRange.length) * 100)}%` : "—"} sub={`${inRange.length - talked.length} not picked up`} />
+        <Figure label="Average call" value={!w ? "…" : w.answered ? duration(Math.round(w.talkSec / w.answered)) : "—"} />
+        <Figure label="Minutes used" value={w ? Math.round(w.talkSec / 60) : "…"} sub="of 500 this month" />
+        <Figure label="Answered" value={!w ? "…" : w.calls ? `${Math.round((w.answered / w.calls) * 100)}%` : "—"} sub={w ? `${w.calls - w.answered} not picked up` : undefined} />
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
-        <Outcomes calls={inRange} />
-        <NextUp app={app} now={now} />
-        <RecentCalls app={app} onOpen={onOpen} />
+        <Outcomes counts={w?.outcomes} />
+        <NextUp upcoming={data?.upcoming} now={now} />
+        <RecentCalls recent={data?.recent} onOpen={onOpen} />
       </div>
     </section>
   );
@@ -251,10 +249,7 @@ function Panel({ title, href, children }: { title: string; href?: string; childr
   );
 }
 
-function Outcomes({ calls }: { calls: Call[] }) {
-  const counts = Object.entries(
-    calls.reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.outcome]: (acc[c.outcome] ?? 0) + 1 }), {}),
-  ).sort((a, b) => b[1] - a[1]);
+function Outcomes({ counts }: { counts?: { outcome: string; count: number }[] }) {
   return (
     <Panel title="Outcomes">
       <table className="w-full text-sm">
@@ -265,7 +260,7 @@ function Outcomes({ calls }: { calls: Call[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {counts.slice(0, 6).map(([outcome, count]) => (
+          {(counts ?? []).slice(0, 6).map(({ outcome, count }) => (
             <tr key={outcome}>
               <td className="px-4 py-2">
                 <span className="flex items-center gap-2">
@@ -276,8 +271,11 @@ function Outcomes({ calls }: { calls: Call[] }) {
               <td className="px-4 py-2 text-right font-mono tabular-nums">{count}</td>
             </tr>
           ))}
-          {counts.length === 0 && (
+          {counts && counts.length === 0 && (
             <tr><td className="px-4 py-3 text-fg-3" colSpan={2}>No calls in this range.</td></tr>
+          )}
+          {!counts && (
+            <tr><td className="px-4 py-3" colSpan={2}><span className="skeleton block h-16 rounded" /></td></tr>
           )}
         </tbody>
       </table>
@@ -285,23 +283,19 @@ function Outcomes({ calls }: { calls: Call[] }) {
   );
 }
 
-function NextUp({ app, now }: { app: AppState; now: Date }) {
-  const upcoming = app.campaigns
-    .filter((c) => c.status === "running")
-    .flatMap((c) => upcomingCalls(c, app.contacts, now, 30, callRulesFor(app.settings)).map((p) => ({ ...p, campaign: c })))
-    .sort((a, b) => a.due.getTime() - b.due.getTime())
-    .slice(0, 5);
+function NextUp({ upcoming, now }: { upcoming?: HomeData["upcoming"]; now: Date }) {
   return (
     <Panel title="Next up" href="/campaigns">
       <div className="divide-y divide-line">
-        {upcoming.length === 0 && <p className="px-4 py-3 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
-        {upcoming.map(({ contact, due, campaign }) => (
-          <div key={`${campaign.id}-${contact.id}`} className="flex items-center gap-3 px-4 py-2.5">
+        {!upcoming && <div className="px-4 py-3"><span className="skeleton block h-16 rounded" /></div>}
+        {upcoming?.length === 0 && <p className="px-4 py-3 text-sm text-fg-3">Nothing scheduled in the next 30 days.</p>}
+        {upcoming?.map(({ contact, due, campaignId, campaignName }) => (
+          <div key={`${campaignId}-${contact.id}`} className="flex items-center gap-3 px-4 py-2.5">
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm">{contact.name}</span>
-              <span className="block truncate text-xs text-fg-4">{campaign.name}</span>
+              <span className="block truncate text-xs text-fg-4">{campaignName}</span>
             </span>
-            <span className="font-mono text-2xs text-fg-3">{dayLabel(due, now)}</span>
+            <span className="font-mono text-2xs text-fg-3">{dayLabel(new Date(due), now)}</span>
           </div>
         ))}
       </div>
@@ -309,23 +303,21 @@ function NextUp({ app, now }: { app: AppState; now: Date }) {
   );
 }
 
-function RecentCalls({ app, onOpen }: { app: AppState; onOpen: (c: Call) => void }) {
-  const recent = [...app.calls].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 5);
+function RecentCalls({ recent, onOpen }: { recent?: HomeData["recent"]; onOpen: (id: string) => void }) {
   return (
     <Panel title="Recent calls" href="/calls">
       <div className="divide-y divide-line">
-        {recent.map((call) => {
-          const contact = app.contacts.find((c) => c.id === call.contactId);
-          return (
-            <button key={call.id} type="button" onClick={() => onOpen(call)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-subtle">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm">{contact?.name}</span>
-                <span className="block truncate text-xs text-fg-4">{call.live ? "Now" : relativeTime(call.startedAt)}</span>
-              </span>
-              {call.live ? <Badge tone="green" dot>Live</Badge> : <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>}
-            </button>
-          );
-        })}
+        {!recent && <div className="px-4 py-3"><span className="skeleton block h-16 rounded" /></div>}
+        {recent?.length === 0 && <p className="px-4 py-3 text-sm text-fg-3">No calls yet.</p>}
+        {recent?.map(({ call, contact }) => (
+          <button key={call.id} type="button" onClick={() => onOpen(call.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-subtle">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">{contact?.name ?? "Unknown caller"}</span>
+              <span className="block truncate text-xs text-fg-4">{call.live ? "Now" : relativeTime(call.startedAt)}</span>
+            </span>
+            {call.live ? <Badge tone="green" dot>Live</Badge> : <Badge tone={outcomeTone(call.outcome)}>{humanize(call.outcome)}</Badge>}
+          </button>
+        ))}
       </div>
     </Panel>
   );

@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",
+    "@outreach/core": "workspace:*",
     "@radix-ui/react-dialog": "1.1.23",
     "@radix-ui/react-popover": "1.1.23",
+    "@tanstack/react-query": "^5",
     "clsx": "^2.1.1",
     "geist": "1.5.1",
     "libphonenumber-js": "^1.11.14",
@@ -24,8 +26,7 @@
     "next": "^14.2.30",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zod": "^4.6.7",
-    "@outreach/core": "workspace:*"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^20.17.6",

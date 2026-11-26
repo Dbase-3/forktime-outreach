@@ -8,9 +8,9 @@ import clsx from "clsx";
 import { AlertTriangle, Check, Phone, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { COUNTRIES, KIND_LABEL, availableNumbers, countryOf, numberOwner, type NumberKind, type Offer } from "@outreach/core/numbers";
-import { newId } from "@outreach/core/flow-tree";
-import { nowIso, update } from "@/lib/store";
+import { useQuery } from "@tanstack/react-query";
+import { COUNTRIES, KIND_LABEL, countryOf, numberOwner, type NumberKind } from "@outreach/core/numbers";
+import { addNumber, searchNumbers } from "@/lib/actions";
 import type { Flow, PhoneNumber } from "@outreach/core/types";
 import { Segmented } from "../ui";
 
@@ -18,12 +18,6 @@ export function describeNumber(n: PhoneNumber): string {
   return `${KIND_LABEL[n.kind]} · ${countryOf(n.country).label}`;
 }
 
-/** Adds a number to the workspace and returns it. */
-export function addNumber(offer: Offer): PhoneNumber {
-  const number: PhoneNumber = { id: newId("n"), e164: offer.e164, display: offer.display, country: offer.country, kind: offer.kind, ...(offer.area ? { area: offer.area } : {}), addedAt: nowIso() };
-  update((s) => ({ ...s, numbers: [...s.numbers, number] }));
-  return number;
-}
 
 export function NumberPicker({
   numbers,
@@ -103,7 +97,10 @@ export function GetNumber({ taken, onAdded, defaultCountry = "AU" }: { taken: st
   const c = countryOf(country);
   const [kind, setKind] = useState<NumberKind>("local");
   const [area, setArea] = useState(c.areas[0].id);
-  const offers = availableNumbers(country, kind, area, taken);
+  // The server offers numbers (fictional ranges until Phase 3) and skips ones anyone has.
+  const offersQuery = useQuery({ queryKey: ["number-offers", country, kind, kind === "local" ? area : ""], queryFn: () => searchNumbers(country, kind, kind === "local" ? area : "") });
+  const offers = offersQuery.data ?? [];
+  const [problem, setProblem] = useState<string | null>(null);
   const [added, setAdded] = useState<string | null>(null);
 
   const changeCountry = (code: string) => {
@@ -137,6 +134,7 @@ export function GetNumber({ taken, onAdded, defaultCountry = "AU" }: { taken: st
       <div>
         <span className="label">Available now</span>
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+          {offersQuery.isLoading && Array.from({ length: 3 }, (_, i) => <li key={i} className="px-3 py-3"><span className="skeleton block h-4 w-36 rounded" /></li>)}
           {offers.map((o) => (
             <li key={o.e164} className="flex items-center gap-3 px-3 py-2.5">
               <Phone size={14} className="shrink-0 text-fg-4" />
@@ -145,9 +143,16 @@ export function GetNumber({ taken, onAdded, defaultCountry = "AU" }: { taken: st
                 type="button"
                 className="btn-secondary h-8 px-3 text-sm"
                 disabled={added !== null}
-                onClick={() => {
+                onClick={async () => {
                   setAdded(o.e164);
-                  onAdded(addNumber(o));
+                  setProblem(null);
+                  try {
+                    onAdded(await addNumber(o));
+                  } catch (err) {
+                    setAdded(null);
+                    setProblem(err instanceof Error ? err.message : "Couldn't add it.");
+                    void offersQuery.refetch();
+                  }
                 }}
               >
                 {added === o.e164 ? <><Check size={14} /> Added</> : "Add"}
@@ -155,6 +160,7 @@ export function GetNumber({ taken, onAdded, defaultCountry = "AU" }: { taken: st
             </li>
           ))}
         </ul>
+        {problem && <p className="mt-1.5 text-xs text-rose-700 dark:text-rose-400">{problem}</p>}
         <p className="mt-1.5 text-xs text-fg-3">Numbers are added to your workspace straight away. You can see them all on <Link href="/numbers" className="underline hover:text-fg">Numbers</Link>.</p>
       </div>
     </div>

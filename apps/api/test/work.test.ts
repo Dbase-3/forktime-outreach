@@ -117,3 +117,58 @@ describe("calls, analytics and home", () => {
     expect(h.recent).toHaveLength(5);
   });
 });
+
+describe("sample workspaces", () => {
+  it("gives every sample workspace its own free numbers, shown the same as dialled", async () => {
+    const { withLastDigits } = require("../src/modules/workspaces/sample.service");
+    expect(withLastDigits("0491 570 156", "4821")).toBe("0491 574 821");
+    expect(withLastDigits("(02) 5550 1234", "0007")).toBe("(02) 5550 0007");
+    const seen = new Set<string>();
+    for (let i = 0; i < 6; i++) {
+      const { agent, ws } = await withWorkspace(app, `s${i}@example.com`, { sample: true });
+      const numbers = (await agent.get(`${ws}/numbers`).expect(200)).body as { e164: string; display: string }[];
+      for (const n of numbers) {
+        expect(seen.has(n.e164)).toBe(false);
+        seen.add(n.e164);
+        expect(n.display.replace(/\D/g, "").slice(-4)).toBe(n.e164.slice(-4));
+      }
+    }
+  });
+});
+
+describe("routes the platform screens use", () => {
+  it("sources, filled-in counts, one contact's calls, live count and both exports", async () => {
+    const { agent, ws } = await withWorkspace(app, "routes@example.com", { sample: true });
+
+    // A sync needs a connected tool; its fields are added once.
+    await agent.delete(`${ws}/integrations/hubspot`).expect(200);
+    await agent.post(`${ws}/sources`).send({ integrationId: "hubspot", object: "Contacts", fields: [] }).expect(422);
+    await agent.put(`${ws}/integrations/hubspot`).send({ account: "acme" }).expect(200);
+    const made = (await agent.post(`${ws}/sources`).send({ integrationId: "hubspot", object: "Contacts", syncEvery: "15m", fields: [{ key: "deal_amount", label: "Deal amount", type: "number" }] }).expect(201)).body;
+    expect(made.source.status).toBe("syncing");
+    expect(made.fieldDefs.some((f: { key: string }) => f.key === "deal_amount")).toBe(true);
+    await agent.post(`${ws}/sources/${made.source.id}/sync`).expect(201);
+    await agent.delete(`${ws}/sources/${made.source.id}`).expect(200);
+    expect((await agent.get(`${ws}/sources`)).body.some((x: { id: string }) => x.id === made.source.id)).toBe(false);
+
+    const filled = (await agent.get(`${ws}/fields/filled`).expect(200)).body;
+    expect(filled.total).toBeGreaterThan(0);
+    expect(filled.byField.first_name).toBe(filled.total);
+    expect(filled.byField.deal_amount).toBe(0);
+
+    const calls = (await agent.post(`${ws}/calls/query`).send({ pageSize: 50 })).body;
+    const contactId = calls.rows.find((r: { contactId?: string }) => r.contactId).contactId;
+    const mine = (await agent.post(`${ws}/calls/query`).send({ contactId, pageSize: 100 }).expect(201)).body;
+    expect(mine.total).toBeGreaterThan(0);
+    expect(mine.rows.every((r: { contactId: string }) => r.contactId === contactId)).toBe(true);
+    expect(typeof (await agent.get(`${ws}/calls/live`).expect(200)).body.live).toBe("number");
+
+    const csv = (await agent.post(`${ws}/analytics/export`).send({ range: "90d" }).expect(200)).text;
+    expect(csv.split("\n")[0]).toContain("Started");
+    expect(csv.split("\n").length).toBeGreaterThan(10);
+
+    const two = (await agent.post(`${ws}/contacts/query`).send({ pageSize: 2 })).body.rows.map((r: { id: string }) => r.id);
+    const picked = (await agent.post(`${ws}/contacts/export`).send({ ids: two }).expect(200)).text.trim().split("\n");
+    expect(picked).toHaveLength(3); // header + the two picked
+  });
+});

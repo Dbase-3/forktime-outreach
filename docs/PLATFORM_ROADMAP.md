@@ -325,6 +325,10 @@ Each phase ends with a working, deployed slice and its tests. Phases 1–2 can o
 
 **Exit:** two people can sign in to one workspace and edit safely; 100k contacts page in under 300 ms.
 
+**Progress (2026-11-26):** built and running locally, not deployed.
+- Done: accounts, email-code sign-in, workspaces + team roles, every API above, imports and knowledge reading as jobs, versioned saves (409 `stale` → reloaded), soft delete, server rules through `packages/core`, sample workspace seeded on the server. The whole front end reads and writes the API (no more localStorage): contacts, calls, Home and Analytics are worked out server-side. 100k contacts: plain 37 ms, filtered 70 ms, sorted ~140 ms (best of three). 32 API tests.
+- Not yet: PDF/Word reading and embeddings (knowledge), virtualised tables, an error-report file for imports, hosting for the API (needs a decision: droplet + production MongoDB + Redis; then Vercel `API_URL`). CSV uploads go through the Next rewrite; on Vercel large files may need to go straight to the API domain.
+
 ### Phase 2: agent runtime (`platform-agent`)
 - **Agent base:** fork the lean outreach agent: pickup detection, early audio, line check, runPending, transfer, recording, ordered event emitter.
 - **Config:** a signed config fetch by version, modelled on forktime-core's Agent API v1 (HMAC + nonce).

@@ -9,8 +9,9 @@ import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { numberOwner, randomAgentName } from "@outreach/core/numbers";
-import { update, useApp } from "@/lib/store";
-import { flowFromTemplate, type FlowTemplate } from "@outreach/core/templates";
+import { useApp } from "@/lib/store";
+import type { FlowTemplate } from "@outreach/core/templates";
+import { createAgent } from "@/lib/actions";
 import { Field, Modal } from "../ui";
 import { GetNumber, NumberPicker } from "../numbers/number-picker";
 
@@ -34,12 +35,21 @@ export function CreateAgentModal({ open, template, onClose }: { open: boolean; t
   }, [open, template]);
 
   const blocked = Boolean(numberOwner(app.flows, numberId));
-  const create = () => {
-    if (!name.trim() || blocked) return;
-    const flow = { ...flowFromTemplate(template, new Date(), app.settings.timezone), name: name.trim(), numberId };
-    update((s) => ({ ...s, flows: [flow, ...s.flows] }));
-    onClose();
-    router.push(template ? `/agents/${flow.id}` : `/agents/${flow.id}?blank=1`);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const create = async () => {
+    if (!name.trim() || blocked || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const flow = await createAgent({ templateId: template?.id ?? null, name: name.trim(), numberId });
+      onClose();
+      router.push(template ? `/agents/${flow.id}` : `/agents/${flow.id}?blank=1`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create the agent.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (view === "number") {
@@ -66,7 +76,7 @@ export function CreateAgentModal({ open, template, onClose }: { open: boolean; t
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={create} disabled={!name.trim() || blocked}>Create agent</button>
+          <button type="button" className="btn-primary" onClick={() => void create()} disabled={!name.trim() || blocked || busy}>{busy ? "Creating…" : "Create agent"}</button>
         </div>
       }
     >
@@ -74,7 +84,7 @@ export function CreateAgentModal({ open, template, onClose }: { open: boolean; t
         className="space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
-          create();
+          void create();
         }}
       >
         <Field label="Agent name" hint="Only for you, to tell your agents apart. What it calls itself on calls is set in Config.">
@@ -85,6 +95,7 @@ export function CreateAgentModal({ open, template, onClose }: { open: boolean; t
           <p className="-mt-0.5 mb-2 text-xs text-fg-3">It makes and answers calls on this number. Each number belongs to one agent.</p>
           <NumberPicker numbers={app.numbers} flows={app.flows} value={numberId} onChange={setNumberId} onGetNumber={() => setView("number")} />
         </div>
+        {error && <p className="text-sm text-rose-700 dark:text-rose-400" role="alert">{error}</p>}
         <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
       </form>
     </Modal>

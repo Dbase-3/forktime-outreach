@@ -7,7 +7,8 @@ import clsx from "clsx";
 import { Check, Webhook } from "lucide-react";
 import { useState } from "react";
 import { CATEGORIES, integrationInfo, logoUrl, type IntegrationInfo } from "@outreach/core/integrations";
-import { nowIso, update, useApp } from "@/lib/store";
+import { connectIntegration, disconnectIntegration } from "@/lib/actions";
+import { useApp } from "@/lib/store";
 import { Sheet } from "./ui";
 
 export function IntegrationLogo({ info, size = "md" }: { info: IntegrationInfo; size?: "sm" | "md" | "lg" }) {
@@ -34,10 +35,10 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
   const [account, setAccount] = useState("");
   const connect = () => {
     if (!info) return;
-    update((s) => ({ ...s, integrations: [...s.integrations.filter((i) => i.id !== info.id), { id: info.id, connected: true, account: account.trim() || `${info.name} account`, connectedAt: nowIso() }] }));
+    void connectIntegration(info.id, account.trim() || `${info.name} account`);
     setAccount("");
   };
-  const disconnect = () => info && update((s) => ({ ...s, integrations: s.integrations.filter((i) => i.id !== info.id) }));
+  const disconnect = () => info && void disconnectIntegration(info.id);
 
   return (
     <Sheet

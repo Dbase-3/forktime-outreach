@@ -9,7 +9,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { relativeTime } from "@outreach/core/format";
 import { numberOwner } from "@outreach/core/numbers";
-import { update, useApp } from "@/lib/store";
+import { releaseNumber } from "@/lib/actions";
+import { useApp } from "@/lib/store";
 import { GetNumber, describeNumber } from "@/components/numbers/number-picker";
 import { Popover } from "@/components/popover";
 import { EmptyState, Modal, PageHeader } from "@/components/ui";
@@ -68,9 +69,12 @@ export default function NumbersPage() {
                               <button
                                 type="button"
                                 className="btn-primary h-8 px-3 text-sm"
-                                onClick={() => {
-                                  update((s) => ({ ...s, numbers: s.numbers.filter((x) => x.id !== n.id) }));
-                                  setReleasing(null);
+                                onClick={async () => {
+                                  try {
+                                    await releaseNumber(n.id);
+                                  } finally {
+                                    setReleasing(null);
+                                  }
                                 }}
                               >
                                 Release

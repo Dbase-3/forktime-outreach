@@ -3,12 +3,16 @@
 // The frame around every page. Desktop: sidebar and a breadcrumb bar. Phones: top bar plus bottom tabs.
 // ⌘K search works everywhere.
 
+import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { AudioLines, BarChart3, BookOpen, Home, Megaphone, Monitor, Moon, MoreHorizontal, Phone, PhoneCall, Plug, Search, Settings, Sun, Users, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { useApp, useSaveProblem } from "@/lib/store";
+import { boot, dismissSaveProblem, flush, loadWorkspace, me, useApp, useSaveProblem, useSaving, useStatus } from "@/lib/store";
+import { request, ws } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
 import type { AppState } from "@outreach/core/types";
 import { CommandPalette, useCommandPalette } from "./command-palette";
@@ -59,31 +63,43 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const mounted = useMounted();
+  const status = useStatus();
   const pathname = usePathname();
+  const router = useRouter();
   const [searchOpen, setSearchOpen] = useCommandPalette();
   // The agent editor is a full-screen workspace (split screen), not a page.
   const fullBleed = /^\/agents\/[^/]+/.test(pathname);
+  useEffect(() => {
+    void boot();
+  }, []);
+  useEffect(() => {
+    if (status.phase === "signed_out") router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
+    if (status.phase === "no_workspace") router.replace("/welcome");
+  }, [status.phase, router, pathname]);
+  const ready = status.phase === "ready";
   return (
     <div className="min-h-dvh lg:pl-60">
       <Sidebar onSearch={() => setSearchOpen(true)} />
       <MobileTopBar onSearch={() => setSearchOpen(true)} />
-      {mounted && <Breadcrumbs />}
+      {ready && <Breadcrumbs />}
       <SaveProblem />
-      <main className={fullBleed ? "w-full" : "mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-8"}>{mounted ? children : <SkeletonFor pathname={pathname} />}</main>
+      <main className={fullBleed ? "w-full" : "mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-14 lg:pt-8"}>
+        {ready ? children : status.phase === "error" ? <LoadProblem message={status.message} /> : <SkeletonFor pathname={pathname} />}
+      </main>
       <BottomTabs />
-      {mounted && <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} pages={NAV} />}
+      {ready && <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} pages={NAV} />}
     </div>
   );
 }
 
-/** The workspace lives in this browser, so pages render after mount; until then each page shows its skeleton. */
-function useMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  return mounted;
+function LoadProblem({ message }: { message: string }) {
+  return (
+    <div className="mx-auto max-w-md py-24 text-center">
+      <p className="text-sm font-medium">The workspace didn&apos;t load</p>
+      <p className="mt-1 text-sm text-fg-3">{message}</p>
+      <button type="button" className="btn-secondary mt-4" onClick={() => void boot()}>Try again</button>
+    </div>
+  );
 }
 
 function Brand() {
@@ -180,19 +196,63 @@ function ThemeSwitch() {
   );
 }
 
+/** The workspace, a switcher when there's more than one, and sign out. */
 function WorkspaceCard() {
-  const { settings, numbers, flows } = useApp();
+  const { settings, numbers, flows, workspace } = useApp();
+  const saving = useSaving();
+  const queries = useQueryClient();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const mine = me()?.workspaces ?? [];
+  const signOut = async () => {
+    await flush();
+    await request("/auth/logout", { method: "POST" });
+    queries.clear();
+    router.replace("/sign-in");
+  };
   return (
-    <Link href="/settings" className="flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-subtle">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-line bg-surface text-2xs font-semibold text-fg-2">
-        {settings.businessName.slice(0, 1).toUpperCase()}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{settings.businessName}</span>
-        <span className="block truncate font-mono text-2xs text-fg-3">{numbers.length} {numbers.length === 1 ? "number" : "numbers"} · {flows.length} {flows.length === 1 ? "agent" : "agents"}</span>
-      </span>
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Number active" />
-    </Link>
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-subtle" aria-expanded={open}>
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-line bg-surface text-2xs font-semibold text-fg-2">
+          {(settings.businessName || workspace.name).slice(0, 1).toUpperCase()}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{settings.businessName || workspace.name}</span>
+          <span className="block truncate font-mono text-2xs text-fg-3">{saving ? "Saving…" : `${numbers.length} ${numbers.length === 1 ? "number" : "numbers"} · ${flows.length} ${flows.length === 1 ? "agent" : "agents"}`}</span>
+        </span>
+        <span className={clsx("h-1.5 w-1.5 rounded-full", saving ? "animate-pulse bg-amber-500" : "bg-emerald-500")} title={saving ? "Saving" : "Saved"} />
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 right-0 mb-1 rounded-xl border border-line bg-surface p-1.5 shadow-pop">
+          {mine.length > 1 && (
+            <>
+              <div className="metric-label px-2 py-1">Workspaces</div>
+              {mine.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  className={clsx("flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted", w.id === workspace.id && "font-medium")}
+                  onClick={async () => {
+                    setOpen(false);
+                    await flush();
+                    queries.clear();
+                    await loadWorkspace(w.id);
+                    router.push("/");
+                  }}
+                >
+                  {w.name}
+                  {w.id === workspace.id && <span className="text-xs text-fg-3">current</span>}
+                </button>
+              ))}
+              <div className="my-1 border-t border-line" />
+            </>
+          )}
+          <Link href="/settings" onClick={() => setOpen(false)} className="block rounded-md px-2 py-1.5 text-sm hover:bg-muted">Settings and team</Link>
+          <Link href="/welcome" onClick={() => setOpen(false)} className="block rounded-md px-2 py-1.5 text-sm hover:bg-muted">New workspace</Link>
+          <button type="button" onClick={() => void signOut()} className="block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted">Sign out <span className="text-fg-3">· {me()?.user.email}</span></button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -214,7 +274,8 @@ function Breadcrumbs() {
   const app = useApp();
   const pathname = usePathname();
   const crumbs = crumbsFor(pathname, app);
-  const live = app.calls.filter((c) => c.live).length;
+  const liveQuery = useQuery({ queryKey: ["live-calls", app.workspace.id], queryFn: () => ws<{ live: number }>("/calls/live"), enabled: Boolean(app.workspace.id), refetchInterval: 15000 });
+  const live = liveQuery.data?.live ?? 0;
   return (
     <div className="sticky top-0 z-20 hidden h-12 items-center justify-between border-b border-line bg-background/80 px-10 backdrop-blur-md lg:flex">
       <nav className="flex min-w-0 items-center gap-1.5 text-sm">
@@ -304,13 +365,14 @@ function BottomTabs() {
   );
 }
 
-/** Shown when the browser refuses to save (storage full or blocked): nothing is lost silently. */
+/** Shown when a save fails or someone else's change was loaded: nothing is lost silently. */
 function SaveProblem() {
   const problem = useSaveProblem();
   if (!problem) return null;
   return (
-    <div role="alert" className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-800 dark:text-amber-300 sm:px-6 lg:px-10">
-      {problem}
+    <div role="alert" className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-800 dark:text-amber-300 sm:px-6 lg:px-10">
+      <span className="flex-1">{problem}</span>
+      <button type="button" className="text-xs font-medium underline" onClick={dismissSaveProblem}>Dismiss</button>
     </div>
   );
 }

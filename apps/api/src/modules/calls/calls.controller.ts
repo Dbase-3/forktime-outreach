@@ -20,6 +20,7 @@ const Query = z.object({
   agentId: z.string().max(64).default(""),
   outcome: z.string().max(64).default(""),
   action: z.string().max(40).default(""),
+  contactId: z.string().max(64).default(""),
   page: z.number().int().min(1).max(10000).default(1),
   pageSize: z.number().int().min(1).max(100).default(50),
 });
@@ -40,6 +41,7 @@ export class CallsController {
     if (q.agentId && Types.ObjectId.isValid(q.agentId)) and.push({ agentId: new Types.ObjectId(q.agentId) });
     if (q.outcome) and.push({ outcome: q.outcome });
     if (q.action) and.push({ actions: q.action });
+    if (q.contactId && Types.ObjectId.isValid(q.contactId)) and.push({ contactId: new Types.ObjectId(q.contactId) });
     if (q.search.trim()) {
       const re = new RegExp(esc(q.search.trim()), "i");
       const people = await this.contacts.find({ workspaceId: ws, $or: [{ name: re }, { phone: re }] }, { _id: 1 }).limit(2000).lean();
@@ -48,6 +50,12 @@ export class CallsController {
     const filter = { $and: and };
     const [total, rows] = await Promise.all([this.calls.countDocuments(filter), this.calls.find(filter, LIGHT).sort({ live: -1, startedAt: -1 }).skip((q.page - 1) * q.pageSize).limit(q.pageSize).lean()]);
     return { rows: rows.map(callOut), contacts: await this.contactsFor(ws, rows), total, page: q.page, pages: Math.max(1, Math.ceil(total / q.pageSize)) };
+  }
+
+  /** How many calls are going on right now (the top bar). */
+  @Get("live")
+  async live(@Ctx() ctx: RequestContext) {
+    return { live: await this.calls.countDocuments({ workspaceId: ctx.workspaceId, live: true }) };
   }
 
   @Get("outcomes")

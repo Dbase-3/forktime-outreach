@@ -77,13 +77,15 @@ export class ContactsController {
   @Post("export")
   async export(@Ctx() ctx: RequestContext, @Body() body: unknown, @Res() res: Response) {
     const ws = ctx.workspaceId!;
-    const q = parse(ContactQuerySchema.pick({ search: true, list: true, filter: true }), body ?? {});
+    const q = parse(ContactQuerySchema.pick({ search: true, list: true, filter: true }).extend({ ids: z.array(z.string().max(64)).max(5000).optional() }), body ?? {});
     const defs = await this.data.defs(ws);
+    const byIds = q.ids?.length ? { workspaceId: ws, deletedAt: null, _id: { $in: q.ids.filter((x) => Types.ObjectId.isValid(x)).map((x) => new Types.ObjectId(x)) } } : null;
     const columns = allColumns(defs);
     res.setHeader("content-type", "text/csv; charset=utf-8");
+    res.status(200);
     res.setHeader("content-disposition", 'attachment; filename="contacts.csv"');
     res.write(columns.map((c) => cell(c.label)).join(",") + "\n");
-    for await (const c of this.service.cursor(await this.service.filterFor(ws, q, defs))) {
+    for await (const c of this.service.cursor(byIds ?? (await this.service.filterFor(ws, q, defs)))) {
       const out = contactOut(c);
       const values: Record<string, string> = { ...plainFields(c.fields as Record<string, unknown>), name: out.name, phone: out.phone, email: out.email ?? "", lists: out.groups.join(", "), last_call: out.lastCallAt?.slice(0, 10) ?? "", last_outcome: out.lastOutcome ?? "", created: out.createdAt.slice(0, 10) };
       res.write(columns.map((col) => cell(values[col.key] ?? "")).join(",") + "\n");

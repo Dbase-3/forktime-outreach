@@ -4,41 +4,59 @@ import { Megaphone, Pause, Play, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { audienceOf, callRulesFor, campaignIssues, defaultCampaign, describeTrigger } from "@outreach/core/campaign";
-import { update, useApp } from "@/lib/store";
+import { describeTrigger } from "@outreach/core/campaign";
+import { useQuery } from "@tanstack/react-query";
+import { ApiError, ws } from "@/lib/api";
+import { createCampaign, pauseCampaign, startCampaign } from "@/lib/actions";
+import { useApp } from "@/lib/store";
 import type { Campaign } from "@outreach/core/types";
 import { STATUS } from "@/components/campaign/campaign-editor";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 
 export default function CampaignsPage() {
   const app = useApp();
-  const rules = callRulesFor(app.settings);
+  // Audience sizes and the first thing stopping each campaign, worked out on the server.
+  const list = useQuery({ queryKey: ["campaign-list", app.workspace.id, app.campaigns.map((c) => `${c.id}:${(c as { version?: number }).version}:${c.status}`).join()], queryFn: () => ws<(Campaign & { audienceCount: number; firstIssue: string | null })[]>("/campaigns") });
+  const facts = new Map((list.data ?? []).map((c) => [c.id, c]));
+  const [problem, setProblem] = useState<string | null>(null);
   const router = useRouter();
   const [query, setQuery] = useState("");
 
-  const create = () => {
-    const agent = app.flows.find((f) => f.status === "live") ?? app.flows[0];
-    const campaign = defaultCampaign(agent?.id ?? "");
-    update((s) => ({ ...s, campaigns: [campaign, ...s.campaigns] }));
-    router.push(`/campaigns/${campaign.id}`);
+  const create = async () => {
+    const agent = app.flows.find((f) => f.status === "live" && f.direction !== "inbound") ?? app.flows[0];
+    try {
+      const campaign = await createCampaign(agent?.id ?? "");
+      router.push(`/campaigns/${campaign.id}`);
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Couldn't create the campaign.");
+    }
   };
   // Home's "Start a campaign" links here with ?new=1. Once only: effects run twice in development.
   const handled = useRef(false);
   useEffect(() => {
     if (handled.current || new URLSearchParams(window.location.search).get("new") !== "1") return;
     handled.current = true;
-    create();
+    void create();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setStatus = (id: string, status: Campaign["status"]) => update((s) => ({ ...s, campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, status } : c)) }));
+  const setStatus = async (id: string, status: "running" | "paused") => {
+    setProblem(null);
+    try {
+      await (status === "running" ? startCampaign(id) : pauseCampaign(id));
+    } catch (err) {
+      const issues = err instanceof ApiError ? (err.details as { issues?: string[] } | undefined)?.issues : undefined;
+      setProblem(issues?.length ? issues.join(" ") : err instanceof Error ? err.message : "That didn't work.");
+    }
+  };
   const q = query.trim().toLowerCase();
   const shown = app.campaigns.filter((c) => !q || c.name.toLowerCase().includes(q));
-  const newButton = <button type="button" className="btn-primary" onClick={create}><Plus size={15} /> New campaign</button>;
+  const newButton = <button type="button" className="btn-primary" onClick={() => void create()}><Plus size={15} /> New campaign</button>;
 
   return (
     <div>
       <PageHeader title="Campaigns" subtitle="Pick an agent, who to call and when. Calls can go out once, or keep going as people qualify." actions={newButton} />
+      {problem && <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300" role="alert">{problem}</p>}
       {app.campaigns.length === 0 ? (
         <EmptyState icon={<Megaphone size={20} />} title="No campaigns yet" body="A campaign is an agent, a list of people and calling hours. Everything else is up to you." action={newButton} />
       ) : (
@@ -61,8 +79,8 @@ export default function CampaignsPage() {
               <tbody className="divide-y divide-line">
                 {shown.map((c) => {
                   const agent = app.flows.find((f) => f.id === c.agentId);
-                  const count = audienceOf(c, app.contacts, new Date(), rules).length;
-                  const blocked = campaignIssues(c, { flows: app.flows, defs: app.fieldDefs, audienceCount: count, workspace: app.settings })[0];
+                  const count = facts.get(c.id)?.audienceCount;
+                  const blocked = facts.get(c.id)?.firstIssue ?? undefined;
                   return (
                     <tr key={c.id} onClick={() => router.push(`/campaigns/${c.id}`)} className="cursor-pointer transition-colors hover:bg-subtle">
                       <td className="px-4 py-3">
@@ -70,15 +88,15 @@ export default function CampaignsPage() {
                         <span className="block truncate text-xs text-fg-3">{agent?.name ?? "No agent"} · {c.audience.list ?? "All contacts"}</span>
                       </td>
                       <td className="hidden truncate px-4 py-3 text-fg-2 lg:table-cell">{c.mode === "always" ? describeTrigger(c.trigger, app.fieldDefs) : "Everyone once"}</td>
-                      <td className="hidden px-4 py-3 font-mono text-xs md:table-cell">{count}</td>
+                      <td className="hidden px-4 py-3 font-mono text-xs md:table-cell">{count ?? <span className="skeleton inline-block h-3 w-8 rounded" />}</td>
                       <td className="hidden px-4 py-3 font-mono text-xs sm:table-cell">{c.answered} / {c.called}</td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <span className="inline-flex items-center gap-2">
                           <Badge tone={STATUS[c.status].tone} dot>{STATUS[c.status].label}</Badge>
                           {c.status === "running" ? (
-                            <button type="button" className="btn-icon h-7 w-7" onClick={() => setStatus(c.id, "paused")} aria-label="Pause"><Pause size={14} /></button>
+                            <button type="button" className="btn-icon h-7 w-7" onClick={() => void setStatus(c.id, "paused")} aria-label="Pause"><Pause size={14} /></button>
                           ) : (
-                            <button type="button" className="btn-icon h-7 w-7" disabled={Boolean(blocked)} title={blocked} onClick={() => setStatus(c.id, "running")} aria-label="Start"><Play size={14} /></button>
+                            <button type="button" className="btn-icon h-7 w-7" disabled={Boolean(blocked) || !facts.has(c.id)} title={blocked} onClick={() => void setStatus(c.id, "running")} aria-label="Start"><Play size={14} /></button>
                           )}
                         </span>
                       </td>

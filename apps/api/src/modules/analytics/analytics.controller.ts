@@ -2,9 +2,10 @@
 // functions the prototype used in the browser, over this workspace's calls
 // without transcripts. Phase 5 replaces this with daily roll-ups.
 
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post, Res } from "@nestjs/common";
+import type { Response } from "express";
 import { InjectModel } from "@nestjs/mongoose";
-import { RANGES, bestTimes, byAgent, conversation, directions, pickCalls, pickupBreakdown, rangeBounds, summarize, timeline, topOutcomes, transfers, type RangeId } from "@outreach/core/analytics";
+import { RANGES, bestTimes, byAgent, callsCsv, conversation, directions, pickCalls, pickupBreakdown, rangeBounds, summarize, timeline, topOutcomes, transfers, type RangeId } from "@outreach/core/analytics";
 import { audienceOf, callRulesFor, upcomingCalls } from "@outreach/core/campaign";
 import { agentStats, answered, callsPerDay, isWin } from "@outreach/core/stats";
 import type { Call, Contact } from "@outreach/core/types";
@@ -33,9 +34,8 @@ export class AnalyticsController {
     return (await this.calls.find({ workspaceId: ws, $or: [{ startedAt: { $gte: from } }, { live: true }] }, LIGHT).lean()).map(callOut);
   }
 
-  @Post("analytics")
-  async analytics(@Ctx() ctx: RequestContext, @Body() body: unknown) {
-    const ws = ctx.workspaceId!;
+  /** The calls a filter picks (this period and the one before), with what the figures need. */
+  private async select(ws: Types.ObjectId, body: unknown) {
     const q = parse(z.object({ range: z.enum(RANGES.map((r) => r.id) as [RangeId, ...RangeId[]]).default("30d"), agentId: z.string().max(64).default(""), direction: z.enum(["all", "inbound", "outbound"]).default("all"), language: z.string().max(40).default(""), metric: z.enum(["pickup", "goal"]).default("pickup") }), body ?? {});
     const now = new Date();
     const b = rangeBounds(q.range, now);
@@ -45,6 +45,12 @@ export class AnalyticsController {
     const before = pickCalls(all, flows, b.prevFrom, b.prevTo, filter);
     const ids = [...new Set(calls.flatMap((c) => (c.contactId ? [c.contactId] : [])))].filter((x) => Types.ObjectId.isValid(x)).map((x) => new Types.ObjectId(x));
     const people = (await this.contacts.find({ _id: { $in: ids }, workspaceId: ws }, { phone: 1, name: 1 }).lean()).map((p) => ({ id: String(p._id), phone: p.phone, name: p.name })) as Contact[];
+    return { q, b, calls, before, flows, settings, people };
+  }
+
+  @Post("analytics")
+  async analytics(@Ctx() ctx: RequestContext, @Body() body: unknown) {
+    const { q, b, calls, before, flows, settings, people } = await this.select(ctx.workspaceId!, body);
     return {
       bounds: b,
       now: { summary: summarize(calls), conversation: conversation(calls) },
@@ -58,6 +64,15 @@ export class AnalyticsController {
       bestTimes: bestTimes(calls, people, settings.timezone, q.metric),
       languages: [...new Set(flows.map((f) => f.agent.language))].sort(),
     };
+  }
+
+  /** The picked calls as a CSV (same filters as the page). */
+  @Post("analytics/export")
+  async export(@Ctx() ctx: RequestContext, @Body() body: unknown, @Res() res: Response) {
+    const { calls, flows, people } = await this.select(ctx.workspaceId!, body);
+    res.setHeader("content-type", "text/csv; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="calls-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.status(200).send(callsCsv(calls, flows, people));
   }
 
   /** Everything Home shows, in one request. */

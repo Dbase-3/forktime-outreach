@@ -8,16 +8,11 @@
 import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { newId } from "@outreach/core/flow-tree";
-import { nowIso, update, useApp } from "@/lib/store";
+import { deleteAgent, duplicateAgent as duplicateOnServer } from "@/lib/actions";
+import { useApp } from "@/lib/store";
 import type { Flow } from "@outreach/core/types";
 import { Popover } from "../popover";
 
-export function duplicateAgent(flow: Flow, takenNames: string[]): Flow {
-  let name = `${flow.name} copy`;
-  for (let n = 2; takenNames.includes(name); n++) name = `${flow.name} copy ${n}`;
-  return { ...structuredClone(flow), id: newId("f"), name, status: "draft", numberId: undefined, updatedAt: nowIso() };
-}
 
 export function AgentMenu({ flow, afterDelete }: { flow: Flow; afterDelete?: () => void }) {
   const app = useApp();
@@ -26,16 +21,24 @@ export function AgentMenu({ flow, afterDelete }: { flow: Flow; afterDelete?: () 
   const [confirming, setConfirming] = useState(false);
   const running = app.campaigns.filter((c) => c.status === "running" && c.agentId === flow.id);
 
-  const duplicate = () => {
-    const copy = duplicateAgent(flow, app.flows.map((f) => f.name));
-    update((s) => ({ ...s, flows: [copy, ...s.flows] }));
-    setOpen(false);
-    router.push(`/agents/${copy.id}`);
+  const [error, setError] = useState<string | null>(null);
+  const duplicate = async () => {
+    try {
+      const copy = await duplicateOnServer(flow.id);
+      setOpen(false);
+      router.push(`/agents/${copy.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't duplicate it.");
+    }
   };
-  const remove = () => {
-    update((s) => ({ ...s, flows: s.flows.filter((f) => f.id !== flow.id) }));
-    setOpen(false);
-    afterDelete?.();
+  const remove = async () => {
+    try {
+      await deleteAgent(flow.id);
+      setOpen(false);
+      afterDelete?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete it.");
+    }
   };
 
   return (
@@ -53,9 +56,10 @@ export function AgentMenu({ flow, afterDelete }: { flow: Flow; afterDelete?: () 
         </button>
       }
     >
+      {error && <p className="px-2.5 pb-1.5 text-xs text-rose-700 dark:text-rose-400">{error}</p>}
       {!confirming ? (
         <div onClick={(e) => e.stopPropagation()}>
-          <button type="button" onClick={duplicate} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-muted">
+          <button type="button" onClick={() => void duplicate()} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-muted">
             <Copy size={14} className="text-fg-3" /> Duplicate
           </button>
           <button type="button" onClick={() => setConfirming(true)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-rose-700 hover:bg-rose-500/10 dark:text-rose-400">
@@ -78,7 +82,7 @@ export function AgentMenu({ flow, afterDelete }: { flow: Flow; afterDelete?: () 
               <p className="mt-1 text-xs text-fg-3">Its number is freed for another agent. Past calls keep their recordings and transcripts.</p>
               <div className="mt-3 flex justify-end gap-2">
                 <button type="button" className="btn-ghost h-8 px-3 text-sm" onClick={() => setConfirming(false)}>Keep</button>
-                <button type="button" className="h-8 rounded-lg bg-rose-600 px-3 text-sm font-medium text-white hover:bg-rose-700" onClick={remove}>Delete</button>
+                <button type="button" className="h-8 rounded-lg bg-rose-600 px-3 text-sm font-medium text-white hover:bg-rose-700" onClick={() => void remove()}>Delete</button>
               </div>
             </>
           )}

@@ -1,11 +1,13 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight, PhoneCall, Search, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, PhoneCall, Search, ThumbsDown, ThumbsUp } from "lucide-react";
+import { useEffect, useState } from "react";
 import { CALL_ACTIONS } from "@outreach/core/call-review";
 import { duration, humanize, relativeTime } from "@outreach/core/format";
+import { ws } from "@/lib/api";
 import { useApp } from "@/lib/store";
-import type { AppState, Call } from "@outreach/core/types";
+import type { Call, Flow } from "@outreach/core/types";
 import { CallSheet, outcomeTone } from "@/components/call-sheet";
 import { Avatar, Badge, EmptyState, PageHeader, Segmented } from "@/components/ui";
 
@@ -19,22 +21,35 @@ export default function CallsPage() {
   const [outcome, setOutcome] = useState("");
   const [action, setAction] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
-  const outcomes = useMemo(() => [...new Set(app.calls.map((c) => c.outcome))].sort(), [app.calls]);
-  const q = query.trim().toLowerCase();
-  const calls = [...app.calls]
-    .filter((c) => direction === "all" || c.direction === direction)
-    .filter((c) => !flowId || c.flowId === flowId)
-    .filter((c) => !outcome || c.outcome === outcome)
-    .filter((c) => !action || (c.actions ?? []).includes(action))
-    .filter((c) => {
-      if (!q) return true;
-      const contact = app.contacts.find((x) => x.id === c.contactId);
-      return `${contact?.name ?? ""} ${contact?.phone ?? ""} ${c.summary}`.toLowerCase().includes(q);
-    })
-    .sort((a, b) => Number(Boolean(b.live)) - Number(Boolean(a.live)) || b.startedAt.localeCompare(a.startedAt));
-  const filtered = Boolean(q || flowId || outcome || action || direction !== "all");
-  const open = app.calls.find((c) => c.id === openId) ?? null;
+  // Search waits for a pause in typing; any filter change goes back to page 1.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(query.trim()), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+  useEffect(() => setPage(1), [search, direction, flowId, outcome, action]);
+  // Links (Home, ⌘K) open a call with ?open=<id>.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("open");
+    if (id) setOpenId(id);
+  }, []);
+
+  const body = { search, direction, agentId: flowId, outcome, action, page, pageSize: 50 };
+  const list = useQuery({
+    queryKey: ["calls", app.workspace.id, body],
+    queryFn: () => ws<{ rows: Call[]; contacts: Record<string, Person>; total: number; pages: number }>("/calls/query", { body }),
+    placeholderData: keepPreviousData,
+    refetchInterval: (q) => (q.state.data?.rows.some((c) => c.live) ? 5000 : false),
+  });
+  const outcomesQuery = useQuery({ queryKey: ["call-outcomes", app.workspace.id], queryFn: () => ws<string[]>("/calls/outcomes") });
+  const outcomes = outcomesQuery.data ?? [];
+  const calls = list.data?.rows ?? [];
+  const people = list.data?.contacts ?? {};
+  const total = list.data?.total ?? 0;
+  const pages = list.data?.pages ?? 1;
+  const filtered = Boolean(search || flowId || outcome || action || direction !== "all");
   const clear = () => {
     setQuery("");
     setFlowId("");
@@ -78,7 +93,11 @@ export default function CallsPage() {
         </div>
       </div>
 
-      {calls.length === 0 ? (
+      {list.isLoading ? (
+        <div className="card divide-y divide-line overflow-hidden">{Array.from({ length: 6 }, (_, i) => <div key={i} className="px-4 py-4"><span className="skeleton block h-10 rounded-lg" /></div>)}</div>
+      ) : list.isError ? (
+        <EmptyState icon={<PhoneCall size={20} />} title="Couldn't load calls" body={list.error instanceof Error ? list.error.message : "Try again in a moment."} action={<button type="button" className="btn-secondary" onClick={() => void list.refetch()}>Try again</button>} />
+      ) : calls.length === 0 ? (
         <EmptyState
           icon={<PhoneCall size={20} />}
           title={filtered ? "No calls match" : "No calls yet"}
@@ -87,22 +106,33 @@ export default function CallsPage() {
         />
       ) : (
         <>
-          <p className="mb-2 text-xs text-fg-3">{calls.length} {calls.length === 1 ? "call" : "calls"}</p>
+          <p className="mb-2 text-xs text-fg-3">
+            {total.toLocaleString()} {total === 1 ? "call" : "calls"}
+            {list.isFetching && <span className="ml-2 text-fg-4">Updating…</span>}
+          </p>
           <div className="card divide-y divide-line overflow-hidden">
             {calls.map((call) => (
-              <CallRow key={call.id} call={call} app={app} onOpen={() => setOpenId(call.id)} />
+              <CallRow key={call.id} call={call} person={call.contactId ? people[call.contactId] : undefined} flows={app.flows} onOpen={() => setOpenId(call.id)} />
             ))}
           </div>
+          {pages > 1 && (
+            <div className="mt-3 flex items-center justify-end gap-2 text-sm">
+              <span className="text-xs text-fg-3">Page {page} of {pages.toLocaleString()}</span>
+              <button type="button" className="btn-icon h-8 w-8" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page"><ChevronLeft size={15} /></button>
+              <button type="button" className="btn-icon h-8 w-8" disabled={page >= pages} onClick={() => setPage((p) => p + 1)} aria-label="Next page"><ChevronRight size={15} /></button>
+            </div>
+          )}
         </>
       )}
-      <CallSheet call={open} app={app} onClose={() => setOpenId(null)} />
+      <CallSheet callId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }
 
-function CallRow({ call, app, onOpen }: { call: Call; app: AppState; onOpen: () => void }) {
-  const contact = app.contacts.find((c) => c.id === call.contactId);
-  const flow = app.flows.find((f) => f.id === call.flowId);
+type Person = { id: string; name: string; phone: string };
+
+function CallRow({ call, person: contact, flows, onOpen }: { call: Call; person?: Person; flows: Flow[]; onOpen: () => void }) {
+  const flow = flows.find((f) => f.id === call.flowId);
   const DirIcon = call.direction === "inbound" ? ArrowDownLeft : ArrowUpRight;
   return (
     <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-subtle">

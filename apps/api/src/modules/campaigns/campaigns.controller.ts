@@ -71,6 +71,15 @@ export class CampaignsController {
     return campaignOut(doc.toObject());
   }
 
+  /** Audience and start checks for a campaign as it is on screen now (before its edits have saved). */
+  @Post("check")
+  async check(@Ctx() ctx: RequestContext, @Body() body: unknown) {
+    const { config, status } = parse(z.object({ config: CampaignInputSchema, status: z.enum(["draft", "running", "paused", "done"]).default("draft") }), body);
+    const c = { ...config, id: "check", status, called: 0, answered: 0, createdAt: new Date().toISOString() } as Campaign;
+    const aud = await this.audience(ctx.workspaceId!, c);
+    return { audienceCount: aud.count, skipped: aud.skipped, issues: await this.issues(ctx.workspaceId!, c), upcoming: await this.dueSoon(ctx.workspaceId!, c, aud.filter) };
+  }
+
   @Get(":id")
   async get(@Ctx() ctx: RequestContext, @Param("id") id: string) {
     const c = campaignOut(await this.load(ctx.workspaceId!, id));
@@ -113,19 +122,24 @@ export class CampaignsController {
     return { deleted: true };
   }
 
-  /** For "Keep calling around a date": who's due in the next N days, soonest first. */
+  /** For "Keep calling around a date": who's due in the next 60 days, soonest first. */
   @Get(":id/upcoming")
   async upcoming(@Ctx() ctx: RequestContext, @Param("id") id: string) {
     const c = campaignOut(await this.load(ctx.workspaceId!, id));
-    if (c.mode !== "always" || c.trigger.kind !== "date_field") return { total: 0, next: [] };
     const aud = await this.audience(ctx.workspaceId!, c);
-    const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
+    return this.dueSoon(ctx.workspaceId!, c, aud.filter);
+  }
+
+  private async dueSoon(_ws: Types.ObjectId, c: Campaign, filter: FilterQuery<Row<"Contact">>) {
+    if (c.mode !== "always" || c.trigger.kind !== "date_field" || !c.trigger.field) return { total: 0, next: [] };
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const horizon = today + 60 * 86_400_000;
-    const due: { contact: ReturnType<typeof contactOut>; due: string }[] = [];
-    for await (const row of this.people.cursor({ $and: [aud.filter, { [`fields.${c.trigger.field}`]: { $exists: true } }] } as FilterQuery<Row<"Contact">>)) {
+    const due: { contact: { id: string; name: string }; due: string }[] = [];
+    for await (const row of this.people.cursor({ $and: [filter, { [`fields.${c.trigger.field}`]: { $exists: true } }] } as FilterQuery<Row<"Contact">>)) {
       const contact = contactOut(row);
       const d = dueDate(c.trigger, contact);
-      if (d && d.getTime() >= today && d.getTime() <= horizon) due.push({ contact, due: d.toISOString() });
+      if (d && d.getTime() >= today && d.getTime() <= horizon) due.push({ contact: { id: contact.id, name: contact.name }, due: d.toISOString() });
     }
     due.sort((a, b) => a.due.localeCompare(b.due));
     return { total: due.length, next: due.slice(0, 10) };

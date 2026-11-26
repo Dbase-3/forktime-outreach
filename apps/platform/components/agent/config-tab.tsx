@@ -10,6 +10,7 @@ import { allTimezones, offsetLabel, timeIn, zoneName } from "@outreach/core/time
 import type { Direction, Flow } from "@outreach/core/types";
 import type { VarGroup } from "@outreach/core/variables";
 import { numberOwner } from "@outreach/core/numbers";
+import { setAgentNumber } from "@/lib/actions";
 import { useApp } from "@/lib/store";
 import { VoicePanel } from "../flow/voice-panel";
 import { GetNumber, NumberPicker } from "../numbers/number-picker";
@@ -173,6 +174,7 @@ function NumberField({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => F
   const [pending, setPending] = useState<string | null>(null);
   const [getting, setGetting] = useState(false);
   const [liveNote, setLiveNote] = useState(false);
+  const [numberProblem, setNumberProblem] = useState<string | null>(null);
   return (
     <>
       <NumberPicker
@@ -196,12 +198,13 @@ function NumberField({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => F
         onGetNumber={() => setGetting(true)}
       />
       {liveNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">A live agent needs a number. Switch it to draft first, or pick another number.</p>}
+      {numberProblem && <p className="mt-2 text-xs text-rose-700 dark:text-rose-400">{numberProblem}</p>}
       <Modal open={getting} onClose={() => setGetting(false)} title="Get another number" description="Pick where people will see you calling from.">
         <GetNumber
           taken={app.numbers.map((n) => n.e164)}
           onAdded={(n) => {
             setPending(null);
-            onEdit((f) => ({ ...f, numberId: n.id }));
+            void setAgentNumber(flow.id, n.id).catch((err) => setNumberProblem(err instanceof Error ? err.message : "Couldn't change the number."));
             setGetting(false);
           }}
         />

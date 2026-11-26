@@ -6,17 +6,39 @@
 
 import clsx from "clsx";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { FEEDBACK_REASONS, NOTE_MAX } from "@outreach/core/call-review";
-import { nowIso, update } from "@/lib/store";
+import { ws } from "@/lib/api";
+import { nowIso, useApp } from "@/lib/store";
 import type { Call, CallFeedback, FeedbackReason } from "@outreach/core/types";
+import { callKey, type CallDetail } from "../call-sheet";
 
-function save(callId: string, feedback: CallFeedback | null): void {
-  update((s) => ({ ...s, calls: s.calls.map((c) => (c.id === callId ? { ...c, feedback } : c)) }));
+/** Shows the rating at once, saves it, and puts it back if the save fails. */
+function useSaveFeedback() {
+  const queries = useQueryClient();
+  const { workspace } = useApp();
+  const [problem, setProblem] = useState<string | null>(null);
+  const save = async (callId: string, feedback: CallFeedback | null) => {
+    const key = callKey(workspace.id, callId);
+    const before = queries.getQueryData<CallDetail>(key);
+    if (before) queries.setQueryData<CallDetail>(key, { ...before, call: { ...before.call, feedback: feedback ?? undefined } });
+    setProblem(null);
+    try {
+      await ws(`/calls/${callId}/feedback`, { method: "PATCH", body: { feedback } });
+      void queries.invalidateQueries({ queryKey: ["calls", workspace.id] });
+    } catch (err) {
+      if (before) queries.setQueryData(key, before);
+      setProblem(err instanceof Error ? err.message : "Couldn't save your rating.");
+    }
+  };
+  return { save, problem };
 }
 
 export function CallFeedbackBar({ call }: { call: Call }) {
   const mine = call.feedback ?? null;
+  const { save: saveNow, problem } = useSaveFeedback();
+  const save = (callId: string, feedback: CallFeedback | null) => void saveNow(callId, feedback);
   const [open, setOpen] = useState(false);
   const [reasons, setReasons] = useState<FeedbackReason[]>(mine?.reasons ?? []);
   const [note, setNote] = useState(mine?.note ?? "");
@@ -100,6 +122,7 @@ export function CallFeedbackBar({ call }: { call: Call }) {
         </div>
       )}
 
+      {problem && <p className="mt-1.5 text-xs text-rose-700 dark:text-rose-400">{problem}</p>}
       {mine && !open && (
         <div className="mt-1.5 text-xs text-fg-3">
           {mine.rating === "up" ? "Thanks, glad it went well." : "Thanks. We'll use this to improve the agent."}{" "}

@@ -11,6 +11,14 @@ import { Types } from "mongoose";
 import type { M } from "../../db/models";
 import { storeFields } from "../contacts/typed-fields";
 
+/** Replaces the last digits of a formatted number, keeping its spaces and brackets: "0491 570 156" + "4821" → "0491 574 821". */
+export function withLastDigits(display: string, tail: string): string {
+  const out = display.split("");
+  let k = tail.length - 1;
+  for (let i = out.length - 1; i >= 0 && k >= 0; i--) if (/\d/.test(out[i])) out[i] = tail[k--];
+  return out.join("");
+}
+
 @Injectable()
 export class SampleService {
   constructor(
@@ -37,9 +45,26 @@ export class SampleService {
     const country = countryOfZone(s.settings.timezone);
     const ws = { workspaceId };
 
-    // Sample numbers are shared fictional ones; make them unique per workspace (still in the 5550 drama range).
-    const suffix = String(workspaceId).slice(-4).replace(/[^0-9]/g, "7").padStart(4, "1");
-    await this.numbers.insertMany(s.numbers.map((n, i) => ({ ...ws, _id: idOf(n.id), e164: `${n.e164.slice(0, -4)}${suffix.slice(0, 3)}${i}`, display: `${n.display.slice(0, -4)}${suffix.slice(0, 3)}${i}`, country: n.country, kind: n.kind, area: n.area })));
+    // Sample numbers are shared fictional ones; each workspace gets its own (same range, last four digits
+    // picked at random and checked as free: numbers are unique across workspaces).
+    const taken = new Set<string>();
+    const freeNumber = async (e164: string) => {
+      for (let tries = 0; tries < 50; tries++) {
+        const tail = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+        const next = `${e164.slice(0, -4)}${tail}`;
+        if (!taken.has(next) && !(await this.numbers.exists({ e164: next }))) {
+          taken.add(next);
+          return tail;
+        }
+      }
+      throw new Error("No free sample number left in that range.");
+    };
+    const numbers = [];
+    for (const n of s.numbers) {
+      const tail = await freeNumber(n.e164);
+      numbers.push({ ...ws, _id: idOf(n.id), e164: `${n.e164.slice(0, -4)}${tail}`, display: withLastDigits(n.display, tail), country: n.country, kind: n.kind, area: n.area });
+    }
+    await this.numbers.insertMany(numbers);
     await this.fields.insertMany(s.fieldDefs.map((f) => ({ ...ws, ...f })));
     await this.knowledge.insertMany(s.knowledge.map((k) => ({ ...ws, _id: idOf(k.id), name: k.name, kind: k.kind, source: k.source, content: k.content, sizeBytes: k.sizeBytes, pages: k.pages, status: k.status, error: k.error, availableToAll: k.availableToAll, autoRefresh: k.autoRefresh })));
     await this.sources.insertMany(s.sources.map((x) => ({ ...ws, _id: idOf(x.id), kind: x.kind, integrationId: x.integrationId, name: x.name, object: x.object, list: x.list, fieldKeys: x.fieldKeys, rows: x.rows, syncEvery: x.syncEvery, lastSyncAt: new Date(x.lastSyncAt), status: x.status })));

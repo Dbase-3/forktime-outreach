@@ -15,6 +15,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { docsForAgent } from "@outreach/core/knowledge";
 import { dataSchema } from "@outreach/core/agent-data";
 import { TOP, allSteps, findStep, flowIssues, insertStep, makeStep, moveStep, removeStep, updateStep, type Container } from "@outreach/core/flow-tree";
+import { useQuery } from "@tanstack/react-query";
+import type { Contact } from "@outreach/core/types";
+import { ApiError, ws } from "@/lib/api";
+import { publishAgent, unpublishAgent } from "@/lib/actions";
 import { nowIso, update, useApp } from "@/lib/store";
 import { humanize } from "@outreach/core/format";
 import { variableGroups } from "@outreach/core/variables";
@@ -57,6 +61,23 @@ export function AgentEditor({ id }: { id: string }) {
   const [drawn, setDrawn] = useState(0); // bumps when AI (or undo) replaces the workflow, so the canvas refits
   const [focusBrief, setFocusBrief] = useState(false); // "Start from scratch": the cursor waits in "What should this agent do?"
   const writer = useAgentWriter();
+  // Contacts to try the preview as (a few from the server).
+  const sampleContacts = useQuery({ queryKey: ["contacts-sample", app.workspace.id], queryFn: () => ws<Contact[]>("/contacts/sample?limit=30") });
+  // Go live / back to draft run on the server (same checks) and say why if refused.
+  const [going, setGoing] = useState(false);
+  const [goProblem, setGoProblem] = useState<string | null>(null);
+  const go = async (fn: () => Promise<unknown>) => {
+    setGoing(true);
+    setGoProblem(null);
+    try {
+      await fn();
+    } catch (err) {
+      const issues = err instanceof ApiError ? (err.details as { issues?: string[] } | undefined)?.issues : undefined;
+      setGoProblem(issues?.length ? issues.join(" ") : err instanceof Error ? err.message : "That didn't work.");
+    } finally {
+      setGoing(false);
+    }
+  };
 
   useEffect(() => {
     if (window.matchMedia("(min-width: 768px)").matches) setView("canvas");
@@ -191,11 +212,18 @@ export function AgentEditor({ id }: { id: string }) {
         )}
         <AgentMenu flow={flow} afterDelete={() => router.push("/agents")} />
         {flow.status === "live" ? (
-          <button type="button" className="btn-secondary h-8 border-emerald-500/40 text-emerald-700 dark:text-emerald-400" onClick={() => edit((f) => ({ ...f, status: "draft" }))} title="Switch back to draft"><CheckCircle2 size={15} /> Live</button>
+          <button type="button" className="btn-secondary h-8 border-emerald-500/40 text-emerald-700 dark:text-emerald-400" disabled={going} onClick={() => void go(() => unpublishAgent(flow.id))} title="Switch back to draft"><CheckCircle2 size={15} /> Live</button>
         ) : (
-          <button type="button" className="btn-primary h-8" disabled={issues.length > 0} onClick={() => edit((f) => ({ ...f, status: "live" }))}>Go live</button>
+          <button type="button" className="btn-primary h-8" disabled={issues.length > 0 || going} onClick={() => void go(() => publishAgent(flow.id))}>{going ? "Going live…" : "Go live"}</button>
         )}
       </div>
+
+      {goProblem && (
+        <div role="alert" className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-800 dark:text-amber-300">
+          <span className="flex-1">{goProblem}</span>
+          <button type="button" className="text-xs font-medium underline" onClick={() => setGoProblem(null)}>Dismiss</button>
+        </div>
+      )}
 
       {/* Phones: one pane at a time */}
       <div className="flex shrink-0 border-b border-line px-3 py-2 md:hidden">
@@ -300,7 +328,7 @@ export function AgentEditor({ id }: { id: string }) {
 
             {/* Preview (stays mounted so a call carries on while you look at the workflow) */}
             <div className={clsx("absolute inset-0 bg-background", mainTab !== "preview" && "invisible")}>
-              <PreviewPanel flow={flow} business={app.settings.businessName} contacts={app.contacts} onActiveStep={setActiveId} />
+              <PreviewPanel flow={flow} business={app.settings.businessName} contacts={sampleContacts.data ?? []} onActiveStep={setActiveId} />
             </div>
           </div>
         </section>

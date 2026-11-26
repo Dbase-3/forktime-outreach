@@ -2,7 +2,8 @@
 
 import clsx from "clsx";
 import { BookOpen, FileUp, Globe, Search, Type } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { refreshReading } from "@/lib/actions";
 import { KIND_LABEL, formatBytes, usedByLabel } from "@outreach/core/knowledge";
 import { relativeTime } from "@outreach/core/format";
 import { useApp } from "@/lib/store";
@@ -30,6 +31,13 @@ const ADD: { kind: AddKind; label: string; hint: string; icon: typeof Globe }[] 
 
 export default function KnowledgePage() {
   const app = useApp();
+  // Web documents are read on the server; check back while any are still reading.
+  const reading = app.knowledge.some((d) => d.status === "reading");
+  useEffect(() => {
+    if (!reading) return;
+    const t = setInterval(() => void refreshReading(), 3000);
+    return () => clearInterval(t);
+  }, [reading]);
   const [adding, setAdding] = useState<AddKind | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");

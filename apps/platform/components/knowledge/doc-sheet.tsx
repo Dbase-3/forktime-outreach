@@ -3,12 +3,15 @@
 // One document: where it came from, who uses it, its text.
 
 import { RefreshCw, Trash2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { knowledgeContent, refreshReading, saveKnowledgeText } from "@/lib/actions";
 import { KIND_LABEL, attachedTo, deleteBlockedReason, formatBytes } from "@outreach/core/knowledge";
 import { relativeTime } from "@outreach/core/format";
 import { useApp } from "@/lib/store";
 import type { KnowledgeDoc } from "@outreach/core/types";
 import { Sheet, Toggle, useLastPresent } from "../ui";
-import { refreshUrl, removeDoc, setDoc, toggleAttached, urlMode } from "./actions";
+import { refreshUrl, removeDoc, setDoc, toggleAttached } from "./actions";
 import { DocStatus } from "./doc-status";
 
 export function DocSheet({ docId, onClose }: { docId: string | null; onClose: () => void }) {
@@ -17,6 +20,45 @@ export function DocSheet({ docId, onClose }: { docId: string | null; onClose: ()
   const blocked = doc ? deleteBlockedReason(doc, app.flows) : null;
   const web = doc && (doc.kind === "url" || doc.kind === "sitemap" || doc.kind === "site");
   const users = doc ? attachedTo(doc, app.flows).map((f) => f.id) : [];
+  // The text is loaded when the document is opened (the list doesn't carry it).
+  const full = useQuery({ queryKey: ["knowledge", docId, doc?.updatedAt], queryFn: () => knowledgeContent(docId as string), enabled: Boolean(docId) && doc?.status !== "reading" });
+  const queries = useQueryClient();
+  const [text, setText] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const version = useRef<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (full.data) {
+      setText(full.data.content);
+      version.current = full.data.version;
+    }
+  }, [full.data]);
+  useEffect(() => {
+    setText(null);
+    setProblem(null);
+  }, [docId]);
+  // While it's being read on the server, check back every few seconds.
+  useEffect(() => {
+    if (doc?.status !== "reading") return;
+    const t = setInterval(() => void refreshReading(), 3000);
+    return () => clearInterval(t);
+  }, [doc?.status]);
+  const editText = (value: string) => {
+    setText(value);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      if (!docId || version.current === null) return;
+      try {
+        const saved = await saveKnowledgeText(docId, version.current, value);
+        version.current = saved.version;
+        queries.setQueryData(["knowledge", docId, saved.updatedAt], saved);
+        setProblem(null);
+      } catch (err) {
+        setProblem(err instanceof Error ? err.message : "Couldn't save the text.");
+      }
+    }, 700);
+  };
+  const content = text ?? "";
 
   return (
     <Sheet
@@ -32,9 +74,13 @@ export function DocSheet({ docId, onClose }: { docId: string | null; onClose: ()
               className="btn-ghost text-rose-600 hover:bg-rose-500/10 disabled:opacity-40"
               disabled={Boolean(blocked)}
               title={blocked ?? undefined}
-              onClick={() => {
-                removeDoc(doc.id);
-                onClose();
+              onClick={async () => {
+                try {
+                  await removeDoc(doc.id);
+                  onClose();
+                } catch (err) {
+                  setProblem(err instanceof Error ? err.message : "Couldn't delete it.");
+                }
               }}
             >
               <Trash2 size={15} /> Delete
@@ -67,7 +113,7 @@ export function DocSheet({ docId, onClose }: { docId: string | null; onClose: ()
                 <Toggle checked={Boolean(doc.autoRefresh)} onChange={(v) => setDoc(doc.id, { autoRefresh: v })} label="Keep it up to date" />
               </Row>
               <Row title="Read it again now" hint={doc.status === "reading" ? "Reading…" : `Last read ${relativeTime(doc.updatedAt)}`}>
-                <button type="button" className="btn-secondary h-8" disabled={doc.status === "reading"} onClick={() => doc.source && void refreshUrl(doc.id, doc.source, urlMode(doc))}>
+                <button type="button" className="btn-secondary h-8" disabled={doc.status === "reading"} onClick={() => void refreshUrl(doc.id)}>
                   <RefreshCw size={14} className={doc.status === "reading" ? "animate-spin" : undefined} /> Refresh
                 </button>
               </Row>
@@ -91,10 +137,13 @@ export function DocSheet({ docId, onClose }: { docId: string | null; onClose: ()
 
           <section>
             <h3 className="metric-label mb-2">{doc.kind === "text" ? "Text" : "What agents read"}</h3>
-            {doc.kind === "text" ? (
-              <textarea className="field min-h-64 font-mono text-xs leading-relaxed" value={doc.content} onChange={(e) => setDoc(doc.id, { content: e.target.value })} />
-            ) : doc.content ? (
-              <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-subtle p-3 font-mono text-xs leading-relaxed text-fg-2">{doc.content}</pre>
+            {problem && <p className="mb-2 text-sm text-rose-700 dark:text-rose-400">{problem}</p>}
+            {full.isLoading && text === null ? (
+              <div className="space-y-2"><span className="skeleton block h-3 w-full rounded" /><span className="skeleton block h-3 w-5/6 rounded" /><span className="skeleton block h-3 w-2/3 rounded" /></div>
+            ) : doc.kind === "text" ? (
+              <textarea className="field min-h-64 font-mono text-xs leading-relaxed" value={content} onChange={(e) => editText(e.target.value)} />
+            ) : content ? (
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-subtle p-3 font-mono text-xs leading-relaxed text-fg-2">{content}</pre>
             ) : (
               <p className="text-sm text-fg-3">Nothing read yet.</p>
             )}

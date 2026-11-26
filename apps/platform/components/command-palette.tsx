@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { queryContacts } from "@/lib/contacts-api";
 // ⌘K / Ctrl+K: jump to any page, agent, automation or contact.
 
 import * as Dialog from "@radix-ui/react-dialog";
@@ -46,12 +48,23 @@ export function CommandPalette({ open, onClose, pages }: { open: boolean; onClos
       ...pages.map((p) => ({ id: `page-${p.href}`, label: p.label, hint: "Page", href: p.href, icon: p.icon, group: "Go to" })),
       ...app.flows.map((f) => ({ id: f.id, label: f.name, hint: `${f.agent.name} · ${f.status === "live" ? "Live" : "Draft"}`, href: `/agents/${f.id}`, icon: Workflow, group: "Agents" })),
       ...app.campaigns.map((c) => ({ id: c.id, label: c.name, hint: c.status === "running" ? "Running" : c.status === "paused" ? "Paused" : "Draft", href: `/campaigns/${c.id}`, icon: CalendarClock, group: "Campaigns" })),
-      ...app.contacts.map((c) => ({ id: c.id, label: c.name, hint: c.phone, href: `/contacts?open=${c.id}`, icon: User, group: "Contacts" })),
     ],
     [app, pages],
   );
   const q = query.trim().toLowerCase();
-  const shown = (q ? items.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(q)) : items.filter((i) => i.group !== "Contacts")).slice(0, 12);
+  // Contacts are searched on the server (there can be 100k), a moment after typing stops.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(q), 200);
+    return () => clearTimeout(t);
+  }, [q]);
+  const people = useQuery({
+    queryKey: ["palette-contacts", app.workspace.id, search],
+    queryFn: () => queryContacts({ search, list: null, filter: { match: "all", rules: [] }, sort: null, page: 1, pageSize: 5 }),
+    enabled: open && search.length >= 2,
+  });
+  const contactItems: Item[] = search.length >= 2 && search === q ? (people.data?.rows ?? []).map((c) => ({ id: c.id, label: c.name, hint: c.phone, href: `/contacts?open=${c.id}`, icon: User, group: "Contacts" })) : [];
+  const shown = [...(q ? items.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(q)) : items).slice(0, 12 - contactItems.length), ...contactItems];
 
   useEffect(() => {
     if (!open) return;

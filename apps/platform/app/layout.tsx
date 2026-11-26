@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { THEME_SCRIPT } from "@/lib/theme-script";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Sets light/dark before the first paint, so there's no flash. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

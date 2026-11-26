@@ -1,13 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { Phone, RotateCcw } from "lucide-react";
+import { Loader2, Phone, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { ApiError, ws } from "@/lib/api";
+import { me } from "@/lib/store";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { WEEKDAYS, hourLabel } from "@outreach/core/format";
-import { resetWorkspace, update, useApp } from "@/lib/store";
+import { update, useApp } from "@/lib/store";
 import type { WorkspaceSettings } from "@outreach/core/types";
-import { Confirm } from "@/components/confirm";
 import { Field, PageHeader } from "@/components/ui";
 
 const TIMEZONES = ["Australia/Sydney", "Australia/Melbourne", "Australia/Brisbane", "Australia/Perth", "Pacific/Auckland", "America/New_York", "America/Chicago", "America/Los_Angeles", "America/Toronto", "Europe/London", "Asia/Karachi", "Asia/Dubai"];
@@ -86,19 +89,8 @@ export default function SettingsPage() {
           />
         </Section>
 
-        <Section title="Sample data" body="This preview keeps everything in your browser. Start over with the sample workspace any time.">
-          <Confirm
-            title="Reset to the sample workspace?"
-            body="Every agent, contact, campaign and setting you've changed is replaced by the sample. This can't be undone."
-            action="Reset"
-            danger
-            onConfirm={resetWorkspace}
-            trigger={
-              <button type="button" className="btn-secondary">
-                <RotateCcw size={16} /> Reset to sample workspace
-              </button>
-            }
-          />
+        <Section title="Team" body="Everyone here can build agents and run campaigns. Owners and admins can invite people and change settings.">
+          <Team />
         </Section>
       </div>
     </div>
@@ -114,5 +106,83 @@ function Section({ title, body, children }: { title: string; body?: string; chil
       </div>
       <div className="space-y-4">{children}</div>
     </section>
+  );
+}
+
+type Members = { members: { userId: string; email: string; role: string }[]; invites: { id: string; email: string; role: string }[] };
+
+function Team() {
+  const app = useApp();
+  const queries = useQueryClient();
+  const canManage = app.workspace.role !== "member";
+  const { data } = useQuery({ queryKey: ["members", app.workspace.id], queryFn: () => ws<Members>("/members") });
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("member");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (fn: () => Promise<Members>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      queries.setQueryData(["members", app.workspace.id], await fn());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const myId = me()?.user.id;
+  return (
+    <div className="space-y-3">
+      <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line">
+        {(data?.members ?? []).map((m) => (
+          <li key={m.userId} className="flex items-center gap-3 px-3.5 py-2.5 text-sm">
+            <span className="min-w-0 flex-1 truncate">{m.email}{m.userId === myId && <span className="text-fg-3"> (you)</span>}</span>
+            {app.workspace.role === "owner" && m.userId !== myId ? (
+              <select className="field h-8 w-auto py-0 text-sm" value={m.role} onChange={(e) => void run(() => ws<Members>(`/members/${m.userId}`, { method: "PATCH", body: { role: e.target.value } }))} aria-label={`Role for ${m.email}`}>
+                <option value="owner">Owner</option>
+                <option value="admin">Admin</option>
+                <option value="member">Member</option>
+              </select>
+            ) : (
+              <span className="text-xs capitalize text-fg-3">{m.role}</span>
+            )}
+            {canManage && m.userId !== myId && (
+              <button type="button" className="btn-icon h-7 w-7 hover:text-rose-600" aria-label={`Remove ${m.email}`} onClick={() => void run(() => ws<Members>(`/members/${m.userId}`, { method: "DELETE" }))}><X size={14} /></button>
+            )}
+          </li>
+        ))}
+        {(data?.invites ?? []).map((i) => (
+          <li key={i.id} className="flex items-center gap-3 px-3.5 py-2.5 text-sm">
+            <span className="min-w-0 flex-1 truncate text-fg-2">{i.email} <span className="text-xs text-fg-3">· invited, joins when they sign in</span></span>
+            <span className="text-xs capitalize text-fg-3">{i.role}</span>
+            {canManage && <button type="button" className="btn-icon h-7 w-7 hover:text-rose-600" aria-label={`Cancel invite for ${i.email}`} onClick={() => void run(() => ws<Members>(`/invites/${i.id}`, { method: "DELETE" }))}><X size={14} /></button>}
+          </li>
+        ))}
+        {!data && <li className="px-3.5 py-2.5"><span className="skeleton block h-4 w-40 rounded" /></li>}
+      </ul>
+      {canManage && (
+        <form
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              const out = await ws<Members>("/invites", { body: { email, role } });
+              setEmail("");
+              return out;
+            });
+          }}
+        >
+          <input className="field flex-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@business.com" aria-label="Email to invite" />
+          <select className="field sm:w-32" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Role">
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+            {app.workspace.role === "owner" && <option value="owner">Owner</option>}
+          </select>
+          <button type="submit" className="btn-primary" disabled={busy || !email.includes("@")}>{busy && <Loader2 size={14} className="animate-spin" />} Invite</button>
+        </form>
+      )}
+      {error && <p className="text-sm text-rose-700 dark:text-rose-400">{error}</p>}
+    </div>
   );
 }

@@ -31,6 +31,16 @@ export class FieldsController {
     return (await this.fields.find({ workspaceId: ctx.workspaceId }).sort({ createdAt: 1 }).lean()).map(fieldOut);
   }
 
+  /** How many live contacts have each field filled in (the Fields tab). */
+  @Get("filled")
+  async filled(@Ctx() ctx: RequestContext) {
+    const ws = ctx.workspaceId!;
+    const defs = await this.fields.find({ workspaceId: ws }, { key: 1 }).lean();
+    const live = { workspaceId: ws, deletedAt: null };
+    const [total, ...counts] = await Promise.all([this.contacts.countDocuments(live), ...defs.map((d) => this.contacts.countDocuments({ ...live, [`fields.${d.key}`]: { $exists: true, $nin: [null, ""] } }))]);
+    return { total, byField: Object.fromEntries(defs.map((d, i) => [d.key, counts[i]])) };
+  }
+
   @Post()
   async add(@Ctx() ctx: RequestContext, @Body() body: unknown) {
     const def = parse(FieldDefSchema, body);

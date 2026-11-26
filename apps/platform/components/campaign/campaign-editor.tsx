@@ -3,20 +3,25 @@
 // One campaign. The basics are always there (agent, who, when); conditions,
 // triggers, follow-ups and what happens after the call are added as needed.
 
+import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ArrowLeft, ArrowRight, Pause, Play, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Confirm } from "../confirm";
 import { dataSchema } from "@outreach/core/agent-data";
 import { daysLabel } from "@outreach/core/automation";
-import { audienceBreakdown, audienceOf, callRulesFor, campaignIssues, campaignSummary, upcomingCalls } from "@outreach/core/campaign";
+import { campaignSummary } from "@outreach/core/campaign";
+import { ApiError } from "@/lib/api";
+import { addField, deleteCampaign, pauseCampaign, startCampaign } from "@/lib/actions";
+import { useCampaignCheck } from "./use-check";
 import { allColumns } from "@outreach/core/contacts-table";
 import { newId, outcomesOf } from "@outreach/core/flow-tree";
 import { WEEKDAYS, dayLabel, hourLabel, humanize } from "@outreach/core/format";
 import { integrationInfo } from "@outreach/core/integrations";
-import { update, useApp } from "@/lib/store";
+import { contactLists } from "@/lib/contacts-api";
+import { update, useApp, type Loaded } from "@/lib/store";
 import type { AppState, Campaign, FollowUp, Trigger, WriteBack } from "@outreach/core/types";
 import { IntegrationLogo } from "../integrations";
 import { RulesEditor } from "../rules-editor";
@@ -37,17 +42,31 @@ export function CampaignEditor({ id }: { id: string }) {
   const app = useApp();
   const router = useRouter();
   const c = app.campaigns.find((x) => x.id === id);
+  const check = useCampaignCheck(c, app.workspace.id);
+  const [busy, setBusy] = useState(false);
+  const [actionProblem, setActionProblem] = useState<string | null>(null);
   if (!c) return <EmptyState icon={<Play size={20} />} title="This campaign isn't here" body="It may have been deleted." action={<Link href="/campaigns" className="btn-primary">Back to campaigns</Link>} />;
 
   const edit = (fn: (c: Campaign) => Campaign) => save(c.id, fn);
-  const rules = callRulesFor(app.settings);
-  const breakdown = audienceBreakdown(c, app.contacts, new Date(), rules);
-  const audience = breakdown.included;
-  const issues = campaignIssues(c, { flows: app.flows, defs: app.fieldDefs, audienceCount: audience.length, workspace: app.settings });
-  const remove = () => {
-    update((s) => ({ ...s, campaigns: s.campaigns.filter((x) => x.id !== c.id) }));
-    router.push("/campaigns");
+  const count = check.data?.audienceCount ?? 0;
+  const skipped = check.data?.skipped ?? { doNotCall: 0, badPhone: 0 };
+  const issues = check.data?.issues ?? ["Checking…"];
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setActionProblem(null);
+    try {
+      await fn();
+    } catch (err) {
+      const list = err instanceof ApiError ? (err.details as { issues?: string[] } | undefined)?.issues : undefined;
+      setActionProblem(list?.length ? list.join(" ") : err instanceof Error ? err.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
   };
+  const remove = () => run(async () => {
+    await deleteCampaign(c.id);
+    router.push("/campaigns");
+  });
 
   return (
     <div>
@@ -56,16 +75,19 @@ export function CampaignEditor({ id }: { id: string }) {
         <input className="-ml-1 min-w-0 flex-1 rounded-lg bg-transparent px-1 py-0.5 text-xl font-semibold tracking-[-0.02em] outline-none transition-colors hover:bg-subtle focus:bg-surface focus:ring-[3px] focus:ring-fg/5" value={c.name} onChange={(e) => edit((x) => ({ ...x, name: e.target.value }))} aria-label="Campaign name" />
         <Badge tone={STATUS[c.status].tone} dot>{STATUS[c.status].label}</Badge>
         {c.status === "running" ? (
-          <button type="button" className="btn-secondary" onClick={() => edit((x) => ({ ...x, status: "paused" }))}><Pause size={15} /> Pause</button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(() => pauseCampaign(c.id))}><Pause size={15} /> Pause</button>
         ) : (
-          <button type="button" className="btn-primary" disabled={issues.length > 0} title={issues[0]} onClick={() => edit((x) => ({ ...x, status: "running" }))}><Play size={15} /> {c.status === "paused" ? "Resume" : "Start"}</button>
+          <button type="button" className="btn-primary" disabled={issues.length > 0 || busy} title={issues[0]} onClick={() => void run(() => startCampaign(c.id))}><Play size={15} /> {c.status === "paused" ? "Resume" : "Start"}</button>
         )}
       </div>
+
+      {actionProblem && <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300" role="alert">{actionProblem}</p>}
+      {c.status === "running" && <p className="mb-4 text-sm text-fg-3">It&apos;s running: pause it to change who it calls, when, or with which agent.</p>}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-3">
           <AgentSection c={c} app={app} edit={edit} />
-          <AudienceSection c={c} app={app} edit={edit} count={audience.length} skipped={breakdown.skipped} />
+          <AudienceSection c={c} app={app} edit={edit} count={count} skipped={skipped} />
           <WhenSection c={c} app={app} edit={edit} />
           <FollowUpSection c={c} app={app} edit={edit} />
           <AfterCallSection c={c} app={app} edit={edit} />
@@ -79,7 +101,7 @@ export function CampaignEditor({ id }: { id: string }) {
           />
         </div>
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <Summary c={c} app={app} count={audience.length} issues={issues} />
+          <Summary c={c} app={app} count={count} issues={issues} upcoming={check.data?.upcoming.next ?? []} />
         </aside>
       </div>
     </div>
@@ -135,8 +157,9 @@ function AgentSection({ c, app, edit }: { c: Campaign; app: AppState; edit: Edit
   );
 }
 
-function AudienceSection({ c, app, edit, count, skipped }: { c: Campaign; app: AppState; edit: Edit; count: number; skipped: { doNotCall: number; badPhone: number } }) {
-  const lists = [...new Set(app.contacts.flatMap((x) => x.groups))].sort();
+function AudienceSection({ c, app, edit, count, skipped }: { c: Campaign; app: Loaded; edit: Edit; count: number; skipped: { doNotCall: number; badPhone: number } }) {
+  const listsQuery = useQuery({ queryKey: ["contact-lists", app.workspace.id], queryFn: contactLists });
+  const lists = [...new Set([...(listsQuery.data ?? []), ...(c.audience.list ? [c.audience.list] : [])])].sort();
   const fields = allColumns(app.fieldDefs).filter((f) => !["lists", "last_call", "last_outcome", "created"].includes(f.key));
   return (
     <Section title="Who to call" aside={<span className="font-mono text-xs text-fg-3">{count} {count === 1 ? "person" : "people"}</span>}>
@@ -305,7 +328,7 @@ function AfterCallSection({ c, app, edit }: { c: Campaign; app: AppState; edit: 
   const ensureField = (key: string) => {
     if (app.fieldDefs.some((d) => d.key === key)) return;
     const field = schema.find((s) => s.key === key);
-    update((s) => ({ ...s, fieldDefs: [...s.fieldDefs, { key, label: field?.label || key.replace(/_/g, " "), type: field?.type ?? "text", source: "call" }] }));
+    void addField({ key, label: field?.label || key.replace(/_/g, " "), type: field?.type ?? "text", source: "call" });
   };
   const addWriteBack = () => {
     const first = schema.find((s) => !c.writeBacks.some((w) => w.from === s.key));
@@ -380,9 +403,9 @@ function AfterCallSection({ c, app, edit }: { c: Campaign; app: AppState; edit: 
   );
 }
 
-function Summary({ c, app, count, issues }: { c: Campaign; app: AppState; count: number; issues: string[] }) {
+function Summary({ c, app, count, issues, upcoming }: { c: Campaign; app: AppState; count: number; issues: string[]; upcoming: { contact: { id: string; name: string }; due: string }[] }) {
   const lines = campaignSummary(c, app.flows, app.fieldDefs, count);
-  const next = upcomingCalls(c, app.contacts, new Date(), 60, callRulesFor(app.settings)).slice(0, 5);
+  const next = upcoming.slice(0, 5).map((u) => ({ contact: u.contact, due: new Date(u.due) }));
   return (
     <div className="card overflow-hidden">
       <div className="border-b border-line bg-subtle p-4">

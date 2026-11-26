@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { relativeTime } from "@outreach/core/format";
-import { agentStats } from "@outreach/core/stats";
+import { useHome } from "@/lib/home";
 import { useApp } from "@/lib/store";
 import { TEMPLATES, type FlowTemplate } from "@outreach/core/templates";
 import { voiceById } from "@outreach/core/voices";
@@ -22,7 +22,8 @@ const DIRECTION: Record<Direction, { label: string; icon: typeof ArrowUpRight }>
 };
 
 export default function AgentsPage() {
-  const { flows, calls, numbers } = useApp();
+  const { flows, numbers } = useApp();
+  const home = useHome();
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
@@ -108,7 +109,7 @@ export default function AgentsPage() {
                       </td>
                       <td className="hidden px-4 py-3 xl:table-cell">{number ? <span className="font-mono text-xs">{number.display}</span> : <span className="text-xs text-amber-700 dark:text-amber-400">No number yet</span>}</td>
                       <td className="hidden px-4 py-3 text-fg-2 lg:table-cell"><span className="flex items-center gap-1.5"><DirIcon size={13} className="text-fg-4" /> {dir.label}</span></td>
-                      <td className="hidden px-4 py-3 text-right font-mono text-xs sm:table-cell">{agentStats(flow, calls, now).week}</td>
+                      <td className="hidden px-4 py-3 text-right font-mono text-xs sm:table-cell">{home.data?.agents[flow.id]?.stats.week ?? "…"}</td>
                       <td className="hidden px-4 py-3 text-fg-3 lg:table-cell">{relativeTime(flow.updatedAt)}</td>
                       <td className="px-4 py-3 text-right"><Badge tone={flow.status === "live" ? "green" : "gray"} dot>{flow.status === "live" ? "Live" : "Draft"}</Badge></td>
                       <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}><AgentMenu flow={flow} /></td>

@@ -4,27 +4,11 @@
 // headline figures with the change from the period before, then where calls
 // went, how agents do, how conversations went, and when to call.
 
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  RANGES,
-  bestTimes,
-  byAgent,
-  callsCsv,
-  change,
-  conversation,
-  directions,
-  pickCalls,
-  pickupBreakdown,
-  rangeBounds,
-  summarize,
-  timeline,
-  topOutcomes,
-  transfers,
-  type CallFilter,
-  type RangeId,
-  type TimeMetric,
-} from "@outreach/core/analytics";
+import { RANGES, change, type AgentRow, type RangeId, type TimeMetric, type conversation, type directions, type pickupBreakdown, type summarize, type timeline, type topOutcomes, type transfers, type bestTimes } from "@outreach/core/analytics";
+import { currentWorkspace, ws } from "@/lib/api";
 import { useApp } from "@/lib/store";
 import { AreaChart, Legend, type Series } from "@/components/charts";
 import { PageHeader, Segmented } from "@/components/ui";
@@ -38,6 +22,21 @@ const SERIES: Series[] = [
   { key: "wins", label: "Did its job", color: "rgb(var(--series-2))" },
 ];
 
+/** What POST /analytics returns: every figure on the page, worked out on the server. */
+type Figures = {
+  bounds: { from: number; to: number; prevFrom: number; prevTo: number };
+  now: { summary: ReturnType<typeof summarize>; conversation: ReturnType<typeof conversation> };
+  was: { summary: ReturnType<typeof summarize>; conversation: ReturnType<typeof conversation> };
+  buckets: ReturnType<typeof timeline>;
+  pickup: ReturnType<typeof pickupBreakdown>;
+  byAgent: { flowId: string; summary: AgentRow["summary"]; trend: number[] }[];
+  outcomes: ReturnType<typeof topOutcomes>;
+  directions: ReturnType<typeof directions>;
+  transfers: ReturnType<typeof transfers>;
+  bestTimes: ReturnType<typeof bestTimes>;
+  languages: string[];
+};
+
 export default function AnalyticsPage() {
   const app = useApp();
   const now = useMemo(() => new Date(), []);
@@ -48,16 +47,32 @@ export default function AnalyticsPage() {
   const [metric, setMetric] = useState<TimeMetric>("pickup");
 
   const languages = useMemo(() => [...new Set(app.flows.map((f) => f.agent.language))].sort(), [app.flows]);
-  const bounds = rangeBounds(range, now);
-  const filter: CallFilter = { flowId: flowId || undefined, direction: dir === "all" ? undefined : dir, language: language || undefined };
-  const calls = useMemo(() => pickCalls(app.calls, app.flows, bounds.from, bounds.to, filter), [app.calls, app.flows, bounds.from, bounds.to, filter.flowId, filter.direction, filter.language]); // eslint-disable-line react-hooks/exhaustive-deps
-  const before = useMemo(() => pickCalls(app.calls, app.flows, bounds.prevFrom, bounds.prevTo, filter), [app.calls, app.flows, bounds.prevFrom, bounds.prevTo, filter.flowId, filter.direction, filter.language]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const now$ = summarize(calls);
-  const was = summarize(before);
-  const conv = conversation(calls);
-  const convBefore = conversation(before);
-  const buckets = timeline(calls, bounds.from, bounds.to);
+  const body = { range, agentId: flowId, direction: dir, language, metric };
+  const figures = useQuery({ queryKey: ["analytics", app.workspace.id, body], queryFn: () => ws<Figures>("/analytics", { body }), placeholderData: keepPreviousData });
+  const [exporting, setExporting] = useState(false);
+  const f = figures.data;
+  if (!f) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Analytics" subtitle="How your agents are doing, and when people pick up." />
+        {figures.isError ? (
+          <p className="text-sm text-fg-2">Couldn&apos;t load the figures. <button type="button" className="text-accent hover:underline" onClick={() => void figures.refetch()}>Try again</button></p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <span key={i} className="skeleton block h-24 rounded-xl" />)}</div>
+        )}
+      </div>
+    );
+  }
+  const bounds = f.bounds;
+  const now$ = f.now.summary;
+  const was = f.was.summary;
+  const conv = f.now.conversation;
+  const convBefore = f.was.conversation;
+  const buckets = f.buckets;
+  const agentRows: AgentRow[] = f.byAgent.flatMap((r) => {
+    const flow = app.flows.find((x) => x.id === r.flowId);
+    return flow ? [{ flow, summary: r.summary, trend: r.trend }] : [];
+  });
   const points = buckets.map((b) => ({ label: b.label, tick: b.tick, values: { calls: b.calls, wins: b.wins } }));
   const qualified = conv.leads.rows.find((r) => r.id === "qualified")?.count ?? 0;
   const qualifiedBefore = convBefore.leads.rows.find((r) => r.id === "qualified")?.count ?? 0;
@@ -66,14 +81,20 @@ export default function AnalyticsPage() {
   const rangeLabel = RANGES.find((r) => r.id === range)?.label ?? "";
   const dates = `${new Date(bounds.from).toLocaleDateString("en-AU", { day: "numeric", month: "short" })} – ${now.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}`;
 
-  const exportCsv = () => {
-    const blob = new Blob([callsCsv(calls, app.flows, app.contacts)], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `calls-${range}-${now.toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/v1/w/${currentWorkspace()}/analytics/export`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" });
+      if (!res.ok) throw new Error("Couldn't export.");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `calls-${range}-${now.toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -81,7 +102,7 @@ export default function AnalyticsPage() {
       <PageHeader
         title="Analytics"
         subtitle="How your agents are doing, and when people pick up."
-        actions={<button type="button" className="btn-secondary" onClick={exportCsv} disabled={calls.length === 0}><Download size={15} /> Export CSV</button>}
+        actions={<button type="button" className="btn-secondary" onClick={() => void exportCsv()} disabled={now$.calls === 0 || exporting}><Download size={15} /> {exporting ? "Exporting…" : "Export CSV"}</button>}
       />
 
       {/* Filters: one row, applied to everything below */}
@@ -100,7 +121,7 @@ export default function AnalyticsPage() {
           </select>
         </div>
         <Segmented<Dir> value={dir} onChange={setDir} options={[{ value: "all", label: "All calls" }, { value: "outbound", label: "We called" }, { value: "inbound", label: "Called in" }]} />
-        <span className="font-mono text-xs text-fg-3 lg:ml-auto">{dates}</span>
+        <span className="font-mono text-xs text-fg-3 lg:ml-auto">{figures.isFetching && <span className="mr-2 text-fg-4">Updating…</span>}{dates}</span>
       </div>
 
       <Kpis
@@ -119,16 +140,16 @@ export default function AnalyticsPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Calls over time" className="lg:col-span-2" action={<Legend series={SERIES} totals={{ calls: now$.calls, wins: now$.wins }} />}>
-          {calls.length === 0 ? <Empty /> : <AreaChart points={points} series={SERIES} height={240} />}
+          {now$.calls === 0 ? <Empty /> : <AreaChart points={points} series={SERIES} height={240} />}
         </Panel>
-        <PickupCard data={pickupBreakdown(calls)} />
+        <PickupCard data={f.pickup} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="By agent" className="lg:col-span-2" flush>
-          <AgentTable rows={byAgent(calls, app.flows, bounds.from, bounds.to)} />
+          <AgentTable rows={agentRows} />
         </Panel>
-        <Outcomes rows={topOutcomes(calls)} />
+        <Outcomes rows={f.outcomes} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -137,11 +158,11 @@ export default function AnalyticsPage() {
         <TierCard title="Caller mood" tiers={MOOD_TIERS} data={conv.mood} />
       </div>
 
-      <BestTime regions={bestTimes(calls, app.contacts, app.settings.timezone, metric)} metric={metric} onMetric={setMetric} />
+      <BestTime regions={f.bestTimes} metric={metric} onMetric={setMetric} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Directions data={directions(calls)} />
-        <TransferCard data={transfers(calls)} />
+        <Directions data={f.directions} />
+        <TransferCard data={f.transfers} />
       </div>
     </div>
   );

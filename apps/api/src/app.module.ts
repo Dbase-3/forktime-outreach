@@ -9,6 +9,7 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { CallsModule } from "./modules/calls/calls.module";
 import { CampaignsModule } from "./modules/campaigns/campaigns.module";
 import { ImportsModule } from "./modules/imports/imports.module";
+import { SourcesModule } from "./modules/sources/sources.module";
 import { IntegrationsModule } from "./modules/integrations/integrations.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { KnowledgeModule } from "./modules/knowledge/knowledge.module";
@@ -19,7 +20,7 @@ import { NumbersModule } from "./modules/numbers/numbers.module";
 import { HealthController } from "./modules/health.controller";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 
-export const FEATURE_MODULES = [AuthModule, JobsModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule, KnowledgeModule, ImportsModule, CampaignsModule, CallsModule, AnalyticsModule, IntegrationsModule];
+export const FEATURE_MODULES = [AuthModule, JobsModule, WorkspacesModule, AgentsModule, NumbersModule, FieldsModule, ContactsModule, KnowledgeModule, ImportsModule, CampaignsModule, CallsModule, AnalyticsModule, IntegrationsModule, SourcesModule];
 
 @Module({
   imports: [

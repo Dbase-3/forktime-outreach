@@ -9,7 +9,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CALL_ACTIONS, END_REASONS, callerMoodLines, flowPath, moodLevel, moodStats } from "@outreach/core/call-review";
 import { duration, humanize } from "@outreach/core/format";
-import type { AppState, Call } from "@outreach/core/types";
+import type { AppState, Call, Contact } from "@outreach/core/types";
 import { fill } from "@outreach/core/practice";
 import { metaOf, summarize } from "../flow/meta";
 import { Badge, type Tone } from "../ui";
@@ -22,8 +22,7 @@ export function outcomeTone(outcome: string): Tone {
   return "gray";
 }
 
-export function CallOverview({ call, app }: { call: Call; app: AppState }) {
-  const contact = app.contacts.find((c) => c.id === call.contactId);
+export function CallOverview({ call, app, contact }: { call: Call; app: AppState; contact?: Contact }) {
   const flow = app.flows.find((f) => f.id === call.flowId);
   const DirIcon = call.direction === "inbound" ? ArrowDownLeft : ArrowUpRight;
   return (
@@ -68,7 +67,7 @@ export function CallOverview({ call, app }: { call: Call; app: AppState }) {
         </Section>
       )}
 
-      {flow && <PathSection call={call} app={app} />}
+      {flow && <PathSection call={call} app={app} contact={contact} />}
       <MoodSection call={call} />
     </div>
   );
@@ -96,10 +95,9 @@ function Section({ title, aside, children }: { title: string; aside?: ReactNode;
 }
 
 /** The steps the call went through, worked out from what it saved. */
-function PathSection({ call, app }: { call: Call; app: AppState }) {
+function PathSection({ call, app, contact }: { call: Call; app: AppState; contact?: Contact }) {
   const flow = app.flows.find((f) => f.id === call.flowId);
   if (!flow) return null;
-  const contact = app.contacts.find((c) => c.id === call.contactId);
   const values = { ...(contact?.fields ?? {}), ...call.saved, agent: flow.agent.name, business: app.settings.businessName };
   const path = flowPath(flow.steps, values);
   const questions = Object.fromEntries(flow.steps.flatMap((s) => (s.kind === "ask" ? [[s.field, s.question]] : [])));

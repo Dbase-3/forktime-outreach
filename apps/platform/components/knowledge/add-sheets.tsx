@@ -42,18 +42,28 @@ function UrlForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void }
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [shared, setShared] = useState(!attachTo);
   const problem = url.trim() ? publicUrlProblem(url) : null;
-  const submit = () => {
-    if (!url.trim() || problem) return;
-    addUrl(url.trim(), mode, { autoRefresh, availableToAll: shared, attachTo });
-    onDone();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url.trim() || problem || busy) return;
+    setBusy(true);
+    setFailed(null);
+    try {
+      await addUrl(url.trim(), mode, { autoRefresh, availableToAll: shared, attachTo });
+      onDone();
+    } catch (err) {
+      setFailed(err instanceof Error ? err.message : "Couldn't add it.");
+    } finally {
+      setBusy(false);
+    }
   };
   return (
-    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <Segmented<UrlMode> value={mode} onChange={setMode} options={[{ value: "page", label: "Single page" }, { value: "sitemap", label: "Sitemap" }, { value: "site", label: "Whole website" }]} />
       <Field label={mode === "sitemap" ? "Sitemap address" : "Address"} hint={mode === "site" ? "Reads the page and the pages it links to on the same site, up to 20." : mode === "sitemap" ? "Reads the pages the sitemap lists, up to 20." : undefined}>
         <input className="field" autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder={mode === "sitemap" ? "https://example.com/sitemap.xml" : "https://example.com/services"} inputMode="url" />
       </Field>
-      {problem && <p className="text-sm text-rose-700 dark:text-rose-400">{problem}</p>}
+      {(problem || failed) && <p className="text-sm text-rose-700 dark:text-rose-400">{problem ?? failed}</p>}
       <div className="flex items-start justify-between gap-4 rounded-lg border border-line p-3">
         <div>
           <div className="text-sm font-medium">Keep it up to date</div>
@@ -69,6 +79,7 @@ function UrlForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void }
 
 function FilesForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
+  const [fileProblems, setFileProblems] = useState<string[]>([]);
   const [shared, setShared] = useState(!attachTo);
   const [over, setOver] = useState(false);
   const pick = (list: FileList | null) => list && setFiles((f) => [...f, ...Array.from(list)]);
@@ -96,7 +107,17 @@ function FilesForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void
         </ul>
       )}
       <ShareRow value={shared} onChange={setShared} />
-      <button type="button" className="btn-primary w-full" disabled={files.length === 0} onClick={() => { void addFiles(files, { availableToAll: shared, attachTo }); onDone(); }}>
+      {fileProblems.length > 0 && <ul className="space-y-1 text-sm text-amber-800 dark:text-amber-300">{fileProblems.map((p) => <li key={p}>{p}</li>)}</ul>}
+      <button
+        type="button"
+        className="btn-primary w-full"
+        disabled={files.length === 0}
+        onClick={async () => {
+          const problems = await addFiles(files, { availableToAll: shared, attachTo });
+          if (problems.length) setFileProblems(problems);
+          else onDone();
+        }}
+      >
         Add {files.length > 1 ? `${files.length} files` : "file"}
       </button>
     </div>
@@ -107,6 +128,7 @@ function TextForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void 
   const [name, setName] = useState("");
   const [content, setContent] = useState("");
   const [shared, setShared] = useState(!attachTo);
+  const [textProblem, setTextProblem] = useState<string | null>(null);
   return (
     <div className="space-y-4">
       <Field label="Name">
@@ -116,7 +138,22 @@ function TextForm({ attachTo, onDone }: { attachTo?: string; onDone: () => void 
         <textarea className="field min-h-56" value={content} onChange={(e) => setContent(e.target.value)} />
       </Field>
       <ShareRow value={shared} onChange={setShared} />
-      <button type="button" className="btn-primary w-full" disabled={!content.trim()} onClick={() => { addText(name, content, { availableToAll: shared, attachTo }); onDone(); }}>Add</button>
+      {textProblem && <p className="text-sm text-rose-700 dark:text-rose-400">{textProblem}</p>}
+      <button
+        type="button"
+        className="btn-primary w-full"
+        disabled={!content.trim()}
+        onClick={async () => {
+          try {
+            await addText(name, content, { availableToAll: shared, attachTo });
+            onDone();
+          } catch (err) {
+            setTextProblem(err instanceof Error ? err.message : "Couldn't add it.");
+          }
+        }}
+      >
+        Add
+      </button>
     </div>
   );
 }

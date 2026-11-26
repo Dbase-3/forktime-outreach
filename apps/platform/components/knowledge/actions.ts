@@ -1,13 +1,13 @@
 "use client";
 
-// Adding and refreshing knowledge documents. Web documents are read by the
-// server route (app/api/knowledge/fetch); text files are read in the browser;
-// PDFs and Word files wait for the backend.
+// Adding and changing knowledge documents, through the API. Web documents are
+// read on the server by a job (public addresses only); text files are read in
+// the browser and sent as text; PDFs and Word files wait for server reading.
 
-import { newId } from "@outreach/core/flow-tree";
-import { MAX_FILE_BYTES, READABLE_FILE, htmlToText } from "@outreach/core/knowledge";
-import { nowIso, update } from "@/lib/store";
+import { MAX_FILE_BYTES, READABLE_FILE } from "@outreach/core/knowledge";
 import type { KnowledgeDoc } from "@outreach/core/types";
+import { addKnowledge, deleteKnowledge, refreshKnowledge } from "@/lib/actions";
+import { update } from "@/lib/store";
 
 export type UrlMode = "page" | "sitemap" | "site";
 
@@ -16,88 +16,55 @@ interface AddOptions {
   attachTo?: string; // an agent id to attach the new document to
 }
 
-function insert(doc: KnowledgeDoc, attachTo?: string): void {
-  update((s) => ({
-    ...s,
-    knowledge: [doc, ...s.knowledge],
-    flows: attachTo ? s.flows.map((f) => (f.id === attachTo ? { ...f, knowledgeIds: [...f.knowledgeIds, doc.id] } : f)) : s.flows,
-  }));
-}
-
-function patch(id: string, changes: Partial<KnowledgeDoc>): void {
-  update((s) => ({ ...s, knowledge: s.knowledge.map((d) => (d.id === id ? { ...d, ...changes, updatedAt: nowIso() } : d)) }));
-}
-
-async function readUrl(url: string, mode: UrlMode): Promise<{ title: string; text: string; pages: number }> {
-  const res = await fetch("/api/knowledge/fetch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url, mode }) });
-  const data = await res.json().catch(() => ({ error: "That address couldn't be read." }));
-  if (!res.ok || data.error) throw new Error(data.error ?? "That address couldn't be read.");
-  return data;
-}
-
 const KIND: Record<UrlMode, KnowledgeDoc["kind"]> = { page: "url", sitemap: "sitemap", site: "site" };
 
-export function addUrl(url: string, mode: UrlMode, opts: AddOptions & { autoRefresh: boolean }): string {
-  const id = newId("k");
-  const now = nowIso();
-  insert({ id, name: url.replace(/^https?:\/\//, ""), kind: KIND[mode], source: url, content: "", sizeBytes: 0, status: "reading", availableToAll: opts.availableToAll, autoRefresh: opts.autoRefresh, createdAt: now, updatedAt: now }, opts.attachTo);
-  void refreshUrl(id, url, mode, true);
-  return id;
+export async function addUrl(url: string, mode: UrlMode, opts: AddOptions & { autoRefresh: boolean }): Promise<string> {
+  const doc = await addKnowledge({ kind: KIND[mode], source: url, availableToAll: opts.availableToAll, attachTo: opts.attachTo });
+  return doc.id;
 }
 
-export async function refreshUrl(id: string, url: string, mode: UrlMode, rename = false): Promise<void> {
-  patch(id, { status: "reading", error: undefined });
-  try {
-    const { title, text, pages } = await readUrl(url, mode);
-    patch(id, { status: "ready", content: text, sizeBytes: new Blob([text]).size, pages, ...(rename ? { name: title } : {}) });
-  } catch (err) {
-    patch(id, { status: "failed", error: err instanceof Error ? err.message : "That address couldn't be read." });
-  }
+export async function refreshUrl(id: string): Promise<void> {
+  await refreshKnowledge(id);
 }
 
-const MAX_BROWSER_TEXT_BYTES = 2 * 1024 * 1024;
+const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 
-export async function addFiles(files: File[], opts: AddOptions): Promise<void> {
+/** Text files are sent as text; other kinds wait for server reading (a later phase). */
+export async function addFiles(files: File[], opts: AddOptions): Promise<string[]> {
+  const problems: string[] = [];
   for (const file of files) {
-    const id = newId("k");
-    const now = nowIso();
-    const base: KnowledgeDoc = { id, name: file.name, kind: "file", source: file.name, content: "", sizeBytes: file.size, status: "reading", availableToAll: opts.availableToAll, createdAt: now, updatedAt: now };
     if (file.size > MAX_FILE_BYTES) {
-      insert({ ...base, status: "failed", error: "Files can be up to 15 MB." }, opts.attachTo);
+      problems.push(`${file.name}: files can be up to 15 MB.`);
       continue;
     }
     if (!READABLE_FILE.test(file.name)) {
-      insert({ ...base, status: "waiting" }, opts.attachTo);
+      problems.push(`${file.name}: PDF and Word files can be read once server reading is on. Paste the text for now.`);
       continue;
     }
-    // The prototype keeps documents in this browser's storage (about 5 MB in all).
-    if (file.size > MAX_BROWSER_TEXT_BYTES) {
-      insert({ ...base, status: "failed", error: "For now, text files can be up to 2 MB. Bigger files wait for the server." }, opts.attachTo);
+    if (file.size > MAX_TEXT_BYTES) {
+      problems.push(`${file.name}: text files can be up to 2 MB.`);
       continue;
     }
-    insert(base, opts.attachTo);
-    const raw = await file.text();
-    // Web pages and XML keep only their words, not their tags.
-    const text = /\.(html?|xml)$/i.test(file.name) ? htmlToText(raw).text : raw;
-    patch(id, { status: "ready", content: text, sizeBytes: new Blob([text]).size });
+    await addKnowledge({ kind: "file", name: file.name, content: await file.text(), availableToAll: opts.availableToAll, attachTo: opts.attachTo });
   }
+  return problems;
 }
 
-export function addText(name: string, content: string, opts: AddOptions): string {
-  const id = newId("k");
-  const now = nowIso();
-  insert({ id, name: name.trim() || "Untitled text", kind: "text", content, sizeBytes: new Blob([content]).size, status: "ready", availableToAll: opts.availableToAll, createdAt: now, updatedAt: now }, opts.attachTo);
-  return id;
+export async function addText(name: string, content: string, opts: AddOptions): Promise<string> {
+  const doc = await addKnowledge({ kind: "text", name: name.trim() || "Untitled text", content, availableToAll: opts.availableToAll, attachTo: opts.attachTo });
+  return doc.id;
 }
 
-export function setDoc(id: string, changes: Partial<KnowledgeDoc>): void {
-  patch(id, changes.content !== undefined ? { ...changes, sizeBytes: new Blob([changes.content]).size } : changes);
+/** Name, "available to all" and "keep up to date" save in the background (lib/store). */
+export function setDoc(id: string, changes: Pick<Partial<KnowledgeDoc>, "name" | "availableToAll" | "autoRefresh">): void {
+  update((s) => ({ ...s, knowledge: s.knowledge.map((d) => (d.id === id ? { ...d, ...changes } : d)) }));
 }
 
-export function removeDoc(id: string): void {
-  update((s) => ({ ...s, knowledge: s.knowledge.filter((d) => d.id !== id), flows: s.flows.map((f) => ({ ...f, knowledgeIds: f.knowledgeIds.filter((k) => k !== id) })) }));
+export async function removeDoc(id: string): Promise<void> {
+  await deleteKnowledge(id);
 }
 
+/** Attaching is part of the agent's draft, so it saves with the agent. */
 export function toggleAttached(docId: string, flowId: string, on: boolean): void {
   update((s) => ({
     ...s,

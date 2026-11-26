@@ -3,7 +3,7 @@
 // Sign in with an emailed 6-digit code (no passwords). New emails get an
 // account on first sign-in; invites are joined then too.
 
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, request } from "@/lib/api";
@@ -75,7 +75,7 @@ export default function SignInPage() {
             <input className="field h-10" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" autoFocus required />
           </label>
           <button type="submit" className="btn-primary mt-4 h-10 w-full" disabled={busy || !email.includes("@")}>
-            {busy ? <Loader2 size={15} className="animate-spin" /> : null} Email me a code {!busy && <ArrowRight size={15} />}
+            {busy && <Loader2 size={15} className="animate-spin" />} Send code
           </button>
           {errorLine}
         </form>

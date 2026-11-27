@@ -125,7 +125,7 @@ export function ChangeWithAi({
   // Closed: a slim bar in the same theme, one click to open again.
   if (!shown) {
     return (
-      <div className="dark ai-dock ai-bar shrink-0 bg-surface">
+      <div className="ai-card ai-bar shrink-0">
         <button type="button" onClick={() => show(true)} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-muted" aria-expanded={false}>
           <Sparkles size={15} className="ai-twinkle shrink-0 text-accent" aria-hidden />
           <span className="font-medium text-fg">{title}</span>
@@ -140,7 +140,7 @@ export function ChangeWithAi({
   return (
     <div className="shrink-0 p-3 pt-2">
       <div className="ai-ring">
-        <div className="dark ai-dock overflow-hidden rounded-[16.5px] bg-surface">
+        <div className="ai-card overflow-hidden rounded-2xl">
           <div className="flex items-start gap-2 px-4 pt-3">
             <Sparkles size={16} className="ai-twinkle mt-0.5 shrink-0 text-accent" aria-hidden />
             <div className="min-w-0 flex-1">
@@ -160,7 +160,7 @@ export function ChangeWithAi({
             <div className="max-h-[40vh] space-y-2 overflow-y-auto px-4 pt-2">
               {turns.map((t, i) =>
                 t.who === "you" ? (
-                  <p key={i} className="ml-8 rounded-lg bg-background px-3 py-2 text-sm text-fg shadow-[0_0_0_1px_rgb(var(--line))]">
+                  <p key={i} className="ml-8 rounded-lg bg-surface px-3 py-2 text-sm text-fg shadow-[0_0_0_1px_rgb(var(--line))]">
                     {t.text}
                   </p>
                 ) : t.who === "error" ? (
@@ -218,7 +218,7 @@ export function ChangeWithAi({
               void send();
             }}
           >
-            <div className="flex items-end gap-2 rounded-xl border border-line bg-background p-1.5 pl-3 transition-colors focus-within:border-fg-3 focus-within:ring-[3px] focus-within:ring-fg/5">
+            <div className="flex items-end gap-2 rounded-xl border border-line bg-surface p-1.5 pl-3 transition-colors focus-within:border-fg-3 focus-within:ring-[3px] focus-within:ring-fg/5">
               <Sparkles size={15} className="mb-2 shrink-0 text-accent" aria-hidden />
               <textarea
                 ref={box}

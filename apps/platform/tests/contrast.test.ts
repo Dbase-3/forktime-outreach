@@ -7,10 +7,16 @@ import { describe, expect, it } from "vitest";
 
 const css = readFileSync(path.join(__dirname, "../app/globals.css"), "utf8");
 
-function tokens(selector: ":root" | ".dark"): Record<string, number[]> {
+function block(selector: string): Record<string, number[]> {
   const start = css.indexOf(`${selector} {`);
+  if (start < 0) throw new Error(`${selector} not found in globals.css`);
   const body = css.slice(start, css.indexOf("}", start));
   return Object.fromEntries([...body.matchAll(/--([\w-]+):\s*(\d+) (\d+) (\d+);/g)].map(([, k, r, g, b]) => [k, [+r, +g, +b]]));
+}
+
+/** A theme's tokens. "Change with AI" is the dark set with its own surfaces on top. */
+function tokens(selector: ":root" | ".dark" | ".ai-dock.dark"): Record<string, number[]> {
+  return selector === ".ai-dock.dark" ? { ...block(".dark"), ...block(".ai-dock.dark") } : block(selector);
 }
 
 function luminance([r, g, b]: number[]): number {
@@ -29,7 +35,7 @@ function contrast(a: number[], b: number[]): number {
 const BACKGROUNDS = ["background", "surface", "subtle", "muted"];
 const FLOORS: Record<string, number> = { fg: 12, "fg-2": 11, "fg-3": 7, "fg-4": 4.5, accent: 4.5 };
 
-describe.each([":root", ".dark"] as const)("text contrast in %s", (selector) => {
+describe.each([":root", ".dark", ".ai-dock.dark"] as const)("text contrast in %s", (selector) => {
   const t = tokens(selector);
 
   it.each(Object.entries(FLOORS))("%s clears %s:1 on every background", (text, floor) => {

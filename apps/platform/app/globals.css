@@ -156,6 +156,44 @@ body {
   .orb, .orb-wrap, .orb-wrap::before { animation: none !important; }
 }
 
+/* "Change with AI" (owner 2026-11-27: "it's blending with the page"). It wears
+   its own theme, a deep indigo night in both modes: the element also carries
+   .dark, so every text token and dark: variant inside is the dark set, and only
+   the surfaces are swapped here (contrast-checked in tests/contrast.test.ts).
+   Its frame is a slowly turning colour ring with a soft breathing glow. */
+.ai-dock.dark {
+  --background: 15 13 36;
+  --surface: 23 20 52;
+  --subtle: 19 17 44;
+  --muted: 29 26 62;
+  --line: 55 49 104;
+  --line-strong: 76 69 136;
+  color: rgb(var(--fg));
+}
+@property --ai-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.ai-ring {
+  border-radius: 18px;
+  padding: 1.5px;
+  background: conic-gradient(from var(--ai-angle), rgb(129 140 248), rgb(192 132 252), rgb(244 114 182), rgb(56 189 248), rgb(129 140 248));
+  animation: ai-spin 5s linear infinite, ai-glow 3.2s ease-in-out infinite;
+}
+/* Closed: a slim bar with the ring's colours along its top edge. */
+.ai-bar { position: relative; }
+.ai-bar::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, rgb(129 140 248), rgb(192 132 252), rgb(244 114 182), rgb(56 189 248));
+}
+.ai-twinkle { animation: ai-twinkle 2.4s ease-in-out infinite; }
+@keyframes ai-spin { to { --ai-angle: 360deg; } }
+@keyframes ai-glow {
+  0%, 100% { box-shadow: 0 10px 32px -14px rgb(129 140 248 / 0.45); }
+  50% { box-shadow: 0 14px 44px -10px rgb(192 132 252 / 0.7); }
+}
+@keyframes ai-twinkle { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; } 50% { transform: scale(1.18) rotate(12deg); opacity: 0.8; } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-ring, .ai-twinkle { animation: none; }
+}
+
 /* Sign-in map: soft pings on every city, a stronger ring on the active call. */
 .map-ping, .map-ping-strong { transform-box: fill-box; transform-origin: center; }
 .map-ping { animation: map-ping 4s ease-out infinite; opacity: 0; }

@@ -113,6 +113,8 @@ export function patchState(fn: (s: Loaded) => Loaded): void {
 
 type Key = string; // "flow:<id>", "campaign:<id>", "settings", "knowledge:<id>", "field:<key>"
 const timers = new Map<Key, ReturnType<typeof setTimeout>>();
+/** Saves the server refused: that work is only in this tab until a later save goes through. */
+const unsaved = new Set<Key>();
 const DRAFT_KEYS = Object.keys(AgentDraftSchema.shape) as (keyof Flow)[];
 const CONFIG_KEYS = Object.keys(CampaignInputSchema.shape) as (keyof Campaign)[];
 const pick = <T extends object>(o: T, keys: (keyof T)[]) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
@@ -192,7 +194,9 @@ async function save(key: Key): Promise<void> {
       if (d) await ws(`/fields/${id}`, { method: "PATCH", body: { label: d.label } });
     }
     saveProblem = null;
+    unsaved.delete(key);
   } catch (err) {
+    if (!(err instanceof ApiError && err.code === "stale")) unsaved.add(key);
     // A rejected save names the part it's about ("Instructions: Too big…"), so the owner knows what to shorten.
     if (err instanceof ApiError && err.code === "stale") {
       // Someone else saved first: take theirs.
@@ -209,7 +213,7 @@ async function save(key: Key): Promise<void> {
       saveProblem = "Someone else changed this just now, so it's been reloaded with their version.";
     } else {
       const detail = err instanceof ApiError && Array.isArray(err.details) ? ` ${(err.details as { path?: string; message: string }[]).map((d) => `${partName(d.path)}${d.message}`).join(" ")}` : "";
-      saveProblem = `Couldn't save: ${err instanceof Error ? err.message : "unknown problem"}${detail}`;
+      saveProblem = `Couldn't save, so this is only in this tab for now: ${err instanceof Error ? err.message : "unknown problem"}${detail}`;
     }
   } finally {
     saving--;
@@ -224,11 +228,15 @@ export async function flush(): Promise<void> {
   await Promise.all(keys.map((k) => save(k)));
 }
 
+// Leaving or refreshing with work the server doesn't have asks first: a save
+// still waiting, one in flight, or one the server refused (that work exists only
+// in this tab; owner 2026-11-27 lost a whole agent to a refresh after refused saves).
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", (e) => {
-    if (timers.size || saving) {
+    if (timers.size || saving || unsaved.size) {
       void flush();
       e.preventDefault();
+      e.returnValue = "";
     }
   });
 }

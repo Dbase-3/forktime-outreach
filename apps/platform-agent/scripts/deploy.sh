@@ -76,7 +76,14 @@ fi
 
 cd "$STAGE"
 if [ -n "$LISNA_ID" ]; then
-  lk agent deploy --id "$LISNA_ID" --secrets-file "$SECRETS"
+  # `lk agent deploy` has no --id: it deploys to the id in ./livekit.toml. Make sure the
+  # staged copy is the guarded one before anything is sent.
+  [ "$(agent_id livekit.toml)" = "$LISNA_ID" ] || { echo "REFUSED: the staged livekit.toml doesn't name $LISNA_ID."; exit 1; }
+  echo "Deploying to Lisna's agent ${LISNA_ID}..."
+  LOG="${LISNA_DEPLOY_LOG:-/tmp/lisna-agent-deploy.log}"; echo "Progress: $LOG"
+  # Answer the project confirmation if it asks; stop following logs once the new worker is ready.
+  expect -c "set timeout 900; log_file -noappend $LOG; spawn lk agent deploy --secrets-file $SECRETS; expect { -re {y Yes} { send y; exp_continue } -re {\\[y/N\\]|\\(y/n\\)} { send \"y\\r\" ; exp_continue } -re {ready \\(platform-agent\\)} { send \"\\003\" ; exp_continue } eof }" >/dev/null || true
+  grep -E -i "error|fail|deployed|ready \(platform-agent\)" "$LOG" | grep -v -i secret | tail -5
 else
   echo "First deploy: creating a NEW Lisna agent on LiveKit Cloud (us-east)."
   BEFORE=$(lk agent list 2>/dev/null | grep -oE 'CA_[A-Za-z0-9]+' | sort -u)

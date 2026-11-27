@@ -58,6 +58,15 @@ export const INTEGRATIONS: IntegrationInfo[] = [
 /** Integrations that connect with a real key: connected only once one is stored. */
 export const KEYED_INTEGRATIONS = INTEGRATIONS.filter((i) => i.apiKey).map((i) => i.id);
 
+/**
+ * What a workspace can connect today: only the ones that really work (owner,
+ * 2026-11-28: "show only the integrations that are available, hide the others,
+ * it's confusing"). The rest stay in the catalog for later but are never shown,
+ * offered by Change with AI, or counted as connected.
+ */
+export const AVAILABLE_INTEGRATIONS = INTEGRATIONS.filter((i) => i.apiKey);
+export const isAvailable = (id: string) => AVAILABLE_INTEGRATIONS.some((i) => i.id === id);
+
 export function integrationInfo(id: string): IntegrationInfo | undefined {
   return INTEGRATIONS.find((i) => i.id === id);
 }

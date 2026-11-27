@@ -1,12 +1,13 @@
 "use client";
 
 // Compact catalog: logo, name, one line, a small button. Connected tools show
-// a green dot and their account; tapping any card opens its drawer.
+// a green dot and their account; tapping any card opens its drawer. Only the
+// tools that really connect are listed (AVAILABLE_INTEGRATIONS, owner 2026-11-28).
 
 import clsx from "clsx";
 import { Search } from "lucide-react";
 import { useState } from "react";
-import { CATEGORIES, INTEGRATIONS, type IntegrationCategory } from "@outreach/core/integrations";
+import { AVAILABLE_INTEGRATIONS, CATEGORIES, type IntegrationCategory } from "@outreach/core/integrations";
 import { useApp } from "@/lib/store";
 import { ConnectSheet, IntegrationLogo } from "@/components/integrations";
 import { PageHeader } from "@/components/ui";
@@ -20,9 +21,10 @@ export default function IntegrationsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const connected = (id: string) => integrations.find((i) => i.id === id && i.connected);
   const q = query.trim().toLowerCase();
-  const inFilter = (f: Filter) => (i: (typeof INTEGRATIONS)[number]) => (f === "all" ? true : f === "connected" ? Boolean(connected(i.id)) : i.category === f);
-  const shown = INTEGRATIONS.filter(inFilter(filter)).filter((i) => !q || `${i.name} ${i.blurb}`.toLowerCase().includes(q));
-  const chips: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "connected", label: "Connected" }, ...CATEGORIES];
+  const inFilter = (f: Filter) => (i: (typeof AVAILABLE_INTEGRATIONS)[number]) => (f === "all" ? true : f === "connected" ? Boolean(connected(i.id)) : i.category === f);
+  const shown = AVAILABLE_INTEGRATIONS.filter(inFilter(filter)).filter((i) => !q || `${i.name} ${i.blurb}`.toLowerCase().includes(q));
+  // Only categories that have something in them.
+  const chips: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "connected", label: "Connected" }, ...CATEGORIES.filter((c) => AVAILABLE_INTEGRATIONS.some((i) => i.category === c.id))];
 
   return (
     <div>
@@ -37,7 +39,7 @@ export default function IntegrationsPage() {
               className={clsx("flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors", filter === chip.id ? "border-fg bg-fg text-background" : "border-line bg-surface text-fg-2 hover:border-line-strong")}
             >
               {chip.label}
-              <span className={clsx("font-mono text-xs", filter === chip.id ? "text-background/70" : "text-fg-4")}>{INTEGRATIONS.filter(inFilter(chip.id)).length}</span>
+              <span className={clsx("font-mono text-xs", filter === chip.id ? "text-background/70" : "text-fg-4")}>{AVAILABLE_INTEGRATIONS.filter(inFilter(chip.id)).length}</span>
             </button>
           ))}
         </div>
@@ -49,8 +51,7 @@ export default function IntegrationsPage() {
 
       {shown.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-3">
-          Nothing matches &ldquo;{query}&rdquo;. A{" "}
-          <button type="button" className="text-accent hover:underline" onClick={() => { setQuery(""); setOpenId("webhook"); }}>webhook</button> or Zapier connects almost anything else.
+          {filter === "connected" && !q ? "Nothing connected yet." : <>Nothing matches &ldquo;{query}&rdquo;.</>}
         </p>
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">

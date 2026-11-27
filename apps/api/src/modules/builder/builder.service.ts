@@ -7,10 +7,9 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { BUILDER_SYSTEM, builderContext, type BuilderWorkspace } from "@outreach/core/agent-builder";
+import { BUILDER_INTEGRATION_IDS, BUILDER_SYSTEM, builderContext, type BuilderWorkspace } from "@outreach/core/agent-builder";
 import { EditError, addAfterCall, addStep, addTool, changeStep, deleteStep, missingIntegrations, removeAfterCall, removeData, setCheck, setData, type EditableAgent, type Edit, type StepInput, type Where } from "@outreach/core/agent-edits";
 import { AgentDraftSchema, BRIEF_MAX, OPS, type AgentDraft } from "@outreach/core/schemas";
-import { INTEGRATIONS } from "@outreach/core/integrations";
 import { greetingIsHonest } from "@outreach/core/disclosure";
 import { VOICES } from "@outreach/core/voices";
 import { Types } from "mongoose";
@@ -27,7 +26,8 @@ export const BuilderBody = z.object({
   history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(BRIEF_MAX) })).max(12).default([]),
 });
 
-const INTEGRATION_IDS = INTEGRATIONS.map((i) => i.id) as [string, ...string[]];
+// Only the tools that really connect, plus a webhook (owner, 2026-11-28).
+const INTEGRATION_IDS = BUILDER_INTEGRATION_IDS;
 const ANSWER = z.enum(["text", "yesno", "number", "date", "choice"]);
 const Condition = z.object({ field: z.string().describe("The field it checks"), op: z.enum(OPS), value: z.string().optional(), value2: z.string().optional().describe("Upper end, for between") });
 const Leaf = z.discriminatedUnion("kind", [
@@ -141,8 +141,8 @@ export class BuilderService {
       betaZodTool({ name: "stop_listening", description: "Remove a data field.", inputSchema: z.object({ key: z.string() }), run: async ({ key }) => apply((a) => removeData(a, key)) }),
       betaZodTool({
         name: "add_after_call",
-        description: "Do something once the call has ended, with what it collected: save_contact (to a CRM), add_row (to a sheet), send_webhook (to their URL; put the URL in detail), post_message (Slack, Teams).",
-        inputSchema: z.object({ kind: z.enum(["save_contact", "add_row", "send_webhook", "post_message"]), integration: z.enum(INTEGRATION_IDS), fields: z.array(z.string()).describe("Field keys to send; empty for everything"), detail: z.string() }),
+        description: "Do something once the call has ended, with what it collected: save_contact (to a CRM), send_webhook (to their URL; put the URL in detail).",
+        inputSchema: z.object({ kind: z.enum(["save_contact", "send_webhook"]), integration: z.enum(INTEGRATION_IDS), fields: z.array(z.string()).describe("Field keys to send; empty for everything"), detail: z.string() }),
         run: async (x) => apply((a) => addAfterCall(a, x)),
       }),
       betaZodTool({ name: "remove_after_call", description: "Remove an after-call action.", inputSchema: z.object({ id: z.string() }), run: async ({ id }) => apply((a) => removeAfterCall(a, id)) }),

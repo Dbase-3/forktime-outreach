@@ -147,21 +147,17 @@ describe("routes the platform screens use", () => {
   it("sources, filled-in counts, one contact's calls, live count and both exports", async () => {
     const { agent, ws } = await withWorkspace(app, "routes@example.com", { sample: true });
 
-    // A sync needs a connected tool; its fields are added once.
-    await agent.delete(`${ws}/integrations/hubspot`).expect(200);
+    // Only the tools that really connect can be connected or synced; the sample connects nothing.
+    expect((await agent.get(`${ws}/integrations`).expect(200)).body.some((i: { connected: boolean }) => i.connected)).toBe(false);
+    expect((await agent.put(`${ws}/integrations/hubspot`).send({ account: "acme" }).expect(422)).body.error.message).toMatch(/isn't available yet/);
     await agent.post(`${ws}/sources`).send({ integrationId: "hubspot", object: "Contacts", fields: [] }).expect(422);
-    await agent.put(`${ws}/integrations/hubspot`).send({ account: "acme" }).expect(200);
-    const made = (await agent.post(`${ws}/sources`).send({ integrationId: "hubspot", object: "Contacts", syncEvery: "15m", fields: [{ key: "deal_amount", label: "Deal amount", type: "number" }] }).expect(201)).body;
-    expect(made.source.status).toBe("syncing");
-    expect(made.fieldDefs.some((f: { key: string }) => f.key === "deal_amount")).toBe(true);
-    await agent.post(`${ws}/sources/${made.source.id}/sync`).expect(201);
-    await agent.delete(`${ws}/sources/${made.source.id}`).expect(200);
-    expect((await agent.get(`${ws}/sources`)).body.some((x: { id: string }) => x.id === made.source.id)).toBe(false);
+    const csv1 = (await agent.get(`${ws}/sources`).expect(200)).body[0];
+    await agent.delete(`${ws}/sources/${csv1.id}`).expect(200);
+    expect((await agent.get(`${ws}/sources`)).body.some((x: { id: string }) => x.id === csv1.id)).toBe(false);
 
     const filled = (await agent.get(`${ws}/fields/filled`).expect(200)).body;
     expect(filled.total).toBeGreaterThan(0);
     expect(filled.byField.first_name).toBe(filled.total);
-    expect(filled.byField.deal_amount).toBe(0);
 
     const calls = (await agent.post(`${ws}/calls/query`).send({ pageSize: 50 })).body;
     const contactId = calls.rows.find((r: { contactId?: string }) => r.contactId).contactId;

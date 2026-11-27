@@ -4,7 +4,10 @@
 
 import { ACTION_LABELS } from "./action-labels";
 import { AFTER_CALL_LABELS, integrationName } from "./connections";
-import { INTEGRATIONS } from "./integrations";
+import { AVAILABLE_INTEGRATIONS } from "./integrations";
+
+/** What Change with AI may set as an integration: the available tools, plus a webhook to the owner's own URL. */
+export const BUILDER_INTEGRATION_IDS: [string, ...string[]] = ["webhook", ...AVAILABLE_INTEGRATIONS.map((i) => i.id)];
 import { VOICES } from "./voices";
 import type { EditableAgent } from "./agent-edits";
 import type { Step } from "./types";
@@ -17,7 +20,7 @@ Where each kind of request goes:
 - A fixed order of things to say and ask, "if they say X, do Y": workflow steps (say, ask, decide, action, end). The system runs the workflow in code; the agent only words the lines.
 - How it talks and behaves (tone, rules, what never to say): the instructions. Edit them with set_text, keeping the rest of the text as it is.
 - Something to do at a point in the call ("when they say yes, book it", "send this to my API"): an action step at that point. A call to their own URL is action "webhook" with the URL in the detail.
-- Something to save or send once the call is over ("at the end, save to GoHighLevel", "add a row to my sheet"): an after-call action. Never a workflow step.
+- Something to save or send once the call is over ("at the end, save to GoHighLevel", "send the answers to my webhook"): an after-call action. Never a workflow step.
 - Something the agent looks up mid-call when the caller asks ("when they ask for times, check my calendar"): a tool, kind "integration".
 - Something to pick up from the conversation without asking for it: listen_for.
 
@@ -27,6 +30,7 @@ Rules:
 - The welcome message must keep saying it's an AI assistant and that the call is recorded.
 - Field keys are lower_case_with_underscores. A decision can only test a field asked earlier on that path, or one the contact already has.
 - When something needs an integration, set it from the list even if it isn't connected yet. Don't refuse and don't ask them to connect it first: the screen marks it and offers Connect.
+- Only the integrations in the list exist. If they ask for any other tool (Slack, Google Sheets, HubSpot, Google Calendar, …), don't add it: say it isn't available yet, and offer a webhook to their own URL if that would do the job.
 - Never store API keys, passwords or tokens anywhere. If they paste one, leave it out and tell them to add it under Integrations.
 - If the request is unclear, or can't be done with these tools, change nothing and ask one short question.
 
@@ -81,6 +85,6 @@ export function builderContext(agent: EditableAgent, ws: BuilderWorkspace): stri
     `Contact fields (usable as {key} and in decisions): first_name, name, phone${ws.contactFields.length ? `, ${ws.contactFields.map((f) => `${f.key} (${f.type})`).join(", ")}` : ""}`,
     `Knowledge library: ${ws.knowledge.map((k) => `[${k.id}] ${k.name}${k.availableToAll ? " (every agent)" : ""}`).join("; ") || "empty"}`,
     `Voices: ${VOICES.map((x) => `${x.id} ${x.name} (${x.gender}, ${x.accent})`).join("; ")}`,
-    `Integrations (id: name, connected or not): ${INTEGRATIONS.map((i) => `${i.id}: ${i.name}${i.id === "webhook" ? " (any URL)" : connected.has(i.id) ? " (connected)" : " (not connected)"}`).join("; ")}`,
+    `Integrations (id: name, connected or not): ${AVAILABLE_INTEGRATIONS.map((i) => `${i.id}: ${i.name}${connected.has(i.id) ? " (connected)" : " (not connected)"}`).join("; ")}; webhook: Webhook (any URL)`,
   ].join("\n");
 }

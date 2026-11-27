@@ -3,15 +3,19 @@
 
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { KEYED_INTEGRATIONS } from "@outreach/core/integrations";
 import type { Campaign, FieldDef, Flow, WorkspaceSettings } from "@outreach/core/types";
 import type { KnownField } from "@outreach/core/flow-tree";
 import type { Types } from "mongoose";
 import type { M } from "../db/models";
 import { agentOut, campaignOut, fieldOut } from "./serialize";
 
-/** Connected integrations that can really be used: a keyed one needs its key stored. */
-export const USABLE = { connected: true, $or: [{ providerId: { $nin: KEYED_INTEGRATIONS } }, { hasKey: true }] };
+/**
+ * Connected integrations that can really be used: a key stored. Only the
+ * available tools can store one (the connect route refuses the rest), so old
+ * name-only records (HubSpot, Slack from the first sample) never count.
+ * Same rule as `integrationOut`. No `providerId` here: callers add their own.
+ */
+export const USABLE = { connected: true, hasKey: true };
 
 @Injectable()
 export class WorkspaceData {

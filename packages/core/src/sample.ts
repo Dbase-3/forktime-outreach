@@ -64,7 +64,7 @@ export function seedState(now = new Date()): AppState {
       service_plan: i % 3 === 0 ? "Yes" : "No",
       suburb: SUBURBS[i % 5],
     },
-    sourceId: "src_hubspot",
+    sourceId: "src_buyers",
     createdAt: isoDay(now, bought),
   });
   const FIRST = ["Mia", "Leo", "Ava", "Jack", "Zoe", "Ethan", "Ruby", "Oscar", "Isla", "Henry", "Chloe", "Max", "Grace", "Liam", "Lily", "Noah", "Ella", "Lucas", "Amelia", "Mason", "Harper", "Logan", "Aria", "Ryan", "Sofia", "Kai", "Layla", "Ari", "Nina", "Theo", "Maya", "Ben"];
@@ -236,17 +236,17 @@ export function seedState(now = new Date()): AppState {
     ],
     contacts,
     fieldDefs: [
-      { key: "first_name", label: "First name", type: "text", source: "src_hubspot" },
-      { key: "car_model", label: "Car model", type: "text", source: "src_hubspot" },
-      { key: "purchase_date", label: "Purchase date", type: "date", source: "src_hubspot" },
-      { key: "km", label: "Kilometres", type: "number", source: "src_hubspot" },
-      { key: "tier", label: "Tier", type: "choice", choices: ["Standard", "Gold", "Platinum"], source: "src_hubspot" },
-      { key: "service_plan", label: "Service plan", type: "yesno", source: "src_hubspot" },
-      { key: "suburb", label: "Suburb", type: "text", source: "src_hubspot" },
+      { key: "first_name", label: "First name", type: "text", source: "src_buyers" },
+      { key: "car_model", label: "Car model", type: "text", source: "src_buyers" },
+      { key: "purchase_date", label: "Purchase date", type: "date", source: "src_buyers" },
+      { key: "km", label: "Kilometres", type: "number", source: "src_buyers" },
+      { key: "tier", label: "Tier", type: "choice", choices: ["Standard", "Gold", "Platinum"], source: "src_buyers" },
+      { key: "service_plan", label: "Service plan", type: "yesno", source: "src_buyers" },
+      { key: "suburb", label: "Suburb", type: "text", source: "src_buyers" },
       { key: "wants_service", label: "Wants service", type: "yesno", source: "call" },
     ],
     sources: [
-      { id: "src_hubspot", kind: "sync", integrationId: "hubspot", name: "HubSpot · Contacts", object: "Contacts", list: "Buyers 2026", fieldKeys: ["first_name", "car_model", "purchase_date", "km", "tier", "service_plan", "suburb"], rows: 34, syncEvery: "15m", lastSyncAt: new Date(now.getTime() - 6 * 60 * 1000).toISOString(), status: "synced" },
+      { id: "src_buyers", kind: "csv", name: "buyers-2026.csv", list: "Buyers 2026", fieldKeys: ["first_name", "car_model", "purchase_date", "km", "tier", "service_plan", "suburb"], rows: 34, lastSyncAt: isoDay(now, -9), status: "synced" },
       { id: "src_web", kind: "csv", name: "web-leads-nov.csv", list: "Web leads", fieldKeys: ["first_name", "suburb"], rows: 6, lastSyncAt: isoDay(now, -2), status: "synced" },
     ],
     campaigns: [
@@ -263,7 +263,7 @@ export function seedState(now = new Date()): AppState {
         endHour: 19,
         followUps: [{ id: "fu_1", outcome: "not_now", action: "call", afterDays: 90 }],
         writeBacks: [{ from: "wants_service", to: "wants_service" }],
-        logTo: ["hubspot", "slack"],
+        logTo: [],
         called: 41,
         answered: 33,
         createdAt: isoDay(now, -30),
@@ -281,7 +281,7 @@ export function seedState(now = new Date()): AppState {
         endHour: 20,
         concurrent: 3,
         followUps: [{ id: "fu_2", outcome: "needs_decision_maker", action: "call", afterDays: 2 }],
-        logTo: ["hubspot"],
+        logTo: [],
         called: 12,
         answered: 9,
         createdAt: isoDay(now, -12),
@@ -299,10 +299,8 @@ export function seedState(now = new Date()): AppState {
       },
     ],
     calls: [live, ...calls, ...sampleHistory(now, [service, lead, desk], contacts)],
-    integrations: [
-      { id: "hubspot", connected: true, account: "northside-motors.hubspot.com", connectedAt: isoDay(now, -40) },
-      { id: "slack", connected: true, account: "#service-desk", connectedAt: isoDay(now, -12) },
-    ],
+    // Nothing connected: only real connections count (owner, 2026-11-28).
+    integrations: [],
     settings: {
       businessName: "Northside Motors",
       phoneNumber: "+61 2 5550 1234",

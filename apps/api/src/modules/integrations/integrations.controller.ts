@@ -1,13 +1,13 @@
-// Integrations. Ones with an API key in the catalog (Cal.com) connect for real:
-// the key is checked with the provider and stored sealed (ConnectionsService).
-// The rest still only remember which account (real OAuth is Phase 6).
+// Integrations. Only the available ones (Cal.com, GoHighLevel, Twenty) can be
+// connected: the key is checked with the provider and stored sealed
+// (ConnectionsService). The rest of the catalog is hidden until it really works.
 
 import { Body, Controller, Delete, Get, Param, Put } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { integrationInfo } from "@outreach/core/integrations";
+import { integrationInfo, isAvailable } from "@outreach/core/integrations";
 import { z } from "zod";
 import { Ctx, Roles } from "../../common/decorators";
-import { notFound } from "../../common/errors";
+import { notFound, unprocessable } from "../../common/errors";
 import type { RequestContext } from "../../common/request";
 import { integrationOut } from "../../common/serialize";
 import { parse } from "../../common/zod";
@@ -31,13 +31,10 @@ export class IntegrationsController {
   async connect(@Ctx() ctx: RequestContext, @Param("provider") provider: string, @Body() body: unknown) {
     const info = integrationInfo(provider);
     if (!info) throw notFound("That integration");
-    if (info.apiKey) {
-      const { apiKey, accountId } = parse(z.object({ apiKey: z.string().trim().min(8, "Paste the whole key.").max(2000), accountId: z.string().trim().max(100).optional() }), body ?? {});
-      return this.connections.connectWithKey(ctx.workspaceId!, provider, apiKey, accountId);
-    }
-    const { account } = parse(z.object({ account: z.string().max(200).default("") }), body ?? {});
-    const doc = await this.integrations.findOneAndUpdate({ workspaceId: ctx.workspaceId, providerId: provider }, { $set: { connected: true, account } }, { upsert: true, new: true }).lean();
-    return integrationOut(doc!);
+    // Only the tools that really connect can be connected (owner, 2026-11-28).
+    if (!isAvailable(provider) || !info.apiKey) throw unprocessable(`${info.name} isn't available yet.`);
+    const { apiKey, accountId } = parse(z.object({ apiKey: z.string().trim().min(8, "Paste the whole key.").max(2000), accountId: z.string().trim().max(100).optional() }), body ?? {});
+    return this.connections.connectWithKey(ctx.workspaceId!, provider, apiKey, accountId);
   }
 
   /** A connected calendar's event types (to pick which one calls book into). */

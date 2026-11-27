@@ -1,7 +1,7 @@
 // Stored documents → the shapes the front end already uses (packages/core
 // types), with string ids and a `version` for saving back.
 
-import { KEYED_INTEGRATIONS } from "@outreach/core/integrations";
+import { isAvailable } from "@outreach/core/integrations";
 import type { Campaign, Call, DataSource, FieldDef, Flow, Integration, KnowledgeDoc, PhoneNumber } from "@outreach/core/types";
 import type { Row } from "../db/models";
 
@@ -50,7 +50,8 @@ export function sourceOut(x: Row<"Source">): DataSource {
 }
 
 export function integrationOut(i: Row<"Integration">): Integration {
-  return { id: i.providerId, connected: i.connected && (!KEYED_INTEGRATIONS.includes(i.providerId) || Boolean(i.hasKey)), account: i.account ?? undefined, connectedAt: iso(i.createdAt), eventType: (i.eventType as Integration["eventType"]) ?? null };
+  // Only a tool that really connects, with its key stored, is connected (old name-only records aren't).
+  return { id: i.providerId, connected: i.connected && isAvailable(i.providerId) && Boolean(i.hasKey), account: i.account ?? undefined, connectedAt: iso(i.createdAt), eventType: (i.eventType as Integration["eventType"]) ?? null };
 }
 
 export function callOut(c: Row<"Call">): Call {

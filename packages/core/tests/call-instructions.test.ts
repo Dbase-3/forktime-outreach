@@ -41,6 +41,23 @@ describe("callInstructions", () => {
     expect(text).toMatch(/test call/);
   });
 
+  it("shows the next line for each answer, so the reply and the note go in one turn", () => {
+    const ahead = {
+      field: "keen",
+      cases: [
+        { when: "Yes", then: { kind: "ask" as const, say: ["Love it."], question: "Which day suits?" } },
+        { when: "No", then: { kind: "end" as const } },
+        { when: "Maybe", then: { kind: "wait" as const } },
+      ],
+    };
+    const text = callInstructions(setup(), nextStep(steps, { first_name: "Sam" }), ahead);
+    expect(text).toMatch(/When they answer, reply in one turn: first say the words out loud .*then call note with their answer to "keen"\. Words first, then the note\./);
+    expect(text).toMatch(/- If Yes: say "Love it\. Which day suits\?" \(ending with the question\), then call note\./);
+    expect(text).toMatch(/- If No: call note only, with no words \(the call is ending and the system says goodbye\)\./);
+    expect(text).toMatch(/- If Maybe: call note and wait; its result says what's next\./);
+    expect(callInstructions(setup(), nextStep(steps, {}))).not.toMatch(/When they answer, reply in one turn/);
+  });
+
   it("points to search when the knowledge is too big to include", () => {
     const text = callInstructions(setup({ knowledge: { inline: [], searchable: true } }), nextStep(steps, {}));
     expect(text).toMatch(/call search_knowledge first/);

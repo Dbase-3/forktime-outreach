@@ -6,7 +6,7 @@
 import { readAnswer } from "./spoken";
 import { fill } from "./variables";
 import { outcomesOf } from "./flow-tree";
-import { describePosition, type Position } from "./workflow-run";
+import { describePosition, type Ahead, type Position } from "./workflow-run";
 import type { SchemaField } from "./agent-data";
 import type { Flow } from "./types";
 
@@ -38,7 +38,18 @@ const PERSONALITY: Record<Flow["agent"]["personality"], string> = {
   calm: "slow, patient and reassuring",
 };
 
-export function callInstructions(setup: CallSetup, position: Position): string {
+/** The next line for each answer, in words for the model (from `lookahead`). */
+function describeAhead(ahead: Ahead): string {
+  const line = (c: Ahead["cases"][number]) => {
+    const lead = c.when === "any answer" ? "- Whatever they answer:" : `- If ${c.when}:`;
+    if (c.then.kind === "end") return `${lead} call note only, with no words (the call is ending and the system says goodbye).`;
+    if (c.then.kind === "wait") return `${lead} call note and wait; its result says what's next.`;
+    return `${lead} say "${[...c.then.say, c.then.question].join(" ")}" (ending with the question), then call note.`;
+  };
+  return [`When they answer, reply in one turn: first say the words out loud (a word to acknowledge, then the line below in your own words, dropping any part they've already heard, like who you are), then call note with their answer to "${ahead.field}". Words first, then the note.`, ...ahead.cases.map(line)].join("\n");
+}
+
+export function callInstructions(setup: CallSetup, position: Position, ahead?: Ahead | null): string {
   const { flow, values, schema } = setup;
   const persona = fill(flow.prompt, values).trim();
   const facts = Object.entries(values)
@@ -64,7 +75,8 @@ You are speaking on a live phone call as ${values.agent}, the AI assistant for $
 ${facts}${setup.test ? "\n- This is a test call by the business owner. Act exactly as on a real call." : ""}`,
     `# The workflow
 The call follows a workflow that the system runs. You never pick the next step yourself.
-- When they answer the current question, call note with the field and their answer first, before you say anything. Never ask a follow-up question of your own: the result tells you what to say next. Say it in your own natural words, keeping its meaning, but leave out anything they've already heard on this call (if you've introduced yourself, don't do it again).
+- When they answer the current question, save it with note. If "Right now" shows what comes after their answer, give it in that same reply: a few words to acknowledge, the next line, and the note. Otherwise call note first and wait: its result tells you what to say. If you're not sure what they meant, ask again rather than noting a guess.
+- Never ask a follow-up question of your own. Say each line in your own natural words, keeping its meaning, but leave out anything they've already heard on this call (if you've introduced yourself, don't do it again).
 - An answer that points at something you know is still an answer: for a phone number, "this number" or "the one you're calling" means the phone number of this call (note that number if it's listed under This call, otherwise note their words).
 - If they answer a question that comes later, note that too, so it isn't asked again.
 - If they change an earlier answer, note the new answer.
@@ -76,7 +88,7 @@ The call follows a workflow that the system runs. You never pick the next step y
         : ""
     }
 
-Right now: ${describePosition(position)}`,
+Right now: ${describePosition(position)}${ahead ? `\n${describeAhead(ahead)}` : ""}`,
     knowledge ? `# What you know\nAnswer questions from these documents only.\n${knowledge}` : setup.knowledge.searchable ? "# What you know\nFor questions about the business, call search_knowledge first and answer from what it returns." : "",
   ]
     .filter(Boolean)

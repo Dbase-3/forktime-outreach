@@ -7,7 +7,7 @@ const anthropic = require("@livekit/agents-plugin-anthropic");
 const elevenlabs = require("@livekit/agents-plugin-elevenlabs");
 const soniox = require("@livekit/agents-plugin-soniox");
 const { z } = require("zod");
-const { nextStep, answerFormat } = require("@outreach/core/workflow-run");
+const { nextStep, answerFormat, lookahead, askedInReply } = require("@outreach/core/workflow-run");
 const { callInstructions, noteValue } = require("@outreach/core/call-instructions");
 const { ACTION_LABELS } = require("@outreach/core/action-labels");
 const { integrationName, needsConnection } = require("@outreach/core/connections");
@@ -24,6 +24,22 @@ class PlatformAgent extends voice.Agent {
   }
   async onUserTurnCompleted(_chatCtx, newMessage) {
     if (!this.call.acceptCallerTurn(newMessage)) throw new voice.StopResponse();
+  }
+  /** Keeps what the model says in each reply, so `note` knows whether the next line was already said in it. */
+  async llmNode(chatCtx, toolCtx, modelSettings) {
+    const stream = await voice.Agent.default.llmNode(this, chatCtx, toolCtx, modelSettings);
+    const call = this.call;
+    call.replyText = "";
+    if (!stream) return stream;
+    return stream.pipeThrough(
+      new TransformStream({
+        transform(chunk, out) {
+          const text = typeof chunk === "string" ? chunk : chunk && chunk.delta && chunk.delta.content;
+          if (text) call.replyText += text;
+          out.enqueue(chunk);
+        },
+      }),
+    );
   }
 }
 
@@ -76,6 +92,8 @@ class PlatformCall {
     this.lines = [];
     this.awaitingPhone = false;
     this.phoneFragments = [];
+    this.ahead = null;
+    this.replyText = "";
   }
 
   after(ms, fn) {
@@ -87,7 +105,9 @@ class PlatformCall {
   }
 
   instructions() {
-    return callInstructions(this.cfg, this.position);
+    // The next line for each answer, so the model can say it with the note: one model round, not two.
+    this.ahead = lookahead(this.cfg.flow.steps, this.values, this.done, this.position);
+    return callInstructions(this.cfg, this.position, this.ahead);
   }
 
   /** The person is in the room: start listening and say the welcome. */
@@ -236,7 +256,9 @@ class PlatformCall {
     };
     if (keys.length) {
       tools.note = llm.tool({
-        description: "Save something they said: the answer to the current question, a later question answered early, a changed answer, or something to listen for. Call it before replying; the result says what to say next.",
+        description:
+          "Save something they actually said: the answer to the current question, a later question answered early, a changed answer, or something to listen for. Never save a question you are asking. " +
+          "The result says what to say next, unless you've already said it (see Right now).",
         parameters: z.object({
           field: z.enum(keys).describe("Which field."),
           value: z.string().describe("Their answer, in the field's format."),
@@ -274,7 +296,14 @@ class PlatformCall {
     this.api.report({ type: "saved", field, value: checked.value });
     const isWorkflowField = def.from === "step";
     if (!isWorkflowField) return `Saved ${field}. Carry on where you were.`;
-    return this.advance(`Saved ${field} = ${checked.value}.`);
+    const ahead = this.ahead;
+    const result = this.advance(`Saved ${field} = ${checked.value}.`);
+    // The model already asked the next question in this reply (it was shown ahead): nothing more to say,
+    // so no second model round. If it only noted, the result tells it what to say, as before.
+    const known = ahead && ahead.field === field && ahead.cases.find((c) => c.when === checked.value || c.when === "any answer");
+    const oneRound = result !== undefined && known && known.then.kind === "ask" && askedInReply(this.replyText, known.then.question);
+    if (process.env.PLATFORM_METRICS) this.log.log(`[Note] ${field}=${checked.value} ${oneRound ? "one round" : result === undefined ? "ending" : "second round"} (said: ${JSON.stringify(this.replyText.slice(0, 80))})`);
+    return oneRound ? undefined : result;
   }
 
   /** Walk the workflow on from here: run actions in code, stop at a question or the ending. */

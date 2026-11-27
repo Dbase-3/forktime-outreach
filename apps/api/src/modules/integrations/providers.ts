@@ -41,6 +41,8 @@ export interface CrmClient {
   /** Find-or-create the person; their id in the CRM. */
   upsertContact(c: ContactInfo): Promise<string>;
   addNote(contactId: string, title: string, body: string): Promise<void>;
+  /** One page of the CRM's contacts, and where the next page starts (null at the end). */
+  listContacts(after: string | null): Promise<{ contacts: (ContactInfo & { id: string })[]; next: string | null }>;
 }
 
 const TIMEOUT_MS = 8000;

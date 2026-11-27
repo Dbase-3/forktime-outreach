@@ -46,7 +46,7 @@ export function fieldOut(f: Row<"FieldDef">): FieldDef {
 }
 
 export function sourceOut(x: Row<"Source">): DataSource {
-  return { id: String(x._id), kind: x.kind as DataSource["kind"], integrationId: x.integrationId ?? undefined, name: x.name ?? "", object: x.object ?? undefined, list: x.list ?? "", fieldKeys: x.fieldKeys ?? [], rows: x.rows, syncEvery: (x.syncEvery ?? undefined) as DataSource["syncEvery"], lastSyncAt: iso(x.lastSyncAt), status: x.status as DataSource["status"] };
+  return { id: String(x._id), kind: x.kind as DataSource["kind"], integrationId: x.integrationId ?? undefined, name: x.name ?? "", object: x.object ?? undefined, list: x.list ?? "", fieldKeys: x.fieldKeys ?? [], rows: x.rows, syncEvery: (x.syncEvery ?? undefined) as DataSource["syncEvery"], lastSyncAt: iso(x.lastSyncAt), status: x.status as DataSource["status"], skipped: x.skipped ?? 0, error: x.lastError ?? undefined };
 }
 
 export function integrationOut(i: Row<"Integration">): Integration {

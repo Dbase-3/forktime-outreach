@@ -40,6 +40,10 @@ function fakeGhl(): Server {
       seen.notes.push({ contactId: note[1], body });
       return send(201, { note: { id: "n1" } });
     }
+    if (url.pathname === "/contacts/search" && req.method === "POST") {
+      if (body.locationId !== "loc_1" || body.pageLimit !== 100) return send(422, { statusCode: 422, message: ["bad search"] });
+      return send(200, { contacts: [{ id: "c1", contactName: "Dee Moss", phone: "+61400555666", email: "dee@x.com" }, { id: "c2", firstName: "Ed", lastName: "Nil" }], total: 2 });
+    }
     if (url.pathname === "/contacts/search/duplicate") {
       return send(200, { contact: url.searchParams.get("number") === "+61400111222" ? { id: "ct_9" } : null });
     }
@@ -192,5 +196,16 @@ describe("changing a GHL appointment", () => {
     expect(seen.appointments.at(-1)).toEqual({ put: "ap_next", startTime: start, endTime: new Date(Date.parse(start) + 45 * 60_000).toISOString() });
     expect((await signedPost(`/runtime/calls/${callId}/calendar/change`, { change: "cancel", id: "ap_next" }).expect(200)).body.ok).toBe(true);
     expect(seen.appointments.at(-1)).toEqual({ put: "ap_next", appointmentStatus: "cancelled" });
+  });
+});
+
+describe("syncing contacts from GHL", () => {
+  it("pulls the sub-account's contacts with a phone into the list", async () => {
+    const w = await connected();
+    await w.agent.post(`${w.ws}/sources`).send({ integrationId: "gohighlevel", object: "Contacts", list: "GHL", syncEvery: "15m" }).expect(201);
+    const src = (await w.agent.get(`${w.ws}/sources`)).body.find((s: { integrationId?: string }) => s.integrationId === "gohighlevel");
+    expect(src).toMatchObject({ status: "synced", rows: 1, skipped: 1 });
+    const rows = (await w.agent.post(`${w.ws}/contacts/query`).send({ pageSize: 200, search: "Dee" })).body.rows as { name: string; email?: string }[];
+    expect(rows.find((r) => r.name === "Dee Moss")).toMatchObject({ email: "dee@x.com" });
   });
 });

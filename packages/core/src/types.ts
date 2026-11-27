@@ -168,6 +168,10 @@ export interface DataSource {
   syncEvery?: "15m" | "1h" | "1d"; // sync only
   lastSyncAt: string;
   status: "synced" | "syncing" | "error";
+  /** A live sync (GoHighLevel, Twenty): people left out for having no number an agent can dial. */
+  skipped?: number;
+  /** A live sync that failed: why, in words. */
+  error?: string;
 }
 
 // ---- Campaigns: who to call, with which agent, when, and what happens after ----

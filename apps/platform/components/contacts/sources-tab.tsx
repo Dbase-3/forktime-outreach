@@ -5,7 +5,8 @@
 import clsx from "clsx";
 import { FileSpreadsheet, Plug, RefreshCw, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { CRMS } from "@outreach/core/calendar";
 import { toFieldKey } from "@outreach/core/flow-tree";
 import { integrationInfo } from "@outreach/core/integrations";
 import { relativeTime } from "@outreach/core/format";
@@ -31,6 +32,9 @@ const CRM_PROPERTIES: { name: string; type: FieldType; target?: "name" | "phone"
   { name: "Opted out of calls", type: "yesno" },
 ];
 
+/** Tools that really sync (name, phone, email); the rest only save their setup for now. */
+const isLive = (id: string | undefined) => (CRMS as readonly string[]).includes(id ?? "");
+
 const EVERY = { "15m": "Every 15 minutes", "1h": "Every hour", "1d": "Every day" };
 
 export function SourcesTab({ onImport }: { onImport: () => void }) {
@@ -50,6 +54,17 @@ export function SourcesTab({ onImport }: { onImport: () => void }) {
       await ws(`/sources/${src.id}`, { method: "DELETE" });
       patchState((s) => ({ ...s, sources: s.sources.filter((x) => x.id !== src.id) }));
     });
+  // A live sync runs in the background: refresh the list until it's done.
+  const syncing_ = app.sources.some((s) => s.kind === "sync" && s.status === "syncing" && isLive(s.integrationId));
+  useEffect(() => {
+    if (!syncing_) return;
+    const t = setInterval(() => {
+      ws<DataSource[]>("/sources")
+        .then((list) => patchState((s) => ({ ...s, sources: list })))
+        .catch(() => undefined);
+    }, 2500);
+    return () => clearInterval(t);
+  }, [syncing_]);
   const syncNow = (src: DataSource) =>
     void run(async () => {
       const next = await ws<DataSource>(`/sources/${src.id}/sync`, { method: "POST" });
@@ -97,13 +112,16 @@ export function SourcesTab({ onImport }: { onImport: () => void }) {
                       {info ? <IntegrationLogo info={info} size="sm" /> : <span className="flex h-6 w-6 items-center justify-center rounded-md border border-line"><FileSpreadsheet size={13} className="text-fg-3" /></span>}
                       <div className="min-w-0">
                         <div className="truncate font-medium">{src.name}</div>
-                        <div className="truncate text-xs text-fg-3">{src.kind === "sync" ? `${EVERY[src.syncEvery ?? "1h"]} · ${src.fieldKeys.length} fields` : `CSV import · ${src.fieldKeys.length} fields`}</div>
+                        <div className="truncate text-xs text-fg-3">
+                          {src.kind === "sync" ? (isLive(src.integrationId) ? `${EVERY[src.syncEvery ?? "1h"]} · name, phone, email${src.skipped ? ` · ${src.skipped} without a number left out` : ""}` : `${EVERY[src.syncEvery ?? "1h"]} · ${src.fieldKeys.length} fields`) : `CSV import · ${src.fieldKeys.length} fields`}
+                        </div>
+                        {src.status === "error" && src.error && <div className="truncate text-xs text-rose-700 dark:text-rose-300">{src.error}</div>}
                       </div>
                     </div>
                   </td>
                   <td className="hidden truncate px-4 py-3 text-fg-2 md:table-cell">{src.list}</td>
                   <td className="hidden px-4 py-3 font-mono text-xs sm:table-cell">{src.rows}</td>
-                  <td className="hidden px-4 py-3 text-fg-3 lg:table-cell">{src.status === "syncing" ? <Badge tone="blue" dot>First sync waiting</Badge> : relativeTime(src.lastSyncAt)}</td>
+                  <td className="hidden px-4 py-3 text-fg-3 lg:table-cell">{src.status === "syncing" ? <Badge tone="blue" dot>{isLive(src.integrationId) ? "Syncing…" : "First sync waiting"}</Badge> : src.status === "error" ? <Badge tone="red" dot>Sync failed</Badge> : relativeTime(src.lastSyncAt)}</td>
                   <td className="px-4 py-3 text-right">
                     {src.kind === "sync" && (
                       <button type="button" className="btn-icon h-8 w-8" onClick={() => syncNow(src)} aria-label="Sync now" title="Sync now"><RefreshCw size={14} /></button>
@@ -142,7 +160,7 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     setBusy(true);
     setProblem(null);
     try {
-      const fields = CRM_PROPERTIES.filter((p) => !p.target && picked[p.name]).map((p) => ({ key: toFieldKey(p.name), label: p.name, type: picked[p.name] as FieldType }));
+      const fields = isLive(info.id) ? [] : CRM_PROPERTIES.filter((p) => !p.target && picked[p.name]).map((p) => ({ key: toFieldKey(p.name), label: p.name, type: picked[p.name] as FieldType }));
       const out = await ws<{ source: DataSource; fieldDefs: FieldDef[] }>("/sources", { body: { integrationId: info.id, object, list: list.trim(), syncEvery: every, fields } });
       patchState((s) => ({ ...s, fieldDefs: out.fieldDefs, sources: [out.source, ...s.sources] }));
       onClose();
@@ -185,11 +203,13 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             })}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Records">
-              <select className="field" value={object} onChange={(e) => setObject(e.target.value)}>
-                {["Contacts", "Leads", "Deals", "Companies"].map((o) => <option key={o}>{o}</option>)}
-              </select>
-            </Field>
+            {!isLive(info?.id) && (
+              <Field label="Records">
+                <select className="field" value={object} onChange={(e) => setObject(e.target.value)}>
+                  {["Contacts", "Leads", "Deals", "Companies"].map((o) => <option key={o}>{o}</option>)}
+                </select>
+              </Field>
+            )}
             <Field label="Check for changes">
               <select className="field" value={every} onChange={(e) => setEvery(e.target.value as keyof typeof EVERY)}>
                 {Object.entries(EVERY).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
@@ -199,6 +219,9 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Field label="List" hint="Synced contacts land here. New records join it as they appear, so a campaign on this list can call them right away.">
             <input className="field" value={list} onChange={(e) => setList(e.target.value)} placeholder={info ? `${info.name} ${object.toLowerCase()}` : ""} />
           </Field>
+          {isLive(info?.id) ? (
+            <p className="text-sm text-fg-2">Brings in each person&rsquo;s name, phone and email, and keeps them up to date. People without a phone number are left out, since agents can only call numbers. Someone already in Contacts with the same number is updated, not added twice.</p>
+          ) : (
           <div>
             <div className="mb-2 flex items-baseline justify-between">
               <span className="label mb-0">Properties to bring in</span>
@@ -221,6 +244,7 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
             <p className="hint">These are {info?.name}&rsquo;s common properties. Once the live connection is on, the list comes from your account, custom properties included.</p>
           </div>
+          )}
         </div>
       )}
     </Sheet>

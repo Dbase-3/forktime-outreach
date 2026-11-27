@@ -67,6 +67,20 @@ export class Twenty implements CrmClient {
     );
   }
 
+  /** A page of people (GET /rest/people, cursor paging with starting_after). */
+  async listContacts(after: string | null): Promise<{ contacts: (ContactInfo & { id: string })[]; next: string | null }> {
+    const q = new URLSearchParams({ limit: "60", ...(after ? { starting_after: after } : {}) });
+    const env = (await this.request("GET", `/people?${q}`)) as Envelope & { pageInfo?: { hasNextPage?: boolean; endCursor?: string } };
+    type Person = { id: string; name?: { firstName?: string; lastName?: string }; emails?: { primaryEmail?: string }; phones?: { primaryPhoneNumber?: string; primaryPhoneCallingCode?: string } };
+    const people = (env.data?.people ?? []) as Person[];
+    const contacts = people.map((p) => {
+      const n = p.phones?.primaryPhoneNumber?.replace(/[^\d+]/g, "") ?? "";
+      const calling = p.phones?.primaryPhoneCallingCode?.replace(/[^\d+]/g, "") ?? "";
+      return { id: p.id, name: [p.name?.firstName, p.name?.lastName].filter(Boolean).join(" ").trim() || undefined, phone: n ? (n.startsWith("+") ? n : `${calling.startsWith("+") ? calling : calling ? `+${calling}` : ""}${n}`) : undefined, email: p.emails?.primaryEmail || undefined };
+    });
+    return { contacts, next: env.pageInfo?.hasNextPage && env.pageInfo.endCursor ? env.pageInfo.endCursor : null };
+  }
+
   async addNote(personId: string, title: string, body: string): Promise<void> {
     const noteId = Twenty.created(await this.request("POST", "/notes", { title: title.slice(0, 200), bodyV2: { markdown: body.slice(0, 5000) } }));
     try {

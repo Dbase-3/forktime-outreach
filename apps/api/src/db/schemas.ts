@@ -138,6 +138,8 @@ export const SourceSchema = new Schema(
     syncEvery: String,
     lastSyncAt: Date,
     status: { type: String, default: "synced" },
+    skipped: { type: Number, default: 0 }, // a live sync: people left out (no number an agent can dial)
+    lastError: String, // a live sync that failed: why, in words
   },
   opts,
 );

@@ -7,7 +7,7 @@ import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } f
 import { Queue, Worker, type Job } from "bullmq";
 import { ENV, type Env } from "../../config/env";
 
-export type JobName = "import-contacts" | "ingest-knowledge" | "read-file";
+export type JobName = "import-contacts" | "ingest-knowledge" | "read-file" | "sync-contacts";
 export type Processor = (data: Record<string, string>) => Promise<void>;
 
 const QUEUE = "platform-jobs";
@@ -21,6 +21,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   private readonly inline = process.env.JOBS_INLINE === "true";
 
   constructor(@Inject(ENV) private readonly env: Env) {}
+
+  /** Whether this process runs the jobs (the worker, or the API with WORKER_IN_PROCESS). */
+  get isWorker(): boolean {
+    return this.worker !== null;
+  }
 
   register(name: JobName, processor: Processor): void {
     this.processors.set(name, processor);

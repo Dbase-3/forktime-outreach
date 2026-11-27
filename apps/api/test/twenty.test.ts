@@ -19,6 +19,11 @@ function fakeTwenty(): Server {
     let raw = "";
     for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : null;
+    if (url.pathname === "/rest/people" && req.method === "GET" && url.searchParams.get("limit") === "60") {
+      // The sync's paging: two pages, one person without a phone.
+      if (url.searchParams.get("starting_after") === "c1") return send(200, { data: { people: [{ id: "p3", name: { firstName: "Cy", lastName: "Ng" }, phones: { primaryPhoneNumber: "400333444", primaryPhoneCallingCode: "+61" }, emails: { primaryEmail: "cy@x.com" } }] }, pageInfo: { hasNextPage: false } });
+      return send(200, { data: { people: [{ id: "p1", name: { firstName: "Ann", lastName: "Lee" }, phones: { primaryPhoneNumber: "400111222", primaryPhoneCallingCode: "+61" } }, { id: "p2", name: { firstName: "No", lastName: "Phone" }, phones: { primaryPhoneNumber: "" } }] }, pageInfo: { hasNextPage: true, endCursor: "c1" } });
+    }
     if (url.pathname === "/rest/people" && req.method === "GET") {
       const filter = url.searchParams.get("filter");
       if (filter) seen.filters.push(filter);
@@ -109,5 +114,21 @@ describe("Twenty", () => {
     await signedPost(`/runtime/calls/${callId}/crm`, { provider: "twenty", saved: { contactName: "Known Person", email: "known@x.com" } }).expect(200);
     expect(seen.people.length).toBe(before);
     expect(seen.targets.at(-1)).toEqual({ noteId: "n_1", targetPersonId: "p_known" });
+  });
+});
+
+describe("syncing people from Twenty", () => {
+  it("brings in everyone with a dialable number, page by page, into the source's list", async () => {
+    const w = await withWorkspace(app, "tw5@example.com");
+    await w.agent.put(`${w.ws}/integrations/twenty`).send({ apiKey: "tw-good-key" }).expect(200);
+    const res = await w.agent.post(`${w.ws}/sources`).send({ integrationId: "twenty", object: "People", list: "Twenty leads", syncEvery: "1h", fields: [{ key: "ignored", label: "Ignored", type: "text" }] }).expect(201);
+    expect(res.body.source.fieldKeys).toEqual([]);
+    const sources = (await w.agent.get(`${w.ws}/sources`)).body;
+    expect(sources[0]).toMatchObject({ status: "synced", rows: 2, skipped: 1, list: "Twenty leads" });
+    const contacts = (await w.agent.post(`${w.ws}/contacts/query`).send({ pageSize: 10 })).body.rows as { name: string; phone: string; groups?: string[] }[];
+    expect(contacts.map((c) => c.name).sort()).toEqual(["Ann Lee", "Cy Ng"]);
+    // A second sync updates the same people, it doesn't add them again.
+    await w.agent.post(`${w.ws}/sources/${sources[0].id}/sync`).expect(201);
+    expect((await w.agent.post(`${w.ws}/contacts/query`).send({ pageSize: 10 })).body.rows).toHaveLength(2);
   });
 });

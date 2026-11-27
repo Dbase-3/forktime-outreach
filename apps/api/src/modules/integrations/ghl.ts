@@ -5,7 +5,7 @@
 // 2021-04-15; free slots take epoch milliseconds (at most 31 days); an
 // appointment needs a contact, so the caller is upserted first.
 
-import { type Bookable, type CalendarClient, type ContactInfo, type CrmClient, dayMs, localDate, providerFetch } from "./providers";
+import { type Bookable, type CalendarClient, type ContactInfo, type CrmClient, dayMs, localDate, ProviderError, providerFetch } from "./providers";
 
 const CONTACTS = "2021-07-28";
 const CALENDARS = "2021-04-15";
@@ -86,6 +86,33 @@ export class Ghl implements CalendarClient, CrmClient {
       appointmentStatus: "confirmed",
     });
     return { id: d.id, start: d.startTime || o.start };
+  }
+
+  /**
+   * A page of contacts. Search Contacts (POST /contacts/search, page + pageLimit)
+   * is GHL's recommended way; its body isn't in the OpenAPI file, so if GHL
+   * refuses it this falls back to the documented (deprecated) GET /contacts/
+   * with startAfterId / startAfter.
+   */
+  async listContacts(after: string | null): Promise<{ contacts: (ContactInfo & { id: string })[]; next: string | null }> {
+    type Row = { id: string; contactName?: string; firstName?: string; lastName?: string; name?: string; phone?: string; email?: string; dateAdded?: string };
+    const read = (r: Row) => ({ id: r.id, name: (r.contactName || r.name || [r.firstName, r.lastName].filter(Boolean).join(" ")).trim() || undefined, phone: r.phone || undefined, email: r.email || undefined });
+    const cursor = after ? (JSON.parse(after) as { page?: number; legacy?: { id: string; at: number } }) : { page: 1 };
+    if (!cursor.legacy) {
+      try {
+        const page = cursor.page ?? 1;
+        const d = await this.request<{ contacts?: Row[] }>("POST", "/contacts/search", CONTACTS, { locationId: this.locationId, page, pageLimit: 100 });
+        const rows = d.contacts ?? [];
+        return { contacts: rows.map(read), next: rows.length === 100 ? JSON.stringify({ page: page + 1 }) : null };
+      } catch (err) {
+        if (!(err instanceof ProviderError) || err.status === 401 || err.status >= 500 || (cursor.page ?? 1) > 1) throw err;
+      }
+    }
+    const q = new URLSearchParams({ locationId: this.locationId, limit: "100", ...(cursor.legacy ? { startAfterId: cursor.legacy.id, startAfter: String(cursor.legacy.at) } : {}) });
+    const d = await this.request<{ contacts?: Row[] }>("GET", `/contacts/?${q}`, CONTACTS);
+    const rows = d.contacts ?? [];
+    const last = rows.at(-1);
+    return { contacts: rows.map(read), next: rows.length === 100 && last ? JSON.stringify({ legacy: { id: last.id, at: Date.parse(last.dateAdded ?? "") || 0 } }) : null };
   }
 
   /** The contact with this phone or email, if GHL has one. */

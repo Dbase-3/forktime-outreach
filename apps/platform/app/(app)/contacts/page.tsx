@@ -4,12 +4,13 @@ import clsx from "clsx";
 import { FileUp, Plus, Users } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useApp } from "@/lib/store";
+import { queryContacts } from "@/lib/contacts-api";
+import { patchState, useApp } from "@/lib/store";
 import { AddContactSheet, ContactSheet } from "@/components/contacts/contact-sheets";
 import { ContactsTable } from "@/components/contacts/contacts-table";
 import { FieldsTab } from "@/components/contacts/fields-tab";
 import { ImportWizard } from "@/components/contacts/import-wizard";
-import { SourcesTab } from "@/components/contacts/sources-tab";
+import { SourcesTab, useSyncWatch } from "@/components/contacts/sources-tab";
 import { EmptyState, PageHeader } from "@/components/ui";
 
 type Tab = "contacts" | "sources" | "fields";
@@ -26,6 +27,15 @@ export default function ContactsPage() {
     void queries.invalidateQueries({ queryKey: ["contact-lists", app.workspace.id] });
     void queries.invalidateQueries({ queryKey: ["fields-filled", app.workspace.id] });
   };
+  // A CRM sync adds contacts in the background: reload the table and the count
+  // (the count decides whether the tab shows the table or "No contacts yet").
+  const synced = () => {
+    refresh();
+    void queryContacts({ search: "", list: null, filter: { match: "all", rules: [] }, sort: null, page: 1, pageSize: 1 })
+      .then((r) => patchState((s) => ({ ...s, counts: { ...s.counts, contacts: r.total } })))
+      .catch(() => undefined);
+  };
+  useSyncWatch(synced);
 
   // Search (⌘K) links here with ?open=<id>.
   useEffect(() => {
@@ -69,7 +79,7 @@ export default function ContactsPage() {
         ) : (
           <ContactsTable onOpen={setOpenId} />
         ))}
-      {tab === "sources" && <SourcesTab onImport={() => setImporting(true)} />}
+      {tab === "sources" && <SourcesTab onImport={() => setImporting(true)} onSynced={synced} />}
       {tab === "fields" && <FieldsTab />}
 
       <ContactSheet contactId={openId} onClose={() => setOpenId(null)} onChanged={refresh} />

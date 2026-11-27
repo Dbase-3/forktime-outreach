@@ -5,7 +5,7 @@
 import clsx from "clsx";
 import { FileSpreadsheet, Plug, RefreshCw, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CRMS } from "@outreach/core/calendar";
 import { toFieldKey } from "@outreach/core/flow-tree";
 import { integrationInfo } from "@outreach/core/integrations";
@@ -37,7 +37,35 @@ const isLive = (id: string | undefined) => (CRMS as readonly string[]).includes(
 
 const EVERY = { "15m": "Every 15 minutes", "1h": "Every hour", "1d": "Every day" };
 
-export function SourcesTab({ onImport }: { onImport: () => void }) {
+/**
+ * A live sync runs in the background: keep checking the sources until it's
+ * done, then call `onSynced` so the Contacts tab shows what it brought in
+ * without a reload. Used by the Contacts page (not the Sources tab), so it keeps
+ * watching whichever tab is open.
+ */
+export function useSyncWatch(onSynced: () => void) {
+  const app = useApp();
+  const syncing = app.sources.some((s) => s.kind === "sync" && s.status === "syncing" && isLive(s.integrationId));
+  const done = useRef(onSynced);
+  done.current = onSynced;
+  const wasSyncing = useRef(syncing);
+  useEffect(() => {
+    if (wasSyncing.current && !syncing) done.current();
+    wasSyncing.current = syncing;
+  }, [syncing]);
+  useEffect(() => {
+    if (!syncing) return;
+    const t = setInterval(() => {
+      ws<DataSource[]>("/sources")
+        .then((list) => patchState((s) => ({ ...s, sources: list })))
+        .catch(() => undefined);
+    }, 2500);
+    return () => clearInterval(t);
+  }, [syncing]);
+}
+
+/** `onSynced` runs when a sync came back already finished (a small CRM can be done before the reply). */
+export function SourcesTab({ onImport, onSynced }: { onImport: () => void; onSynced?: () => void }) {
   const app = useApp();
   const [syncing, setSyncing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -54,21 +82,14 @@ export function SourcesTab({ onImport }: { onImport: () => void }) {
       await ws(`/sources/${src.id}`, { method: "DELETE" });
       patchState((s) => ({ ...s, sources: s.sources.filter((x) => x.id !== src.id) }));
     });
-  // A live sync runs in the background: refresh the list until it's done.
-  const syncing_ = app.sources.some((s) => s.kind === "sync" && s.status === "syncing" && isLive(s.integrationId));
-  useEffect(() => {
-    if (!syncing_) return;
-    const t = setInterval(() => {
-      ws<DataSource[]>("/sources")
-        .then((list) => patchState((s) => ({ ...s, sources: list })))
-        .catch(() => undefined);
-    }, 2500);
-    return () => clearInterval(t);
-  }, [syncing_]);
+  const finishedAlready = (src: DataSource) => {
+    if (isLive(src.integrationId) && src.status !== "syncing") onSynced?.();
+  };
   const syncNow = (src: DataSource) =>
     void run(async () => {
       const next = await ws<DataSource>(`/sources/${src.id}/sync`, { method: "POST" });
       patchState((s) => ({ ...s, sources: s.sources.map((x) => (x.id === src.id ? next : x)) }));
+      finishedAlready(next);
     });
 
   return (
@@ -137,12 +158,12 @@ export function SourcesTab({ onImport }: { onImport: () => void }) {
           </tbody>
         </table>
       </div>
-      <SyncSheet open={syncing} onClose={() => setSyncing(false)} />
+      <SyncSheet open={syncing} onClose={() => setSyncing(false)} onCreated={finishedAlready} />
     </div>
   );
 }
 
-function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function SyncSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (src: DataSource) => void }) {
   const app = useApp();
   const candidates = app.integrations.filter((i) => i.connected && integrationInfo(i.id)?.syncsContacts);
   const [integrationId, setIntegrationId] = useState<string>("");
@@ -163,6 +184,7 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
       const fields = isLive(info.id) ? [] : CRM_PROPERTIES.filter((p) => !p.target && picked[p.name]).map((p) => ({ key: toFieldKey(p.name), label: p.name, type: picked[p.name] as FieldType }));
       const out = await ws<{ source: DataSource; fieldDefs: FieldDef[] }>("/sources", { body: { integrationId: info.id, object, list: list.trim(), syncEvery: every, fields } });
       patchState((s) => ({ ...s, fieldDefs: out.fieldDefs, sources: [out.source, ...s.sources] }));
+      onCreated(out.source);
       onClose();
     } catch (err) {
       setProblem(err instanceof Error ? err.message : "Couldn't start syncing.");

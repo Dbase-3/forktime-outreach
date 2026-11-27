@@ -7,6 +7,10 @@ import { z } from "zod";
 import { newId } from "./flow-tree";
 import { OPS } from "./conditions";
 import { greetingIsHonest } from "./disclosure";
+import { AVAILABLE_INTEGRATIONS } from "./integrations";
+import { CRMS, isBookingCalendar } from "./calendar";
+
+const isCrm = (id: string) => (CRMS as readonly string[]).includes(id);
 import type { ConditionOp, DataField, Direction, FieldType, Flow, Step, SuccessCheck } from "./types";
 
 const OP_KEYS = Object.keys(OPS) as [ConditionOp, ...ConditionOp[]];
@@ -20,7 +24,9 @@ const ask = z.object({
   answerType: z.enum(["text", "yesno", "number", "date", "choice"]),
   choices: z.array(z.string()).describe("only for answerType choice; otherwise empty"),
 });
-const action = z.object({ kind: z.literal("action"), action: z.enum(["book", "transfer", "text", "crm", "webhook"]), detail: z.string() });
+// What an action can run on: the tools that really connect, a webhook, or nothing ("").
+const LINKS = ["", "webhook", ...AVAILABLE_INTEGRATIONS.map((i) => i.id)] as [string, ...string[]];
+const action = z.object({ kind: z.literal("action"), action: z.enum(["book", "transfer", "text", "crm", "webhook"]), detail: z.string(), integration: z.enum(LINKS).describe("the tool it runs on, from the list you're given; empty for none") });
 const end = z.object({ kind: z.literal("end"), outcome: z.string().describe("snake_case result, e.g. meeting_booked"), text: z.string() });
 const condition = z.object({ field: z.string(), op: z.enum(OP_KEYS), value: z.string().describe("empty for is_yes, is_no, is_set, is_empty") });
 
@@ -80,7 +86,7 @@ export function toSteps(steps: DraftStep[]): Step[] {
         };
       }
       case "action":
-        return { id: newId(), kind: "action", action: s.action, detail: s.detail.trim() };
+        return { id: newId(), kind: "action", action: s.action, detail: s.detail.trim(), ...(s.integration ? { integration: s.integration } : {}) };
       case "end":
         return { id: newId(), kind: "end", outcome: fieldKey(s.outcome || "done"), text: s.text.trim() };
       case "branch": {
@@ -158,7 +164,9 @@ An agent has two parts, and they must not repeat each other:
    - say: a line the agent says.
    - ask: a question; the answer is saved under field (snake_case). answerType is text, yesno, number, date or choice (give 2 to 5 choices for choice, otherwise an empty list).
    - branch: a decision on a field saved earlier by an ask, or on a contact field. Use is_yes / is_no for yesno answers, is / any_of for choices, less_than / more_than for numbers, before / after for dates. value is empty for is_yes, is_no, is_set, is_empty. Each side is a list of steps; a side may be empty (the call carries on after the branch).
-   - action: book (calendar), transfer (to a person), text (send an SMS), crm (save or flag in the CRM), webhook. detail says what, in a few words.
+   - action: book (calendar), transfer (to a person), text (send an SMS), crm (save or flag in the CRM), webhook. detail says what, in a few words. integration is the tool it runs on, from the Tools list you're given: link every book step to a calendar and every crm step to a CRM there (the one the owner names, or the only one that fits); leave it empty when nothing fits, and for transfer and text.
+   - Booking on a calendar: the book step itself finds free times, offers them, agrees one with the caller and books it. So don't put an ask for the day or time before it, and never a say after it claiming it's booked (the call confirms the real booking).
+   - A date answer holds a day only, never a time of day.
    - end: the call ends with this line; outcome is a snake_case result such as meeting_booked or not_interested.
    Keep it to the main path: 4 to 12 steps in total, one question at a time, and every path finishes with an end step.
 
@@ -181,13 +189,17 @@ export interface DraftRequest {
   brief: string;
   business: string;
   fields: { key: string; label: string; type: string }[];
+  /** Ids of the tools the workspace has connected (the list of tools is the available ones). */
+  connected?: string[];
   /** Workflow mode: the agent as it is now. */
   agent?: { name: string; prompt: string; greeting: string; direction: Direction };
 }
 
 export function draftUserMessage(req: DraftRequest): string {
   const fields = req.fields.length ? req.fields.map((f) => `- {${f.key}}: ${f.label} (${f.type})`).join("\n") : "(none)";
-  const head = `Business: ${req.business || "(not named)"}\n\nContact fields you may use:\n- {first_name}: First name (text)\n${fields}`;
+  const have = new Set(req.connected ?? []);
+  const tools = AVAILABLE_INTEGRATIONS.map((i) => `- ${i.id}: ${i.name} (${[isCrm(i.id) ? "CRM" : "", isBookingCalendar(i.id) ? "calendar" : ""].filter(Boolean).join(" and ")}${have.has(i.id) ? ", connected" : ", not connected yet"})`).join("\n");
+  const head = `Business: ${req.business || "(not named)"}\n\nContact fields you may use:\n- {first_name}: First name (text)\n${fields}\n\nTools (for an action's integration):\n${tools}\n- webhook: their own URL`;
   if (req.mode === "workflow" && req.agent) {
     return `${head}\n\nRebuild only the workflow (steps) for this existing agent. Keep it consistent with its prompt and greeting, and don't repeat the greeting as a step.\n\nName: ${req.agent.name}\nUsed for: ${req.agent.direction}\nGreeting: ${req.agent.greeting}\n\nPrompt:\n${req.agent.prompt}\n\nWhat the owner asked for:\n${req.brief || "(nothing more)"}`;
   }

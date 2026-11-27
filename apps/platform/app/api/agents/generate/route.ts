@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     fields: Array.isArray(body.fields)
       ? body.fields.slice(0, 60).map((f) => ({ key: String(f?.key ?? "").slice(0, 60), label: String(f?.label ?? "").slice(0, 80), type: String(f?.type ?? "text").slice(0, 12) }))
       : [],
+    connected: Array.isArray(body.connected) ? body.connected.slice(0, 40).map((x) => String(x).slice(0, 40)) : [],
     agent: body.agent
       ? {
           name: String(body.agent.name ?? "").slice(0, 80),

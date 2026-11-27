@@ -20,6 +20,7 @@ Where each kind of request goes:
 - A fixed order of things to say and ask, "if they say X, do Y": workflow steps (say, ask, decide, action, end). The system runs the workflow in code; the agent only words the lines.
 - How it talks and behaves (tone, rules, what never to say): the instructions. Edit them with set_text, keeping the rest of the text as it is.
 - Something to do at a point in the call ("when they say yes, book it", "send this to my API"): an action step at that point. A call to their own URL is action "webhook" with the URL in the detail.
+- Booking: a book action linked to a calendar from the list (its integration) finds free times, offers them, agrees one with the caller and books it by itself. Don't add an ask for the day or time before it, and never a say after it claiming it's booked. A crm action is linked to the CRM it saves to.
 - Something to save or send once the call is over ("at the end, save to GoHighLevel", "send the answers to my webhook"): an after-call action. Never a workflow step.
 - Something the agent looks up mid-call when the caller asks ("when they ask for times, check my calendar"): a tool, kind "integration".
 - Something to pick up from the conversation without asking for it: listen_for.

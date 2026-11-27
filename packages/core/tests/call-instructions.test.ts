@@ -51,11 +51,11 @@ describe("callInstructions", () => {
       ],
     };
     const text = callInstructions(setup(), nextStep(steps, { first_name: "Sam" }), ahead);
-    expect(text).toMatch(/When they answer, reply in one turn: first say the words out loud .*then call note with their answer to "keen"\. Words first, then the note\./);
+    expect(text).toMatch(/Once you've asked it and they answer it, reply in one turn \(a reply to anything else, like the welcome, is not an answer: then just ask it, with no note\): first say the words out loud .*then call note with their answer to "keen"\. Words first, then the note\./);
     expect(text).toMatch(/- If Yes: say "Love it\. Which day suits\?" \(ending with the question\), then call note\./);
     expect(text).toMatch(/- If No: call note only, with no words \(the call is ending and the system says goodbye\)\./);
     expect(text).toMatch(/- If Maybe: call note and wait; its result says what's next\./);
-    expect(callInstructions(setup(), nextStep(steps, {}))).not.toMatch(/When they answer, reply in one turn/);
+    expect(callInstructions(setup(), nextStep(steps, {}))).not.toMatch(/they answer it, reply in one turn/);
   });
 
   it("points to search when the knowledge is too big to include", () => {

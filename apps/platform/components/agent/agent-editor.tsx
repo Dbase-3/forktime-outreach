@@ -142,7 +142,7 @@ export function AgentEditor({ id }: { id: string }) {
 
   /** A blank agent, written whole from what the owner described. Returns a problem to show, or null. */
   const writeAgent = async (brief: string): Promise<string | null> => {
-    const draft = await writer.writeAgent({ brief, business: app.settings.businessName, fields: draftFields(app) });
+    const draft = await writer.writeAgent({ brief, business: app.settings.businessName, fields: draftFields(app), connected: app.integrations.filter((i) => i.connected).map((i) => i.id) });
     if (!draft) return writer.lastError() ?? "Couldn't write the agent. Try describing it differently.";
     setSelectedId(null);
     setDrawn((n) => n + 1);
@@ -162,6 +162,7 @@ export function AgentEditor({ id }: { id: string }) {
       brief: flow.brief ?? "",
       business: businessOf(flow, app.settings.businessName),
       fields: draftFields(app),
+      connected: app.integrations.filter((i) => i.connected).map((i) => i.id),
       agent: { name: flow.agent.name, prompt: flow.prompt, greeting: flow.greeting, direction: flow.direction },
     });
     if (!newSteps) return;

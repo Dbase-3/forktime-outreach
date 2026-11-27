@@ -3,7 +3,7 @@
 // call, the workflow protocol and where the call is now, and the knowledge it
 // answers from. Pure, so the API, the agent and tests build the same text.
 
-import { isLiveBooking } from "./calendar";
+import { addDays, dateIn, isLiveBooking } from "./calendar";
 import { readAnswer } from "./spoken";
 import { fill } from "./variables";
 import { outcomesOf } from "./flow-tree";
@@ -63,10 +63,28 @@ function describeAhead(ahead: Ahead): string {
     if (c.then.kind === "wait") return `${lead} call note and wait; its result says what's next.`;
     return `${lead} say "${[...c.then.say, c.then.question].join(" ")}" (ending with the question), then call note.`;
   };
-  return [`When they answer, reply in one turn: first say the words out loud (a word to acknowledge, then the line below in your own words, dropping any part they've already heard, like who you are), then call note with their answer to "${ahead.field}". Words first, then the note.`, ...ahead.cases.map(line)].join("\n");
+  return [`Once you've asked it and they answer it, reply in one turn (a reply to anything else, like the welcome, is not an answer: then just ask it, with no note): first say the words out loud (a word to acknowledge, then the line below in your own words, dropping any part they've already heard, like who you are), then call note with their answer to "${ahead.field}". Words first, then the note. But if your instructions say to read this answer back, this turn is only the read-back: no note, no next line until they confirm.`, ...ahead.cases.map(line)].join("\n");
 }
 
-export function callInstructions(setup: CallSetup, position: Position, ahead?: Ahead | null): string {
+/**
+ * Today and the next two weeks, each with its weekday and its YYYY-MM-DD value.
+ * Given "today" alone, the call model worked weekdays out wrong (2026-11-28 test:
+ * "next Monday" from a Saturday came out as 1 December in 4 of 5 runs).
+ */
+export function comingDays(timeZone: string, now = new Date(), count = 14): string {
+  let zone = timeZone;
+  try {
+    new Intl.DateTimeFormat("en-AU", { timeZone: zone });
+  } catch {
+    zone = "UTC";
+  }
+  const today = dateIn(zone, now);
+  const label = (iso: string) => new Intl.DateTimeFormat("en-AU", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`)).replace(",", "");
+  const days = Array.from({ length: count }, (_, i) => addDays(today, i + 1));
+  return [`Today is ${label(today)} (${today}). The days after it:`, ...days.map((d) => `  - ${label(d)}: ${d}`)].join("\n");
+}
+
+export function callInstructions(setup: CallSetup, position: Position, ahead?: Ahead | null, now = new Date()): string {
   const { flow, values, schema } = setup;
   const persona = fill(flow.prompt, values).trim();
   const facts = Object.entries(values)
@@ -85,14 +103,19 @@ You are speaking on a live phone call as ${values.agent}, the AI assistant for $
 - Keep each reply to one or two short sentences, then let them talk. One question at a time.
 - Plain spoken words only: no lists, no symbols, no markdown. Say times and prices the way people say them.
 - If they ask, you are an AI assistant, and the call is recorded. Never claim to be a person.
-- Never make up facts, prices or availability. If you don't know, say the team will follow up.`,
+- Never make up facts, prices or availability. If you don't know, say the team will follow up.
+- Never say something is booked, saved or sent unless a tool result told you it was.`,
     `# This call
 - ${setup.direction === "inbound" ? "They called you." : "You called them."}
 - Business: ${setup.business}
+- ${comingDays(setup.flow.timezone || "UTC", now)}
+  Work out any day they name ("next Monday", "this Friday") from this list, never in your head.
 ${facts}${setup.test ? "\n- This is a test call by the business owner. Act exactly as on a real call." : ""}`,
     `# The workflow
 The call follows a workflow that the system runs. You never pick the next step yourself.
 - When they answer the current question, save it with note. If "Right now" shows what comes after their answer, give it in that same reply: a few words to acknowledge, the next line, and the note. Otherwise call note first and wait: its result tells you what to say. If you're not sure what they meant, ask again rather than noting a guess.
+- Only note words they actually said in answer to that question. A reply to the welcome message (like "yes, now's fine") doesn't answer the current question: just ask it, with no note. Until they've answered, there's nothing to note: never note a placeholder like "waiting for answer" or "unknown".
+- When your instructions say to read an answer back or spell it out, do it, then stop and wait for their reply. Call note, and say the next line, once they've confirmed it.
 - Never ask a follow-up question of your own. Say each line in your own natural words, keeping its meaning, but leave out anything they've already heard on this call (if you've introduced yourself, don't do it again).
 - An answer that points at something you know is still an answer: for a phone number, "this number" or "the one you're calling" means the phone number of this call (note that number if it's listed under This call, otherwise note their words).
 - If they answer a question that comes later, note that too, so it isn't asked again.

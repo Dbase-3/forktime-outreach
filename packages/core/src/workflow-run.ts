@@ -99,7 +99,7 @@ const FORMAT: Record<AskStep["answerType"], string> = {
   text: "their answer in a few words",
   yesno: "Yes or No",
   number: "digits only",
-  date: "a date as YYYY-MM-DD",
+  date: "a date as YYYY-MM-DD: find the day they mean in the list of days under This call and use its value",
   choice: "one of the options",
 };
 

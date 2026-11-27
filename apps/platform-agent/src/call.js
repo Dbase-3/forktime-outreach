@@ -242,7 +242,7 @@ class PlatformCall {
       end_call: llm.tool({
         description:
           "End the call when it can't go on: they want to stop, have no time, ask not to be called again, it's a wrong number, or it's voicemail. " +
-          "Not for the workflow's own ending, which the system runs. Your goodbye is spoken for you: write nothing else in that reply.",
+          "Not for the workflow's own ending, which the system runs. Your goodbye is spoken for you from `goodbye`: the reply that calls end_call has no words of its own, or the goodbye is said twice.",
         parameters: z.object({
           goodbye: z.string().describe("Your last words: one short, warm sentence."),
           outcome: z.enum(cfg.outcomes).describe("How the call ended."),

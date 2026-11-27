@@ -59,7 +59,8 @@ const p = (html: string, extra = "") => `<p style="margin:0 0 16px;font-family:$
 const small = (html: string) => `<p style="margin:0;font-family:${SANS};font-size:13px;line-height:20px;color:${C.fg3};">${html}</p>`;
 
 export function codeEmail(o: { code: string; to: string; appUrl: string }): Email {
-  const spaced = `${o.code.slice(0, 3)}&thinsp;&thinsp;${o.code.slice(3)}`;
+  // The gap is padding, not a character: copying the code gives just the 6 digits (owner 2026-11-28).
+  const spaced = `<span style="padding-right:0.4em;">${o.code.slice(0, 3)}</span>${o.code.slice(3)}`;
   const body = [
     p("Enter this code on the sign-in page to continue to Lisna."),
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px;"><tr>

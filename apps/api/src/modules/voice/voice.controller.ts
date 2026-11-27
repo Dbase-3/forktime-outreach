@@ -76,6 +76,18 @@ export class RuntimeController {
     return this.voice.book(callIdOf(id), body);
   }
 
+  @Post("calendar/mine")
+  @HttpCode(200)
+  mine(@Param("id") id: string, @Body() body: unknown) {
+    return this.voice.myBookings(callIdOf(id), body);
+  }
+
+  @Post("calendar/change")
+  @HttpCode(200)
+  change(@Param("id") id: string, @Body() body: unknown) {
+    return this.voice.changeBooking(callIdOf(id), body);
+  }
+
   @Post("crm")
   @HttpCode(200)
   crm(@Param("id") id: string, @Body() body: unknown) {

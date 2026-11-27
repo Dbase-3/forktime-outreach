@@ -64,4 +64,23 @@ export class CalCom implements CalendarClient {
     });
     return { id: d.uid, start: d.start };
   }
+
+  async upcoming(eventTypeId: string | number, who: { phone?: string; email?: string }): Promise<{ id: string; start: string }[]> {
+    if (!who.phone && !who.email) return [];
+    const q = new URLSearchParams({ status: "upcoming", eventTypeId: String(eventTypeId), take: "100", sortStart: "asc", ...(who.email && !who.phone ? { attendeeEmail: who.email } : {}) });
+    const d = await this.request<{ uid: string; start: string; attendees?: { email?: string; phoneNumber?: string }[] }[]>("GET", `/bookings?${q}`, "2024-08-13");
+    const email = who.email?.toLowerCase();
+    return (Array.isArray(d) ? d : [])
+      .filter((b) => (b.attendees ?? []).some((a) => (who.phone && a.phoneNumber?.replace(/[^\d+]/g, "") === who.phone) || (email && a.email?.toLowerCase() === email)))
+      .map((b) => ({ id: b.uid, start: b.start }));
+  }
+
+  async reschedule(uid: string, start: string): Promise<{ id: string; start: string }> {
+    const d = await this.request<{ uid: string; start: string }>("POST", `/bookings/${encodeURIComponent(uid)}/reschedule`, "2024-08-13", { start: new Date(start).toISOString(), reschedulingReason: "Changed on a phone call" });
+    return { id: d.uid, start: d.start };
+  }
+
+  async cancel(uid: string, reason: string): Promise<void> {
+    await this.request("POST", `/bookings/${encodeURIComponent(uid)}/cancel`, "2024-08-13", { cancellationReason: reason.slice(0, 300) || "Cancelled on a phone call" });
+  }
 }

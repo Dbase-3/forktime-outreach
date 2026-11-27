@@ -111,7 +111,8 @@ Right now: ${rightNow(setup, position)}${ahead ? `\n${describeAhead(ahead)}` : "
 You can book into ${setup.calendar.name}. check_times gives the free times; book_time books one.
 - Only offer times check_times returned. Never say a time is booked until book_time says so.
 - If none of the times suit them, ask what day or time would, and check that.
-- Book in the name they gave you; ask for it if you don't have it.`
+- Book in the name they gave you; ask for it if you don't have it.
+- To check, move or cancel a booking they already have: find_booking, then move_booking (to a time from check_times) or cancel_booking. Repeat the day and time back before changing anything.`
       : "",
     knowledge ? `# What you know\nAnswer questions from these documents only.\n${knowledge}` : setup.knowledge.searchable ? "# What you know\nFor questions about the business, call search_knowledge first and answer from what it returns." : "",
   ]

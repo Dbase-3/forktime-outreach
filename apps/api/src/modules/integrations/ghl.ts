@@ -23,7 +23,7 @@ export class Ghl implements CalendarClient, CrmClient {
     private readonly base = "https://services.leadconnectorhq.com",
   ) {}
 
-  private request<T>(method: "GET" | "POST", path: string, version: string, body?: unknown): Promise<T> {
+  private request<T>(method: "GET" | "POST" | "PUT", path: string, version: string, body?: unknown): Promise<T> {
     return providerFetch<T>("GoHighLevel", `${this.base}${path}`, { method, headers: { Authorization: `Bearer ${this.token}`, Version: version }, body }, said);
   }
 
@@ -86,5 +86,36 @@ export class Ghl implements CalendarClient, CrmClient {
       appointmentStatus: "confirmed",
     });
     return { id: d.id, start: d.startTime || o.start };
+  }
+
+  /** The contact with this phone or email, if GHL has one. */
+  private async findContact(who: ContactInfo): Promise<string | null> {
+    for (const [key, value] of [["number", who.phone], ["email", who.email]] as const) {
+      if (!value) continue;
+      const d = await this.request<{ contact?: { id?: string } | null }>("GET", `/contacts/search/duplicate?${new URLSearchParams({ locationId: this.locationId, [key]: value })}`, CONTACTS);
+      if (d?.contact?.id) return d.contact.id;
+    }
+    return null;
+  }
+
+  async upcoming(_calendarId: string | number, who: ContactInfo): Promise<{ id: string; start: string }[]> {
+    if (!who.phone && !who.email) return [];
+    const contactId = await this.findContact(who);
+    if (!contactId) return [];
+    const d = await this.request<{ events?: { id: string; startTime: string; appointmentStatus?: string; deleted?: boolean }[] }>("GET", `/contacts/${encodeURIComponent(contactId)}/appointments`, CONTACTS);
+    return (d.events ?? [])
+      .filter((e) => !e.deleted && e.appointmentStatus !== "cancelled" && Date.parse(e.startTime) > Date.now())
+      .sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))
+      .map((e) => ({ id: e.id, start: e.startTime }));
+  }
+
+  async reschedule(id: string, start: string, minutes: number): Promise<{ id: string; start: string }> {
+    const end = new Date(Date.parse(start) + minutes * 60_000).toISOString();
+    const d = await this.request<{ id?: string; startTime?: string }>("PUT", `/calendars/events/appointments/${encodeURIComponent(id)}`, CALENDARS, { startTime: start, endTime: end });
+    return { id: d.id || id, start: d.startTime || start };
+  }
+
+  async cancel(id: string): Promise<void> {
+    await this.request("PUT", `/calendars/events/appointments/${encodeURIComponent(id)}`, CALENDARS, { appointmentStatus: "cancelled" });
   }
 }

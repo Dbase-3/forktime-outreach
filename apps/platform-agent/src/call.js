@@ -359,6 +359,37 @@ class PlatformCall {
         },
       }),
     };
+    const changeLine = (text) => this.api.report({ type: "line", line: { who: "action", text: `${text}${cfg.test ? " (test call, really changed)" : ""}`, at: Math.round(this.secondsIn()) } });
+    tools.find_booking = llm.tool({
+      description: `Look up the caller's upcoming bookings in ${name}, when they want to check, move or cancel one. Say a few words first.`,
+      parameters: z.object({ email: z.string().optional().describe("The email they booked with, only if the result asked for it.") }),
+      execute: async ({ email }) => {
+        try {
+          return (await this.api.myBookings(email)).text;
+        } catch (err) {
+          this.log.warn(`[Call] find_booking failed: ${err.message}`);
+          return "The calendar can't be checked right now. Say the team will help with their booking.";
+        }
+      },
+    });
+    tools.move_booking = llm.tool({
+      description: "Move one of their bookings (from find_booking) to a free time (from check_times), after they've agreed to the new day and time.",
+      parameters: z.object({ id: z.string().describe("The booking's value in brackets, from find_booking."), start: z.string().describe("The new time's value in brackets, from check_times.") }),
+      execute: async ({ id, start }) => {
+        const res = await this.api.changeBooking({ change: "move", id, start }).catch((err) => ({ ok: false, text: `The calendar didn't answer (${err.message.slice(0, 80)}). Say the team will sort it out.` }));
+        if (res.ok) changeLine(`Moved in ${name} to ${res.when}`);
+        return res.ok ? `${res.text} Tell them, in a few words.` : res.text;
+      },
+    });
+    tools.cancel_booking = llm.tool({
+      description: "Cancel one of their bookings (from find_booking), only after they've clearly said to cancel it and you've repeated which one.",
+      parameters: z.object({ id: z.string().describe("The booking's value in brackets, from find_booking."), reason: z.string().describe("Why, in a few words, if they said.") }),
+      execute: async ({ id, reason }) => {
+        const res = await this.api.changeBooking({ change: "cancel", id, reason }).catch((err) => ({ ok: false, text: `The calendar didn't answer (${err.message.slice(0, 80)}). Say the team will sort it out.` }));
+        if (res.ok) changeLine(`Cancelled a booking in ${name}${reason ? ` (${reason})` : ""}`);
+        return res.ok ? `${res.text} Tell them it's cancelled, in a few words.` : res.text;
+      },
+    });
     if (hasLiveBookingStep(cfg.flow.steps, cfg.calendar.provider)) {
       tools.skip_booking = llm.tool({
         description: "They don't want to book a time now. The workflow then carries on.",

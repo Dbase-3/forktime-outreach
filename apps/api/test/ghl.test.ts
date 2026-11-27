@@ -40,6 +40,18 @@ function fakeGhl(): Server {
       seen.notes.push({ contactId: note[1], body });
       return send(201, { note: { id: "n1" } });
     }
+    if (url.pathname === "/contacts/search/duplicate") {
+      return send(200, { contact: url.searchParams.get("number") === "+61400111222" ? { id: "ct_9" } : null });
+    }
+    if (url.pathname === "/contacts/ct_9/appointments") {
+      const soon = new Date(Date.now() + 3 * 86_400_000).toISOString();
+      return send(200, { events: [{ id: "ap_old", startTime: "2020-01-01T00:00:00Z", appointmentStatus: "confirmed" }, { id: "ap_gone", startTime: soon, appointmentStatus: "cancelled" }, { id: "ap_next", startTime: soon, appointmentStatus: "confirmed" }] });
+    }
+    const put = url.pathname.match(/^\/calendars\/events\/appointments\/([^/]+)$/);
+    if (put && req.method === "PUT") {
+      seen.appointments.push({ put: put[1], ...body });
+      return send(200, { id: put[1], startTime: body.startTime });
+    }
     if (url.pathname === "/calendars/events/appointments") {
       seen.appointments.push(body);
       return send(200, { id: "appt_1", startTime: body.startTime, calendarId: body.calendarId });
@@ -165,5 +177,20 @@ describe("saving to GHL", () => {
     const cfg = (await request(app.getHttpServer()).get(path).set("x-runtime-signature", signRuntime(KEY, "GET", path, "")).expect(200)).body;
     expect(cfg.crms).toEqual(["gohighlevel"]);
     expect(cfg.calendar).toEqual({ provider: "gohighlevel", name: "GoHighLevel", eventType: "Consults" });
+  });
+});
+
+describe("changing a GHL appointment", () => {
+  it("finds the caller's next appointment by their number, then moves or cancels it", async () => {
+    const w = await connected();
+    const callId = await liveCall(w, [{ id: "bk", kind: "action", action: "book", detail: "", integration: "gohighlevel" }, { id: "e1", kind: "end", outcome: "booked", text: "Bye" }]);
+    const found = (await signedPost(`/runtime/calls/${callId}/calendar/mine`, {}).expect(200)).body.text;
+    expect(found).toContain("[ap_next]");
+    expect(found).not.toMatch(/ap_old|ap_gone/);
+    const start = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    expect((await signedPost(`/runtime/calls/${callId}/calendar/change`, { change: "move", id: "ap_next", start }).expect(200)).body.ok).toBe(true);
+    expect(seen.appointments.at(-1)).toEqual({ put: "ap_next", startTime: start, endTime: new Date(Date.parse(start) + 45 * 60_000).toISOString() });
+    expect((await signedPost(`/runtime/calls/${callId}/calendar/change`, { change: "cancel", id: "ap_next" }).expect(200)).body.ok).toBe(true);
+    expect(seen.appointments.at(-1)).toEqual({ put: "ap_next", appointmentStatus: "cancelled" });
   });
 });

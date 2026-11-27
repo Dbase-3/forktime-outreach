@@ -255,6 +255,7 @@ export const CallSchema = new Schema(
     recording: Mixed,
     endReason: String,
     actions: [String],
+    bookingRefs: { type: [String], select: false }, // bookings this call found for the caller or made: the only ones it may move or cancel
     mood: [Number],
     feedback: { type: Mixed, default: null },
     checkResults: Mixed,

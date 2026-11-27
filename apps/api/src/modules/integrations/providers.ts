@@ -25,6 +25,10 @@ export interface CalendarClient {
   /** Free start times (ISO with the zone's offset) on the dates from..to (YYYY-MM-DD, inclusive) in that zone. */
   slots(calendarId: string | number, from: string, to: string, timeZone: string): Promise<string[]>;
   book(o: { calendarId: string | number; minutes: number; start: string; name: string; timeZone: string; email?: string; phone?: string; metadata?: Record<string, string> }): Promise<{ id: string; start: string }>;
+  /** This person's upcoming bookings, matched on phone or email only (never a name alone: that could show someone else's). */
+  upcoming(calendarId: string | number, who: ContactInfo): Promise<{ id: string; start: string }[]>;
+  reschedule(id: string, start: string, minutes: number): Promise<{ id: string; start: string }>;
+  cancel(id: string, reason: string): Promise<void>;
 }
 
 export interface ContactInfo {

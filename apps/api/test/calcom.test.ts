@@ -12,6 +12,7 @@ import { startApp, withWorkspace } from "./helpers";
 // what it was asked.
 const seen: { slots: URLSearchParams[]; bookings: Record<string, unknown>[] } = { slots: [], bookings: [] };
 const VERSIONS: Record<string, string | undefined> = { "/v2/me": undefined, "/v2/event-types": "2024-06-14", "/v2/slots": "2024-09-04", "/v2/bookings": "2024-08-13" };
+const changes: { path: string; body: Record<string, unknown> }[] = [];
 
 function fakeCalCom(): Server {
   return createServer(async (req: IncomingMessage, res) => {
@@ -26,6 +27,23 @@ function fakeCalCom(): Server {
       seen.slots.push(url.searchParams);
       const day = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
       return send(200, { status: "success", data: { [day]: [{ start: `${day}T09:00:00.000+11:00` }, { start: `${day}T10:30:00.000+11:00` }] } });
+    }
+    if (url.pathname === "/v2/bookings" && req.method === "GET") {
+      if (req.headers["cal-api-version"] !== "2024-08-13" || url.searchParams.get("status") !== "upcoming") return send(400, { status: "error", error: { message: "bad list" } });
+      const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+      return send(200, { status: "success", data: [
+        { uid: "bk_mine", start: `${soon}T00:00:00.000Z`, attendees: [{ name: "Ann", phoneNumber: "+61400111222" }] },
+        { uid: "bk_other", start: `${soon}T02:00:00.000Z`, attendees: [{ name: "Ann", phoneNumber: "+61499999999" }] },
+      ] });
+    }
+    const change = url.pathname.match(/^\/v2\/bookings\/([^/]+)\/(reschedule|cancel)$/);
+    if (change && req.method === "POST") {
+      if (req.headers["cal-api-version"] !== "2024-08-13") return send(400, { status: "error", error: { message: "wrong version" } });
+      let raw = "";
+      for await (const chunk of req) raw += chunk;
+      const body = JSON.parse(raw || "{}");
+      changes.push({ path: url.pathname, body });
+      return send(200, { status: "success", data: change[2] === "reschedule" ? { uid: "bk_moved", start: body.start } : { uid: change[1], status: "cancelled" } });
     }
     if (url.pathname === "/v2/bookings" && req.method === "POST") {
       let raw = "";
@@ -149,5 +167,24 @@ describe("booking during a call", () => {
     const { callId } = await bookingCall(false);
     const res = await signedPost(`/runtime/calls/${callId}/calendar/times`, {}).expect(200);
     expect(res.body.text).toMatch(/isn't connected/);
+  });
+});
+
+describe("changing a booking the caller already has", () => {
+  it("finds only bookings with this caller's number, and moves or cancels only those", async () => {
+    const { callId } = await bookingCall(true);
+    const found = (await signedPost(`/runtime/calls/${callId}/calendar/mine`, {}).expect(200)).body.text;
+    expect(found).toMatch(/Sydney time/);
+    expect(found).toContain("[bk_mine]");
+    expect(found).not.toContain("bk_other");
+    // Someone else's booking can't be touched, even with its id.
+    expect((await signedPost(`/runtime/calls/${callId}/calendar/change`, { change: "cancel", id: "bk_other" }).expect(200)).body).toMatchObject({ ok: false });
+    const start = new Date(Date.now() + 4 * 86_400_000).toISOString();
+    const moved = (await signedPost(`/runtime/calls/${callId}/calendar/change`, { change: "move", id: "bk_mine", start }).expect(200)).body;
+    expect(moved).toMatchObject({ ok: true });
+    expect(changes.at(-1)).toMatchObject({ path: "/v2/bookings/bk_mine/reschedule", body: { start } });
+    // The moved booking (a new uid on Cal.com) can be cancelled on the same call.
+    expect((await signedPost(`/runtime/calls/${callId}/calendar/change`, { change: "cancel", id: "bk_moved", reason: "can't make it" }).expect(200)).body).toMatchObject({ ok: true, text: "Cancelled." });
+    expect(changes.at(-1)).toEqual({ path: "/v2/bookings/bk_moved/cancel", body: { cancellationReason: "can't make it" } });
   });
 });

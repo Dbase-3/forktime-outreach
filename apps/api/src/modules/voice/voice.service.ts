@@ -248,6 +248,52 @@ export class VoiceService {
     }
   }
 
+  /** The caller's upcoming bookings (matched on their phone or email), each with the value to move or cancel it. */
+  async myBookings(callId: Types.ObjectId, body: unknown): Promise<{ text: string }> {
+    const { email } = parse(z.object({ email: z.string().trim().email().max(200).optional().or(z.literal("")) }), body ?? {});
+    const { call, timeZone, cal } = await this.bookingContext(callId);
+    if (!cal) return { text: "The calendar isn't connected. Say the team will help with their booking." };
+    const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { name: 1, phoneE164: 1, email: 1 }).lean() : null;
+    const person = personOf({ contact, saved: (call.saved ?? {}) as Record<string, string>, fromNumber: call.fromNumber });
+    const who = { phone: person.phone, email: email || person.email };
+    if (!who.phone && !who.email) return { text: "There's no phone number on this call to look them up by. Ask for the email address they booked with, then call find_booking with it." };
+    try {
+      const found = (await cal.client.upcoming(cal.eventType.id, who)).slice(0, 5);
+      if (!found.length) return { text: `No upcoming booking under ${[who.phone && "this phone number", who.email].filter(Boolean).join(" or ")}.${who.email ? "" : " Ask for the email address they booked with and try again."}` };
+      await this.calls.updateOne({ _id: callId }, { $addToSet: { bookingRefs: { $each: found.map((b) => b.id) } } });
+      return { text: `Their upcoming bookings (${zoneName(timeZone)} time), with the value for each in brackets:\n${found.map((b) => `- ${whenLabel(b.start, timeZone)} [${b.id}]`).join("\n")}` };
+    } catch (err) {
+      this.log.warn(`find bookings failed for call ${String(callId)}: ${err instanceof Error ? err.message : err}`);
+      return { text: "The calendar can't be checked right now. Say the team will help with their booking." };
+    }
+  }
+
+  /** Move or cancel one of the bookings this call found or made (never any other). */
+  async changeBooking(callId: Types.ObjectId, body: unknown): Promise<{ ok: boolean; text: string; when?: string }> {
+    const input = parse(z.discriminatedUnion("change", [z.object({ change: z.literal("move"), id: z.string().min(1).max(100), start: z.string().min(10).max(40) }), z.object({ change: z.literal("cancel"), id: z.string().min(1).max(100), reason: z.string().max(300).default("") })]), body);
+    const { timeZone, cal } = await this.bookingContext(callId);
+    if (!cal) return { ok: false, text: "The calendar isn't connected. Say the team will help with their booking." };
+    const refs = ((await this.calls.findById(callId, { bookingRefs: 1 }).select("+bookingRefs").lean())?.bookingRefs ?? []) as string[];
+    if (!refs.includes(input.id)) return { ok: false, text: "That isn't one of their bookings. Call find_booking first and use the value in brackets." };
+    try {
+      if (input.change === "cancel") {
+        await cal.client.cancel(input.id, input.reason || "Cancelled on a phone call");
+        this.log.log(`call ${String(callId)} cancelled booking ${input.id}`);
+        return { ok: true, text: "Cancelled." };
+      }
+      if (Number.isNaN(Date.parse(input.start))) return { ok: false, text: "That isn't one of the free times. Use the exact value in brackets from check_times." };
+      const moved = await cal.client.reschedule(input.id, input.start, cal.eventType.minutes);
+      await this.calls.updateOne({ _id: callId }, { $addToSet: { bookingRefs: moved.id } });
+      const when = whenLabel(moved.start || input.start, timeZone);
+      this.log.log(`call ${String(callId)} moved booking ${input.id} to ${when}`);
+      return { ok: true, when, text: `Moved to ${when}.` };
+    } catch (err) {
+      const why = err instanceof ProviderError ? err.message : "the calendar didn't answer";
+      this.log.warn(`booking change failed for call ${String(callId)}: ${why}`);
+      return { ok: false, text: `That didn't work (${why}). Offer another time, or say the team will sort it out.` };
+    }
+  }
+
   /** A workflow step "save to the CRM" during the call, with the answers so far. */
   async crmStep(callId: Types.ObjectId, body: unknown): Promise<{ text: string }> {
     const { provider, saved } = parse(z.object({ provider: z.string().max(40), saved: z.record(z.string().max(64), z.string().max(500)).default({}) }), body);
@@ -285,7 +331,7 @@ export class VoiceService {
       // Nothing that week: look one more fortnight ahead before saying so.
       if (!starts.length && !from) starts = await cal.client.slots(cal.eventType.id, addDays(start, days), addDays(start, days + 13), timeZone);
       const text = describeSlots(starts.filter((s) => Date.parse(s) > Date.now()), timeZone);
-      return { text: text ? `Free times (${cal.eventType.minutes} minutes each), with the value to book each one in brackets:\n${text}` : `No free times from ${start} for a few weeks. Ask which other day suits them, or say the team will be in touch.` };
+      return { text: text ? `Free times in ${zoneName(timeZone)} time (${cal.eventType.minutes} minutes each), with the value to book each one in brackets:\n${text}\nIf they might be in another time zone, say the times are ${zoneName(timeZone)} time.` : `No free times from ${start} for a few weeks. Ask which other day suits them, or say the team will be in touch.` };
     } catch (err) {
       this.log.warn(`free times failed for call ${String(callId)}: ${err instanceof Error ? err.message : err}`);
       return { text: "The calendar can't be checked right now. Say the team will confirm a time with them." };
@@ -303,6 +349,7 @@ export class VoiceService {
     try {
       const booked = await cal.client.book({ calendarId: cal.eventType.id, minutes: cal.eventType.minutes, start, name, timeZone, email: email || contact?.email || undefined, phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
       const when = whenLabel(booked.start || start, timeZone);
+      await this.calls.updateOne({ _id: callId }, { $addToSet: { bookingRefs: booked.id } });
       this.log.log(`call ${String(callId)} booked ${booked.id} for ${when}`);
       return { ok: true, when, text: `Booked: ${when}.` };
     } catch (err) {
@@ -320,6 +367,9 @@ export class VoiceService {
     return { passages: passages.map((p) => ({ docName: p.docName, heading: p.heading, text: p.text })) };
   }
 }
+
+/** "Sydney" for Australia/Sydney: how people name a time zone. */
+const zoneName = (tz: string) => (tz === "UTC" ? "UTC" : (tz.split("/").pop() ?? tz).replace(/_/g, " "));
 
 const validZone = (tz: string | undefined) => {
   if (!tz) return "";

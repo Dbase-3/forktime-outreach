@@ -66,6 +66,10 @@ function createApi({ baseUrl, key, callId, fetchImpl = fetch, log = console }) {
     search: (query) => send("POST", `${base}/search`, { query }),
     /** Free times on the call's calendar, in words: { text }. */
     freeTimes: (from) => send("POST", `${base}/calendar/times`, from ? { from } : {}),
+    /** The caller's upcoming bookings, in words: { text }. */
+    myBookings: (email) => send("POST", `${base}/calendar/mine`, email ? { email } : {}),
+    /** Move ({change:"move", id, start}) or cancel ({change:"cancel", id, reason}) one of them: { ok, text, when }. */
+    changeBooking: (change) => send("POST", `${base}/calendar/change`, change),
     /** Save the caller and the answers so far to a connected CRM: { text } (what happened). */
     saveToCrm: (provider, saved) => send("POST", `${base}/crm`, { provider, saved }),
     /** Book a time: { ok, text, when }. A refusal is words for the model, not an error. */

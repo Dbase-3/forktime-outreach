@@ -148,7 +148,6 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
               {info.id !== "webhook" && <span className="hint block">This preview doesn&rsquo;t sign in to {info.name} yet; it only remembers the name.</span>}
             </label>
           )}
-          {info.syncsContacts && <p className="text-sm text-fg-3">Once connected, pick which records and fields to bring in under Contacts → Sources.</p>}
         </div>
       )}
     </Sheet>

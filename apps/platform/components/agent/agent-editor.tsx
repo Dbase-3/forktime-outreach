@@ -11,7 +11,7 @@ import clsx from "clsx";
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Loader2, MessageSquareText, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { docsForAgent } from "@outreach/core/knowledge";
 import { dataSchema } from "@outreach/core/agent-data";
 import { BRIEF_MAX } from "@outreach/core/schemas";
@@ -38,6 +38,7 @@ import { AgentMenu } from "./agent-menu";
 import { PreviewPanel } from "./preview-panel";
 import { ToolsTab } from "./tools-tab";
 import { ChangeWithAi } from "./change-with-ai";
+import { SplitDivider, useSplit } from "./split-divider";
 
 type SetupTab = "config" | "knowledge" | "data" | "tools" | "step";
 type MainTab = "workflow" | "preview";
@@ -54,6 +55,8 @@ export function AgentEditor({ id }: { id: string }) {
   const [setupTab, setSetupTab] = useState<SetupTab>("config");
   const [mainTab, setMainTab] = useState<MainTab>("preview");
   const [phoneSetup, setPhoneSetup] = useState(true); // phones show one pane: setup, or the main tab
+  const [split, setSplit] = useSplit(); // the left pane's width in %, dragged with the divider
+  const panes = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ container: Container; index: number } | null>(null);
@@ -243,9 +246,9 @@ export function AgentEditor({ id }: { id: string }) {
         />
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        {/* Left: the agent's setup */}
-        <aside className={clsx("flex w-full min-w-0 flex-col border-line bg-surface md:flex-[3] md:border-r", !phoneSetup && "max-md:hidden")}>
+      <div ref={panes} className="flex min-h-0 flex-1" style={{ "--split": `${split}%` } as CSSProperties}>
+        {/* Left: the agent's setup (its width set by the divider from tablet up) */}
+        <aside className={clsx("flex w-full min-w-0 flex-col bg-surface md:w-auto md:flex-none md:basis-[var(--split)]", !phoneSetup && "max-md:hidden")}>
           <TabBar
             tabs={setupTabs}
             value={setupTab}
@@ -293,8 +296,10 @@ export function AgentEditor({ id }: { id: string }) {
           <ChangeWithAi flow={flow} onApply={applyParts} onWriteWhole={writeAgent} writing={writer.busy === "agent"} focus={focusBrief} />
         </aside>
 
+        <SplitDivider container={panes} pct={split} onChange={setSplit} />
+
         {/* Right: Workflow | Preview */}
-        <section className={clsx("flex min-w-0 flex-col md:flex-[2] lg:min-w-[360px]", phoneSetup && "max-md:hidden")}>
+        <section className={clsx("flex min-w-0 flex-1 flex-col lg:min-w-[320px]", phoneSetup && "max-md:hidden")}>
           <div className="flex shrink-0 items-center gap-3 border-b border-line pr-3 max-md:hidden">
             <TabBar tabs={[{ id: "workflow", label: "Workflow", count: allSteps(flow.steps).length }, { id: "preview", label: "Preview" }]} value={mainTab} onChange={setMainTab} bare />
             {mainTab === "workflow" && (

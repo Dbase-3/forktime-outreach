@@ -64,6 +64,10 @@ function createApi({ baseUrl, key, callId, fetchImpl = fetch, log = console }) {
   return {
     setup: () => send("GET", base),
     search: (query) => send("POST", `${base}/search`, { query }),
+    /** Free times on the call's calendar, in words: { text }. */
+    freeTimes: (from) => send("POST", `${base}/calendar/times`, from ? { from } : {}),
+    /** Book a time: { ok, text, when }. A refusal is words for the model, not an error. */
+    book: (booking) => send("POST", `${base}/calendar/book`, booking),
     /** Queue a report; it goes within a second, or at once for the end of the call. */
     report(event) {
       if (closed) return;

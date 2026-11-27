@@ -64,6 +64,18 @@ export class RuntimeController {
     return this.voice.applyEvents(callIdOf(id), body);
   }
 
+  @Post("calendar/times")
+  @HttpCode(200)
+  times(@Param("id") id: string, @Body() body: unknown) {
+    return this.voice.freeTimes(callIdOf(id), body);
+  }
+
+  @Post("calendar/book")
+  @HttpCode(200)
+  book(@Param("id") id: string, @Body() body: unknown) {
+    return this.voice.book(callIdOf(id), body);
+  }
+
   @Post("search")
   @HttpCode(200)
   search(@Param("id") id: string, @Body() body: unknown) {

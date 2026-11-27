@@ -8,9 +8,10 @@ const elevenlabs = require("@livekit/agents-plugin-elevenlabs");
 const soniox = require("@livekit/agents-plugin-soniox");
 const { z } = require("zod");
 const { nextStep, answerFormat, lookahead, askedInReply } = require("@outreach/core/workflow-run");
-const { callInstructions, noteValue } = require("@outreach/core/call-instructions");
+const { callInstructions, noteValue, BOOK_NOW } = require("@outreach/core/call-instructions");
 const { ACTION_LABELS } = require("@outreach/core/action-labels");
 const { integrationName, needsConnection } = require("@outreach/core/connections");
+const { isLiveBooking, hasLiveBookingStep } = require("@outreach/core/calendar");
 
 const { VOICE, TIMING, VOICE_IDS, LANGUAGE_CODES, env, ttsOptions } = require("./config");
 const { wrapUp } = require("./wrapup");
@@ -266,6 +267,7 @@ class PlatformCall {
         execute: async ({ field, value }) => this.note(field, value),
       });
     }
+    if (cfg.calendar) Object.assign(tools, this.calendarTools());
     if (cfg.knowledge.searchable) {
       tools.search_knowledge = llm.tool({
         description: "Look up facts about the business (hours, prices, policies, services) before answering a question about them.",
@@ -279,6 +281,75 @@ class PlatformCall {
             this.log.warn(`[Call] search failed: ${err.message}`);
             return "The documents can't be searched right now. Say the team will follow up.";
           }
+        },
+      });
+    }
+    return tools;
+  }
+
+  /** A Book step on the calendar this call books into: it waits for the caller to pick a time. */
+  isBookingStep(step) {
+    return Boolean(this.cfg.calendar && isLiveBooking(step, this.cfg.calendar.provider));
+  }
+
+  /** The workflow is waiting at a Book step: it's done (booked or declined), so carry on. */
+  finishBookingStep(prefix) {
+    const { next } = this.position;
+    if (next.kind !== "action" || !this.isBookingStep(next.step)) return null;
+    for (const s of this.position.say) this.done.add(s.id);
+    this.done.add(next.step.id);
+    return this.advance(prefix);
+  }
+
+  calendarTools() {
+    const { cfg } = this;
+    const name = cfg.calendar.name;
+    const tools = {
+      check_times: llm.tool({
+        description: `Get free times from ${name}, from today or from a day they asked about. Say a few words first (like "Let me check what's free").`,
+        parameters: z.object({ from: z.string().optional().describe("A day to start from, YYYY-MM-DD, when they asked about a particular day. Leave out for the next free times.") }),
+        execute: async ({ from }) => {
+          try {
+            const { text } = await this.api.freeTimes(/^\d{4}-\d{2}-\d{2}$/.test(from || "") ? from : undefined);
+            return `${text}\nOffer two or three of these in plain words (never read out the values in brackets).`;
+          } catch (err) {
+            this.log.warn(`[Call] check_times failed: ${err.message}`);
+            return "The calendar can't be checked right now. Say the team will confirm a time with them.";
+          }
+        },
+      }),
+      book_time: llm.tool({
+        description: `Book the time they picked in ${name}. Only after they've agreed to a day and time from check_times.`,
+        parameters: z.object({
+          start: z.string().describe("The exact value in brackets after the time they picked, from check_times."),
+          name: z.string().describe("The name to book under: the person's full name as they gave it."),
+          email: z.string().optional().describe("Their email, only if they gave one or the calendar asked for it."),
+        }),
+        execute: async ({ start, name: who, email }) => {
+          let res;
+          try {
+            res = await this.api.book({ start, name: who, ...(email ? { email } : {}) });
+          } catch (err) {
+            this.log.warn(`[Call] book_time failed: ${err.message}`);
+            res = { ok: false, text: "The calendar didn't answer. Say the team will confirm the time with them." };
+          }
+          if (!res.ok) return res.text;
+          this.api.report({ type: "line", line: { who: "action", text: `Booked in ${name}: ${res.when}${cfg.test ? " (test call, really booked)" : ""}`, at: Math.round(this.secondsIn()) } });
+          this.api.report({ type: "action", action: "booked" });
+          const then = this.finishBookingStep(`Booked: ${res.when}.`);
+          if (then === undefined) return undefined; // the workflow ends: its closing line is spoken for you
+          return then || `Booked: ${res.when}. Tell them it's booked, in a few words, then carry on.`;
+        },
+      }),
+    };
+    if (hasLiveBookingStep(cfg.flow.steps, cfg.calendar.provider)) {
+      tools.skip_booking = llm.tool({
+        description: "They don't want to book a time now. The workflow then carries on.",
+        parameters: z.object({ reason: z.string().describe("Why, in a few words.") }),
+        execute: async ({ reason }) => {
+          this.api.report({ type: "line", line: { who: "action", text: `No booking: ${reason}`, at: Math.round(this.secondsIn()) } });
+          const then = this.finishBookingStep(`Not booked (${reason}).`);
+          return then === null ? "Fine. Carry on where you were." : then;
         },
       });
     }
@@ -316,7 +387,7 @@ class PlatformCall {
       this.position = nextStep(this.cfg.flow.steps, this.values, this.done);
       const { next } = this.position;
       say.push(...this.position.say.map((s) => s.text));
-      if (next.kind !== "action") break;
+      if (next.kind !== "action" || this.isBookingStep(next.step)) break;
       for (const s of this.position.say) this.done.add(s.id);
       this.done.add(next.step.id);
       const result = runAction(next.step, next.detail, this.cfg.test, this.cfg.connected || []);
@@ -335,7 +406,8 @@ class PlatformCall {
     }
     Promise.resolve(this.agent.updateInstructions(this.instructions())).catch(() => undefined);
     if (say.length) parts.push(`Say: "${say.join(" ")}"`);
-    if (next.kind === "ask") parts.push(`Then ask: "${next.question}" Save the answer with note, field "${next.step.field}" (${answerFormat(next.step)}).`);
+    if (next.kind === "action") parts.push(`Then: ${BOOK_NOW}`);
+    else if (next.kind === "ask") parts.push(`Then ask: "${next.question}" Save the answer with note, field "${next.step.field}" (${answerFormat(next.step)}).`);
     else parts.push("The workflow has no more steps. Help with anything else they need, then call end_call.");
     return parts.join(" ");
   }

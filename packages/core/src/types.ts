@@ -276,6 +276,8 @@ export interface Integration {
   connected: boolean;
   account?: string; // which account, e.g. "northside-motors.hubspot.com"
   connectedAt?: string;
+  /** A calendar: the event type calls book into. */
+  eventType?: { id: number; name: string; minutes: number } | null;
 }
 
 export interface WorkspaceSettings {

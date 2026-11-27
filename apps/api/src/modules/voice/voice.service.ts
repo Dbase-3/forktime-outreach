@@ -8,6 +8,7 @@ import { businessOf } from "@outreach/core/variables";
 import { dataSchema, structuredResult } from "@outreach/core/agent-data";
 import { INLINE_KNOWLEDGE_CHARS, callOutcomes, type CallSetup } from "@outreach/core/call-instructions";
 import { AFTER_CALL_LABELS, integrationName, needsConnection } from "@outreach/core/connections";
+import { addDays, bookingCalendarOf, dateIn, describeSlots, whenLabel } from "@outreach/core/calendar";
 import type { AgentDraft } from "@outreach/core/schemas";
 import { fill } from "@outreach/core/variables";
 import { Types } from "mongoose";
@@ -18,6 +19,8 @@ import { WorkspaceData } from "../../common/workspace-data";
 import { parse } from "../../common/zod";
 import type { M } from "../../db/models";
 import { contactOut } from "../contacts/contacts.service";
+import { ConnectionsService } from "../integrations/connections.service";
+import { CalComError } from "../integrations/calcom";
 import { LiveKitService } from "./livekit.service";
 
 /** What the agent gets for a call: everything to run it, nothing else of the workspace. */
@@ -29,6 +32,8 @@ export interface RuntimeConfig extends CallSetup {
   voice: { voiceId: string; speed: number; language: string; name: string };
   choices: Record<string, string[]>; // per field key, when its answer is one of a list
   connected: string[]; // integrations the workspace has connected: a step needing another is skipped
+  /** The calendar this call books into (connected, with an event type picked), or null. */
+  calendar: { provider: string; name: string; eventType: string } | null;
   maxCallMinutes: number;
 }
 
@@ -64,6 +69,7 @@ export class VoiceService {
     private readonly data: WorkspaceData,
     private readonly index: KnowledgeIndex,
     private readonly livekit: LiveKitService,
+    private readonly connections: ConnectionsService,
   ) {}
 
   /** The owner talks to the agent's current draft from the browser. */
@@ -137,6 +143,10 @@ export class VoiceService {
     const walk = (steps: AgentDraft["steps"]): void => steps.forEach((s) => (s.kind === "ask" && s.choices?.length ? (choices[s.field] = s.choices) : s.kind === "branch" ? (walk(s.yes), walk(s.no)) : undefined));
     walk(draft.steps);
 
+    const connected = await this.data.connected(ws);
+    const provider = bookingCalendarOf(draft, connected);
+    const cal = provider ? await this.connections.calendar(ws, provider) : null;
+
     return {
       callId: String(call._id),
       agentId: String(call.agentId),
@@ -151,7 +161,8 @@ export class VoiceService {
       greeting: fill(draft.greeting, values),
       outcomes: callOutcomes(draft),
       voice: { ...draft.agent, voiceId: draft.agent.voiceId },
-      connected: await this.data.connected(ws),
+      connected,
+      calendar: provider && cal ? { provider, name: integrationName(provider), eventType: cal.eventType.name } : null,
       maxCallMinutes: call.test ? 10 : 15,
     };
   }
@@ -196,6 +207,60 @@ export class VoiceService {
     });
   }
 
+  /** The call's agent, its time zone, and the calendar it books into: for check_times / book_time. */
+  private async bookingContext(callId: Types.ObjectId) {
+    const call = await this.calls.findById(callId).lean();
+    if (!call || !call.live) throw notFound("That call");
+    let draft = call.config as AgentDraft | undefined;
+    if (!draft && call.agentVersionId) draft = (await this.versions.findById(call.agentVersionId).lean())?.config as AgentDraft | undefined;
+    if (!draft) throw notFound("That agent");
+    const settings = await this.data.settings(call.workspaceId);
+    const timeZone = validZone(draft.timezone) || validZone(settings.timezone) || "UTC";
+    const provider = bookingCalendarOf(draft, await this.data.connected(call.workspaceId));
+    const cal = provider ? await this.connections.calendar(call.workspaceId, provider) : null;
+    return { call, timeZone, cal };
+  }
+
+  /** Free times from a day on (default today), in words with the exact values to book. Never throws for a provider problem: the model gets a sentence. */
+  async freeTimes(callId: Types.ObjectId, body: unknown): Promise<{ text: string }> {
+    const { from, days } = parse(z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), days: z.number().int().min(1).max(14).default(7) }), body ?? {});
+    const { timeZone, cal } = await this.bookingContext(callId);
+    if (!cal) return { text: "The calendar isn't connected. Say the team will confirm a time with them." };
+    const today = dateIn(timeZone);
+    const start = from && from > today ? from : today;
+    try {
+      let starts = await cal.client.slots(cal.eventType.id, start, addDays(start, days - 1), timeZone);
+      // Nothing that week: look one more fortnight ahead before saying so.
+      if (!starts.length && !from) starts = await cal.client.slots(cal.eventType.id, addDays(start, days), addDays(start, days + 13), timeZone);
+      const text = describeSlots(starts.filter((s) => Date.parse(s) > Date.now()), timeZone);
+      return { text: text ? `Free times (${cal.eventType.minutes} minutes each), with the value to book each one in brackets:\n${text}` : `No free times from ${start} for a few weeks. Ask which other day suits them, or say the team will be in touch.` };
+    } catch (err) {
+      this.log.warn(`free times failed for call ${String(callId)}: ${err instanceof Error ? err.message : err}`);
+      return { text: "The calendar can't be checked right now. Say the team will confirm a time with them." };
+    }
+  }
+
+  /** Book a time for the caller. A refusal comes back as words for the model, not an error. */
+  async book(callId: Types.ObjectId, body: unknown): Promise<{ ok: boolean; text: string; when?: string }> {
+    const { start, name, email } = parse(z.object({ start: z.string().min(10).max(40), name: z.string().trim().min(1).max(120), email: z.string().trim().email().max(200).optional().or(z.literal("")) }), body);
+    if (Number.isNaN(Date.parse(start))) return { ok: false, text: "That isn't one of the times. Use the exact value in brackets from check_times." };
+    const { call, timeZone, cal } = await this.bookingContext(callId);
+    if (!cal) return { ok: false, text: "The calendar isn't connected. Say the team will confirm a time with them." };
+    const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { phoneE164: 1, email: 1 }).lean() : null;
+    const phone = [contact?.phoneE164, call.fromNumber].find((p): p is string => typeof p === "string" && /^\+\d{8,15}$/.test(p));
+    try {
+      const booked = await cal.client.book({ eventTypeId: cal.eventType.id, start, name, timeZone, email: email || contact?.email || undefined, phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
+      const when = whenLabel(booked.start || start, timeZone);
+      this.log.log(`call ${String(callId)} booked ${booked.uid} for ${when}`);
+      return { ok: true, when, text: `Booked: ${when}.` };
+    } catch (err) {
+      const why = err instanceof CalComError ? err.message : "the calendar didn't answer";
+      this.log.warn(`booking failed for call ${String(callId)}: ${why}`);
+      const email = /email/i.test(why);
+      return { ok: false, text: email ? "This calendar needs an email address to book. Ask for their email, then call book_time again with it." : `It couldn't be booked (${why}). Call check_times again and offer another time.` };
+    }
+  }
+
   async search(callId: Types.ObjectId, query: string) {
     const call = await this.calls.findById(callId, { workspaceId: 1, agentId: 1, live: 1 }).lean();
     if (!call || !call.live) throw notFound("That call");
@@ -203,6 +268,16 @@ export class VoiceService {
     return { passages: passages.map((p) => ({ docName: p.docName, heading: p.heading, text: p.text })) };
   }
 }
+
+const validZone = (tz: string | undefined) => {
+  if (!tz) return "";
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return tz;
+  } catch {
+    return "";
+  }
+};
 
 /** "Thursday 26 November 2026" in the agent's time zone. */
 export function todayIn(timezone: string, now = new Date()): string {

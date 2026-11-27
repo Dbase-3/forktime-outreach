@@ -3,11 +3,15 @@
 
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
+import { KEYED_INTEGRATIONS } from "@outreach/core/integrations";
 import type { Campaign, FieldDef, Flow, WorkspaceSettings } from "@outreach/core/types";
 import type { KnownField } from "@outreach/core/flow-tree";
 import type { Types } from "mongoose";
 import type { M } from "../db/models";
 import { agentOut, campaignOut, fieldOut } from "./serialize";
+
+/** Connected integrations that can really be used: a keyed one needs its key stored. */
+export const USABLE = { connected: true, $or: [{ providerId: { $nin: KEYED_INTEGRATIONS } }, { hasKey: true }] };
 
 @Injectable()
 export class WorkspaceData {
@@ -21,7 +25,7 @@ export class WorkspaceData {
 
   /** The integrations this workspace has connected (ids from @outreach/core/integrations). */
   async connected(ws: Types.ObjectId): Promise<string[]> {
-    return (await this.integrations.find({ workspaceId: ws, connected: true }, { providerId: 1 }).lean()).map((i) => i.providerId);
+    return (await this.integrations.find({ workspaceId: ws, ...USABLE }, { providerId: 1 }).lean()).map((i) => i.providerId);
   }
 
   async flows(ws: Types.ObjectId): Promise<Flow[]> {

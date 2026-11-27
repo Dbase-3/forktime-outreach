@@ -16,7 +16,7 @@ afterAll(() => stop());
 const PERSONAL = new Set(["/me", "/workspaces"]);
 const PUBLIC = new Set(["/auth/code", "/auth/verify", "/auth/logout", "/healthz"]);
 // The voice agent's door: public to the session guard, but each request must be signed (RuntimeGuard, tested in voice.test.ts).
-const SIGNED = new Set(["/runtime/calls/:id", "/runtime/calls/:id/events", "/runtime/calls/:id/search"]);
+const SIGNED = new Set(["/runtime/calls/:id", "/runtime/calls/:id/events", "/runtime/calls/:id/search", "/runtime/calls/:id/calendar/times", "/runtime/calls/:id/calendar/book"]);
 
 it("every route is guarded by sign-in and, where it holds data, by workspace membership", () => {
   const discovery = app.get(DiscoveryService);

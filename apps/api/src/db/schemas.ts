@@ -277,7 +277,19 @@ CallSchema.index({ campaignId: 1, startedAt: -1 }, { sparse: true });
 
 // ---- Integrations ----
 
-export const IntegrationSchema = new Schema({ workspaceId: { type: ObjectId, required: true }, providerId: { type: String, required: true }, connected: { type: Boolean, default: true }, account: String }, opts);
+export const IntegrationSchema = new Schema(
+  {
+    workspaceId: { type: ObjectId, required: true },
+    providerId: { type: String, required: true },
+    connected: { type: Boolean, default: true },
+    account: String,
+    secret: { type: String, select: false }, // the API key, sealed (common/secrets.ts); never sent anywhere
+    hasKey: { type: Boolean, default: false }, // a key is stored: a keyed integration counts as connected only then
+    eventType: { type: Mixed, default: null }, // a calendar: { id, name, minutes } calls book into
+    lastError: String,
+  },
+  opts,
+);
 IntegrationSchema.index({ workspaceId: 1, providerId: 1 }, { unique: true });
 
 export const MODELS = {

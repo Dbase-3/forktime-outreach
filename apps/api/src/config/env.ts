@@ -29,6 +29,10 @@ const EnvSchema = z.object({
   PLATFORM_AGENT_NAME: z.string().default("platform-agent-local"),
   /** Shared with apps/platform-agent: it signs every request to /runtime with it. */
   AGENT_RUNTIME_KEY: z.string().min(32).optional(),
+  /** Encrypts integration keys at rest (32 bytes, hex or base64: `openssl rand -hex 32`). Unset: keyed integrations can't connect. */
+  INTEGRATIONS_KEY: z.string().optional(),
+  /** Cal.com's API (a test points it at a fake). */
+  CALCOM_API_URL: z.string().url().default("https://api.cal.com/v2"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

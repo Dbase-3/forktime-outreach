@@ -85,3 +85,51 @@ describe("helpers", () => {
     expect(parseWrapUp("no json", cfg, [])).toBeNull();
   });
 });
+
+describe("booking into a connected calendar", () => {
+  const calSteps = steps.map((s) => (s.id === "b2" ? { ...s, yes: [{ ...s.yes[0], integration: "calcom" }, s.yes[1]] } : s));
+  function calendarCall(book) {
+    const reports = [];
+    const f = { ...flow, steps: calSteps };
+    const cfg = { flow: f, business: "Northside", direction: "outbound", values: { agent: "Mia", business: "Northside", car_model: "Corolla" }, schema: dataSchema(f), choices: {}, knowledge: { inline: [], searchable: false }, test: true, outcomes: ["booked", "not_now", "other"], voice: f.agent, greeting: f.greeting, maxCallMinutes: 10, connected: ["calcom"], calendar: { provider: "calcom", name: "Cal.com", eventType: "Service" } };
+    const api = { report: (e) => reports.push(e), freeTimes: async () => ({ text: "Wednesday 2 December: 9 am [2026-12-02T09:00:00.000+11:00]" }), book };
+    const call = new PlatformCall({ ctx: { room: {} }, api, cfg, vad: null, log: { warn() {}, log() {} } });
+    call.agent = { updateInstructions() {} };
+    call.note("all_good", "yes");
+    return { call, reports };
+  }
+
+  it("waits at the Book step: the model is told to check times and book, nothing runs on its own", () => {
+    const { call, reports } = calendarCall(async () => ({ ok: true }));
+    const said = call.note("wants", "yes");
+    expect(said).toMatch(/Then: Book a time with them now\..*check_times/);
+    expect(call.position.next).toMatchObject({ kind: "action", step: { id: "a1" } });
+    expect(reports.some((r) => r.type === "action")).toBe(false);
+    expect(call.instructions()).toMatch(/Right now: Book a time with them now\./);
+    expect(Object.keys(call.tools())).toEqual(expect.arrayContaining(["check_times", "book_time", "skip_booking"]));
+  });
+
+  it("a booking moves the workflow on to its ending, and is on the transcript", async () => {
+    const { call, reports } = calendarCall(async (b) => ({ ok: true, when: "Wednesday 2 December at 9 am", text: "Booked", got: b }));
+    call.note("wants", "yes");
+    const out = await call.calendarTools().book_time.execute({ start: "2026-12-02T09:00:00.000+11:00", name: "Ann Lee" }, {});
+    expect(out).toBeUndefined();
+    expect(call.pending).toEqual({ type: "end", goodbye: "All set, bye!" });
+    expect(reports).toContainEqual({ type: "action", action: "booked" });
+    expect(reports.find((r) => r.type === "line" && r.line.who === "action").line.text).toBe("Booked in Cal.com: Wednesday 2 December at 9 am (test call, really booked)");
+  });
+
+  it("a refused booking keeps the step waiting and tells the model why", async () => {
+    const { call } = calendarCall(async () => ({ ok: false, text: "This calendar needs an email address to book." }));
+    call.note("wants", "yes");
+    expect(await call.calendarTools().book_time.execute({ start: "x", name: "Ann" }, {})).toMatch(/needs an email/);
+    expect(call.position.next.kind).toBe("action");
+  });
+
+  it("declining finishes the step and carries on", async () => {
+    const { call } = calendarCall(async () => ({ ok: true }));
+    call.note("wants", "yes");
+    expect(await call.calendarTools().skip_booking.execute({ reason: "will call back" }, {})).toBeUndefined();
+    expect(call.done.has("a1")).toBe(true);
+  });
+});

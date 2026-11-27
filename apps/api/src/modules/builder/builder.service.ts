@@ -16,7 +16,7 @@ import { VOICES } from "@outreach/core/voices";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { ApiError, notFound, tooMany, unprocessable } from "../../common/errors";
-import { WorkspaceData } from "../../common/workspace-data";
+import { USABLE, WorkspaceData } from "../../common/workspace-data";
 import { ENV, type Env } from "../../config/env";
 import type { M } from "../../db/models";
 
@@ -216,7 +216,7 @@ export class BuilderService {
     const [settings, defs, connected, docs] = await Promise.all([
       this.data.settings(ws),
       this.data.defs(ws),
-      this.integrations.find({ workspaceId: ws, connected: true }, { providerId: 1 }).lean(),
+      this.integrations.find({ workspaceId: ws, ...USABLE }, { providerId: 1 }).lean(),
       this.knowledge.find({ workspaceId: ws, deletedAt: null }, { name: 1, availableToAll: 1 }).lean(),
     ]);
     return {

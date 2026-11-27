@@ -12,6 +12,8 @@ export interface IntegrationInfo {
   blurb: string; // one line: what an agent can do with it
   does: string[]; // the connect drawer's list
   syncsContacts?: boolean; // can be a contacts source
+  /** Connects for real with an API key the owner pastes (checked, stored encrypted). Others only remember a name for now. */
+  apiKey?: { label: string; help: string; placeholder: string };
 }
 
 export const CATEGORIES: { id: IntegrationCategory; label: string }[] = [
@@ -37,7 +39,7 @@ export const INTEGRATIONS: IntegrationInfo[] = [
 
   { id: "google_calendar", name: "Google Calendar", domain: "calendar.google.com", logo: "https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png", category: "calendar", blurb: "Check free times and book appointments.", does: ["See when you're free", "Book, move and cancel events", "Send invites to the caller"] },
   { id: "outlook", name: "Outlook Calendar", domain: "outlook.com", category: "calendar", blurb: "Book into Microsoft 365 calendars.", does: ["See when you're free", "Book, move and cancel events"] },
-  { id: "calcom", name: "Cal.com", domain: "cal.com", category: "calendar", blurb: "Book into your event types and availability.", does: ["Offer times from your event types", "Book and reschedule"] },
+  { id: "calcom", name: "Cal.com", domain: "cal.com", category: "calendar", blurb: "Book into your event types and availability.", does: ["Offer free times from one of your event types", "Book the time the caller picks, during the call"], apiKey: { label: "API key", help: "In Cal.com, open Settings → Developer → API keys, add a key and paste it here.", placeholder: "cal_live_…" } },
   { id: "calendly", name: "Calendly", domain: "calendly.com", category: "calendar", blurb: "Offer your Calendly slots on the call.", does: ["Offer times from your event types", "Book on the call"] },
 
   { id: "google_sheets", name: "Google Sheets", domain: "sheets.google.com", logo: "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico", category: "data", blurb: "Use a sheet as a contact list, write results back.", does: ["Use a sheet as a contacts source", "Add a row for every call", "Start calls when new rows appear"], syncsContacts: true },
@@ -52,6 +54,9 @@ export const INTEGRATIONS: IntegrationInfo[] = [
   { id: "n8n", name: "n8n", domain: "n8n.io", category: "automation", blurb: "Self-hosted workflows with call results.", does: ["Send call results to a workflow", "Start calls from a workflow"] },
   { id: "webhook", name: "Webhook", category: "automation", blurb: "Post each call's answers to your own URL.", does: ["POST the call's data as JSON when it ends", "Retry if your server is down"] },
 ];
+
+/** Integrations that connect with a real key: connected only once one is stored. */
+export const KEYED_INTEGRATIONS = INTEGRATIONS.filter((i) => i.apiKey).map((i) => i.id);
 
 export function integrationInfo(id: string): IntegrationInfo | undefined {
   return INTEGRATIONS.find((i) => i.id === id);

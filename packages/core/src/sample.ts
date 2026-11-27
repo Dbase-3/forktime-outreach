@@ -301,7 +301,6 @@ export function seedState(now = new Date()): AppState {
     calls: [live, ...calls, ...sampleHistory(now, [service, lead, desk], contacts)],
     integrations: [
       { id: "hubspot", connected: true, account: "northside-motors.hubspot.com", connectedAt: isoDay(now, -40) },
-      { id: "calcom", connected: true, account: "cal.com/northside-service", connectedAt: isoDay(now, -40) },
       { id: "slack", connected: true, account: "#service-desk", connectedAt: isoDay(now, -12) },
     ],
     settings: {

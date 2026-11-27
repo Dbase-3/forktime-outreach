@@ -3,6 +3,7 @@
 // call, the workflow protocol and where the call is now, and the knowledge it
 // answers from. Pure, so the API, the agent and tests build the same text.
 
+import { isLiveBooking } from "./calendar";
 import { readAnswer } from "./spoken";
 import { fill } from "./variables";
 import { outcomesOf } from "./flow-tree";
@@ -25,6 +26,22 @@ export interface CallSetup {
   schema: SchemaField[];
   knowledge: { inline: { name: string; text: string }[]; searchable: boolean };
   test: boolean;
+  /** A connected calendar the agent books into during the call (check_times / book_time). */
+  calendar?: { provider: string; name: string } | null;
+}
+
+/** What the model is told when the workflow is at a Book step on the connected calendar. */
+export const BOOK_NOW =
+  "Book a time with them now. Say a few words (like \"Let me check what's free\") and call check_times. Offer two or three of the times it returns, never any other. When they pick one, repeat the day and time back once, then call book_time. If they don't want to book, call skip_booking.";
+
+/** Where the call is, in words: the workflow's position, or the booking it's waiting on. */
+function rightNow(setup: CallSetup, position: Position): string {
+  const next = position.next;
+  if (next.kind === "action" && setup.calendar && isLiveBooking(next.step, setup.calendar.provider)) {
+    const say = position.say.length ? `Say: "${position.say.map((s) => s.text).join(" ")}" Then: ` : "";
+    return `${say}${BOOK_NOW}`;
+  }
+  return describePosition(position);
 }
 
 export function callOutcomes(flow: Pick<Flow, "steps">): string[] {
@@ -88,7 +105,14 @@ The call follows a workflow that the system runs. You never pick the next step y
         : ""
     }
 
-Right now: ${describePosition(position)}${ahead ? `\n${describeAhead(ahead)}` : ""}`,
+Right now: ${rightNow(setup, position)}${ahead ? `\n${describeAhead(ahead)}` : ""}`,
+    setup.calendar
+      ? `# Booking
+You can book into ${setup.calendar.name}. check_times gives the free times; book_time books one.
+- Only offer times check_times returned. Never say a time is booked until book_time says so.
+- If none of the times suit them, ask what day or time would, and check that.
+- Book in the name they gave you; ask for it if you don't have it.`
+      : "",
     knowledge ? `# What you know\nAnswer questions from these documents only.\n${knowledge}` : setup.knowledge.searchable ? "# What you know\nFor questions about the business, call search_knowledge first and answer from what it returns." : "",
   ]
     .filter(Boolean)

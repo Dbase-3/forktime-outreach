@@ -1,7 +1,8 @@
 "use client";
 
-// The agent's setup, first tab on the left: its instructions (persona, tone,
-// rules), the welcome line, direction, time zone, number and voice. The steps
+// The agent's setup, first tab on the left, top to bottom: description, voice
+// (name, voice, speed, language), the welcome line, its instructions (persona,
+// tone, rules), direction, time zone and number. The steps
 // live in the workflow. Writing or changing it with AI is the "Change with AI"
 // box under the setup (change-with-ai.tsx).
 
@@ -49,6 +50,19 @@ export function ConfigTab({
         <input className="field" value={flow.description} onChange={(e) => onEdit((f) => ({ ...f, description: e.target.value }))} placeholder="What this agent is for" />
       </Field>
 
+      {/* Who's talking and what they say first, before the rules (owner 2026-11-27). */}
+      <div>
+        <h3 className="eyebrow mb-3">Voice</h3>
+        <VoicePanel agent={flow.agent} onChange={(patch) => onEdit((f) => ({ ...f, agent: { ...f.agent, ...patch } }))} />
+      </div>
+
+      <Field label="Welcome message" hint="Keep “AI assistant” and “recorded” in it: callers must be told.">
+        <div className="relative">
+          <VarText className="field min-h-20 leading-relaxed" value={flow.greeting} onChange={(greeting) => onEdit((f) => ({ ...f, greeting }))} groups={vars.filter((g) => g.title !== "Answers on this call")} disabled={busy === "agent"} aria-label="Welcome message" />
+          {busy === "agent" && <Shimmer />}
+        </div>
+      </Field>
+
       {/* Instructions */}
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -90,13 +104,6 @@ export function ConfigTab({
         )}
       </div>
 
-      <Field label="Welcome message" hint="Keep “AI assistant” and “recorded” in it: callers must be told.">
-        <div className="relative">
-          <VarText className="field min-h-20 leading-relaxed" value={flow.greeting} onChange={(greeting) => onEdit((f) => ({ ...f, greeting }))} groups={vars.filter((g) => g.title !== "Answers on this call")} disabled={busy === "agent"} aria-label="Welcome message" />
-          {busy === "agent" && <Shimmer />}
-        </div>
-      </Field>
-
       <div className="grid gap-4 xl:grid-cols-2">
         <div>
           <span className="label">Used for</span>
@@ -118,12 +125,6 @@ export function ConfigTab({
         <p className="mb-3 text-xs text-fg-3">It makes and answers calls on this number. Each number belongs to one agent.</p>
         <NumberField flow={flow} onEdit={onEdit} />
       </div>
-
-      <div className="border-t border-line pt-5">
-        <h3 className="eyebrow mb-3">Voice</h3>
-        <VoicePanel agent={flow.agent} onChange={(patch) => onEdit((f) => ({ ...f, agent: { ...f.agent, ...patch } }))} />
-      </div>
-
     </div>
   );
 }

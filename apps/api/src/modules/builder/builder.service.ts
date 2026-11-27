@@ -9,7 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { BUILDER_SYSTEM, builderContext, type BuilderWorkspace } from "@outreach/core/agent-builder";
 import { EditError, addAfterCall, addStep, addTool, changeStep, deleteStep, missingIntegrations, removeAfterCall, removeData, setCheck, setData, type EditableAgent, type Edit, type StepInput, type Where } from "@outreach/core/agent-edits";
-import { AgentDraftSchema, OPS, type AgentDraft } from "@outreach/core/schemas";
+import { AgentDraftSchema, BRIEF_MAX, OPS, type AgentDraft } from "@outreach/core/schemas";
 import { INTEGRATIONS } from "@outreach/core/integrations";
 import { VOICES } from "@outreach/core/voices";
 import { Types } from "mongoose";
@@ -22,8 +22,8 @@ import type { M } from "../../db/models";
 const PER_HOUR = 60; // changes per workspace per hour
 
 export const BuilderBody = z.object({
-  message: z.string().trim().min(2).max(4000),
-  history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(4000) })).max(12).default([]),
+  message: z.string().trim().min(2).max(BRIEF_MAX),
+  history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(BRIEF_MAX) })).max(12).default([]),
 });
 
 const INTEGRATION_IDS = INTEGRATIONS.map((i) => i.id) as [string, ...string[]];

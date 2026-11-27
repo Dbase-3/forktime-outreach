@@ -7,6 +7,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { NextResponse } from "next/server";
 import { clientIp, fromOtherSite, makeLimiter } from "@/lib/server/rate-limit";
 import { AgentDraft, DRAFT_SYSTEM, WorkflowDraft, applyDraft, draftUserMessage, toSteps, type DraftRequest } from "@outreach/core/agent-draft";
+import { BRIEF_MAX } from "@outreach/core/schemas";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   } catch {
     return bad(400, "That request wasn't readable.");
   }
-  const brief = String(body.brief ?? "").trim().slice(0, 4000);
+  const brief = String(body.brief ?? "").trim().slice(0, BRIEF_MAX);
   const mode = body.mode === "workflow" ? "workflow" : "agent";
   if (mode === "agent" && brief.length < 8) return bad(400, "Describe the agent in a sentence or two.");
   if (mode === "workflow" && !body.agent) return bad(400, "Nothing to rebuild.");

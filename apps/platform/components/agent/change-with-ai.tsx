@@ -12,6 +12,7 @@ import clsx from "clsx";
 import { AlertTriangle, ArrowUp, Check, ChevronDown, ChevronUp, Loader2, Sparkles, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { missingIntegrations, type Missing } from "@outreach/core/agent-edits";
+import { BRIEF_MAX } from "@outreach/core/schemas";
 import type { Flow } from "@outreach/core/types";
 import { ApiError, ws } from "@/lib/api";
 import { flush, useApp } from "@/lib/store";
@@ -153,6 +154,7 @@ export function ChangeWithAi({ flow, onApply, onWriteWhole, writing, focus }: { 
           <textarea
             ref={box}
             rows={1}
+            maxLength={BRIEF_MAX}
             className="max-h-32 min-h-[34px] flex-1 resize-none bg-transparent py-1.5 text-[16px] leading-snug text-fg outline-none placeholder:text-fg-4 sm:text-sm"
             value={text}
             onChange={(e) => {

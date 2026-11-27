@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { docsForAgent } from "@outreach/core/knowledge";
 import { dataSchema } from "@outreach/core/agent-data";
+import { BRIEF_MAX } from "@outreach/core/schemas";
 import { TOP, allSteps, findStep, flowIssues, insertStep, makeStep, moveStep, removeStep, updateStep, type Container } from "@outreach/core/flow-tree";
 import { useQuery } from "@tanstack/react-query";
 import type { Contact } from "@outreach/core/types";
@@ -142,7 +143,7 @@ export function AgentEditor({ id }: { id: string }) {
     if (!draft) return writer.lastError() ?? "Couldn't write the agent. Try describing it differently.";
     setSelectedId(null);
     setDrawn((n) => n + 1);
-    edit((f) => ({ ...f, ...draft, brief, name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
+    edit((f) => ({ ...f, ...draft, brief: brief.slice(0, BRIEF_MAX), name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
     showMain("workflow");
     return null;
   };

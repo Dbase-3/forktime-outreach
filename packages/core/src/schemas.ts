@@ -11,6 +11,9 @@ const key = z.string().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/, "Use lower-case
 const short = (max = 200) => z.string().max(max);
 const text = (max = 4000) => z.string().max(max);
 
+/** The longest description of an agent (Write with AI's brief, a Change with AI message). One cap everywhere, so a brief the writer took can always be saved. */
+export const BRIEF_MAX = 8000;
+
 export const OPS = [
   "is", "is_not", "contains", "not_contains", "starts_with",
   "more_than", "less_than", "at_least", "at_most", "between",
@@ -72,7 +75,7 @@ export const AgentDraftSchema = z.object({
   agent: AgentVoiceSchema,
   greeting: text(1000),
   prompt: text(12000),
-  brief: text(4000).optional(),
+  brief: text(BRIEF_MAX).optional(),
   timezone: short(64),
   tools: z.array(AgentToolSchema).max(20),
   steps: z.array(StepSchema).max(60),

@@ -151,6 +151,16 @@ function schedule(key: Key): void {
 
 const versionOf = (o: unknown) => (o as { version?: number }).version ?? 1;
 
+/** What the owner calls the part of an agent a rejected save points at ("prompt" → "Instructions: "). */
+const PART_NAMES: Record<string, string> = {
+  name: "Name", description: "Description", brief: "Description for Write with AI", greeting: "Welcome message", prompt: "Instructions",
+  steps: "A workflow step", dataFields: "Data to collect", checks: "Success checks", tools: "Tools", afterCall: "After the call", agent: "Voice",
+};
+function partName(path?: string): string {
+  const first = (path ?? "").split(".")[0];
+  return PART_NAMES[first] ? `${PART_NAMES[first]}: ` : "";
+}
+
 async function save(key: Key): Promise<void> {
   timers.delete(key);
   if (!state) return;
@@ -183,6 +193,7 @@ async function save(key: Key): Promise<void> {
     }
     saveProblem = null;
   } catch (err) {
+    // A rejected save names the part it's about ("Instructions: Too big…"), so the owner knows what to shorten.
     if (err instanceof ApiError && err.code === "stale") {
       // Someone else saved first: take theirs.
       const current = (err.details as { current?: unknown } | undefined)?.current;
@@ -197,7 +208,7 @@ async function save(key: Key): Promise<void> {
       }
       saveProblem = "Someone else changed this just now, so it's been reloaded with their version.";
     } else {
-      const detail = err instanceof ApiError && Array.isArray(err.details) ? ` ${(err.details as { message: string }[]).map((d) => d.message).join(" ")}` : "";
+      const detail = err instanceof ApiError && Array.isArray(err.details) ? ` ${(err.details as { path?: string; message: string }[]).map((d) => `${partName(d.path)}${d.message}`).join(" ")}` : "";
       saveProblem = `Couldn't save: ${err instanceof Error ? err.message : "unknown problem"}${detail}`;
     }
   } finally {

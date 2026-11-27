@@ -45,23 +45,43 @@ const EVERY = { "15m": "Every 15 minutes", "1h": "Every hour", "1d": "Every day"
  */
 export function useSyncWatch(onSynced: () => void) {
   const app = useApp();
-  const syncing = app.sources.some((s) => s.kind === "sync" && s.status === "syncing" && isLive(s.integrationId));
+  const live = app.sources.filter((s) => s.kind === "sync" && isLive(s.integrationId));
+  const syncing = live.some((s) => s.status === "syncing");
   const done = useRef(onSynced);
   done.current = onSynced;
-  const wasSyncing = useRef(syncing);
+
+  // A sync finished = a live source's lastSyncAt moved while it isn't syncing. This
+  // also catches the worker's scheduled re-syncs (every 15 min / hour / day), which
+  // the screen never started. What's there when the page opens is just remembered.
+  const seen = useRef<Map<string, string> | null>(null);
+  const stamp = live.map((s) => `${s.id}=${s.status === "syncing" ? "…" : s.lastSyncAt}`).join("|");
   useEffect(() => {
-    if (wasSyncing.current && !syncing) done.current();
-    wasSyncing.current = syncing;
-  }, [syncing]);
+    // A syncing source is remembered as "…", so a new source finishing counts too.
+    const now = new Map(live.map((s) => [s.id, s.status === "syncing" ? "…" : s.lastSyncAt]));
+    const before = seen.current;
+    seen.current = now;
+    if (before && [...now].some(([id, at]) => at !== "…" && before.has(id) && before.get(id) !== at)) done.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `stamp` is what `live` says
+  }, [stamp]);
+
+  // Check the sources: every 2.5 s while one is syncing, every 20 s otherwise
+  // (only while a live sync exists and the page is on screen), and on coming back to the tab.
+  const hasLive = live.length > 0;
   useEffect(() => {
-    if (!syncing) return;
-    const t = setInterval(() => {
+    if (!hasLive) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
       ws<DataSource[]>("/sources")
         .then((list) => patchState((s) => ({ ...s, sources: list })))
         .catch(() => undefined);
-    }, 2500);
-    return () => clearInterval(t);
-  }, [syncing]);
+    };
+    const t = setInterval(check, syncing ? 2500 : 20_000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [hasLive, syncing]);
 }
 
 /** `onSynced` runs when a sync came back already finished (a small CRM can be done before the reply). */

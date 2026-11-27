@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { Check, Loader2, Webhook } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CATEGORIES, integrationInfo, logoUrl, type IntegrationInfo } from "@outreach/core/integrations";
+import { BOOKING_CALENDARS } from "@outreach/core/calendar";
 import { connectIntegration, connectWithKey, disconnectIntegration, eventTypesOf, setEventType, type EventTypeOption } from "@/lib/actions";
 import { ApiError } from "@/lib/api";
 import { useApp } from "@/lib/store";
@@ -35,9 +36,11 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
   const conn = info ? integrations.find((i) => i.id === info.id && i.connected) : undefined;
   const [account, setAccount] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => (setApiKey(""), setError("")), [id]);
+  useEffect(() => (setApiKey(""), setAccountId(""), setError("")), [id]);
+  const ready = Boolean(info?.apiKey) && apiKey.trim().length >= 8 && (!info?.apiKey?.account || info.apiKey.account.optional || accountId.trim().length > 0);
   const connect = async () => {
     if (!info) return;
     if (!info.apiKey) {
@@ -48,8 +51,9 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
     setBusy(true);
     setError("");
     try {
-      await connectWithKey(info.id, apiKey.trim());
+      await connectWithKey(info.id, apiKey.trim(), accountId.trim() || undefined);
       setApiKey("");
+      setAccountId("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : `Couldn't reach ${info.name}. Try again.`);
     } finally {
@@ -68,7 +72,7 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
         (conn ? (
           <button type="button" className="btn-ghost w-full text-rose-600 hover:bg-rose-500/10" onClick={disconnect}>Disconnect</button>
         ) : (
-          <button type="button" className="btn-primary w-full" onClick={() => void connect()} disabled={busy || (Boolean(info.apiKey) && apiKey.trim().length < 8)}>
+          <button type="button" className="btn-primary w-full" onClick={() => void connect()} disabled={busy || (Boolean(info.apiKey) && !ready)}>
             {busy ? (
               <>
                 <Loader2 size={15} className="animate-spin" /> Checking the key…
@@ -104,7 +108,7 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
               ))}
             </ul>
           </div>
-          {conn && info.apiKey && <EventTypePicker provider={info.id} current={conn.eventType ?? null} />}
+          {conn && info.apiKey && (BOOKING_CALENDARS as readonly string[]).includes(info.id) && <EventTypePicker provider={info.id} current={conn.eventType ?? null} />}
           {!conn && info.apiKey && (
             <label className="block">
               <span className="label">{info.apiKey.label}</span>
@@ -115,13 +119,28 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
                 spellCheck={false}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && apiKey.trim().length >= 8 && !busy && void connect()}
+                onKeyDown={(e) => e.key === "Enter" && ready && !busy && void connect()}
                 placeholder={info.apiKey.placeholder}
               />
               <span className="hint block">{info.apiKey.help} It&rsquo;s checked with {info.name} and stored encrypted.</span>
-              {error && <span className="mt-2 block text-sm text-rose-700 dark:text-rose-300">{error}</span>}
             </label>
           )}
+          {!conn && info.apiKey?.account && (
+            <label className="block">
+              <span className="label">{info.apiKey.account.label}</span>
+              <input
+                className="field font-mono"
+                autoComplete="off"
+                spellCheck={false}
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && ready && !busy && void connect()}
+                placeholder={info.apiKey.account.placeholder}
+              />
+              <span className="hint block">{info.apiKey.account.help}</span>
+            </label>
+          )}
+          {!conn && error && <p className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
           {!conn && !info.apiKey && (
             <label className="block">
               <span className="label">{info.id === "webhook" ? "Send each call to" : "Account"}</span>
@@ -137,7 +156,7 @@ export function ConnectSheet({ id, onClose }: { id: string | null; onClose: () =
 }
 
 /** Which event type calls book into (a connected calendar). */
-function EventTypePicker({ provider, current }: { provider: string; current: { id: number; name: string; minutes: number } | null }) {
+function EventTypePicker({ provider, current }: { provider: string; current: { id: string | number; name: string; minutes: number } | null }) {
   const [types, setTypes] = useState<EventTypeOption[] | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -149,7 +168,7 @@ function EventTypePicker({ provider, current }: { provider: string; current: { i
       live = false;
     };
   }, [provider]);
-  const pick = (id: number) => {
+  const pick = (id: string | number) => {
     setError("");
     setEventType(provider, id).catch((err) => setError(err instanceof ApiError ? err.message : "Couldn't save that."));
   };
@@ -161,8 +180,8 @@ function EventTypePicker({ provider, current }: { provider: string; current: { i
           <Loader2 size={14} className="animate-spin" /> {current ? current.name : "Loading your event types…"}
         </div>
       ) : (
-        <select className="field" value={current?.id ?? ""} onChange={(e) => pick(Number(e.target.value))} disabled={!types?.length}>
-          {!current && <option value="">Pick an event type</option>}
+        <select className="field" value={String(current?.id ?? "")} onChange={(e) => pick((types ?? []).find((t) => String(t.id) === e.target.value)?.id ?? e.target.value)} disabled={!types?.length}>
+          {!current && <option value="">Pick a calendar</option>}
           {(types ?? []).map((t) => (
             <option key={t.id} value={t.id}>
               {t.name} ({t.minutes} min)
@@ -170,7 +189,7 @@ function EventTypePicker({ provider, current }: { provider: string; current: { i
           ))}
         </select>
       )}
-      <span className="hint block">{types && !types.length ? "This account has no visible event types. Add one in Cal.com, then reopen this." : "Agents offer free times from this event type and book the one the caller picks."}</span>
+      <span className="hint block">{types && !types.length ? "This account has nothing to book into yet. Add a calendar or event type there, then reopen this." : "Agents offer free times from this calendar and book the one the caller picks."}</span>
       {error && <span className="mt-2 block text-sm text-rose-700 dark:text-rose-300">{error}</span>}
     </label>
   );

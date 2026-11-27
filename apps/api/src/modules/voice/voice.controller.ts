@@ -76,6 +76,12 @@ export class RuntimeController {
     return this.voice.book(callIdOf(id), body);
   }
 
+  @Post("crm")
+  @HttpCode(200)
+  crm(@Param("id") id: string, @Body() body: unknown) {
+    return this.voice.crmStep(callIdOf(id), body);
+  }
+
   @Post("search")
   @HttpCode(200)
   search(@Param("id") id: string, @Body() body: unknown) {

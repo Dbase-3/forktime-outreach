@@ -79,7 +79,7 @@ describe("connecting Cal.com with an API key", () => {
   it("refuses a key Cal.com doesn't accept, and keeps nothing", async () => {
     const { agent, ws } = await withWorkspace(app, "calbad@example.com");
     const res = await agent.put(`${ws}/integrations/calcom`).send({ apiKey: "cal_live_wrong" }).expect(422);
-    expect(res.body.error.message).toMatch(/didn't accept that API key/);
+    expect(res.body.error.message).toMatch(/didn't accept that key/);
     expect((await agent.get(`${ws}/integrations`)).body).toEqual([]);
   });
 
@@ -98,7 +98,7 @@ describe("connecting Cal.com with an API key", () => {
   it("lists only visible event types and books into the one picked", async () => {
     const { agent, ws } = await withWorkspace(app, "calpick@example.com");
     await agent.put(`${ws}/integrations/calcom`).send({ apiKey: "cal_live_good" }).expect(200);
-    expect((await agent.get(`${ws}/integrations/calcom/event-types`).expect(200)).body).toEqual([{ id: 11, name: "Intro call", minutes: 30, hidden: false }]);
+    expect((await agent.get(`${ws}/integrations/calcom/event-types`).expect(200)).body).toEqual([{ id: 11, name: "Intro call", minutes: 30 }]);
     await agent.put(`${ws}/integrations/calcom/event-type`).send({ id: 12 }).expect(422);
     expect((await agent.put(`${ws}/integrations/calcom/event-type`).send({ id: 11 }).expect(200)).body.eventType.id).toBe(11);
   });

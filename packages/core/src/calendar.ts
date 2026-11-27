@@ -6,7 +6,10 @@
 import type { Flow, Step } from "./types";
 
 /** Calendars an agent can book into during a call. */
-export const BOOKING_CALENDARS = ["calcom"] as const;
+export const BOOKING_CALENDARS = ["calcom", "gohighlevel"] as const;
+
+/** CRMs a call saves its contact and a note to. */
+export const CRMS = ["gohighlevel", "twenty"] as const;
 export type BookingCalendar = (typeof BOOKING_CALENDARS)[number];
 
 export const isBookingCalendar = (id: string | undefined): id is BookingCalendar => BOOKING_CALENDARS.includes(id as BookingCalendar);

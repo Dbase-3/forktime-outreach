@@ -32,8 +32,8 @@ export class IntegrationsController {
     const info = integrationInfo(provider);
     if (!info) throw notFound("That integration");
     if (info.apiKey) {
-      const { apiKey } = parse(z.object({ apiKey: z.string().trim().min(8, "Paste the whole key.").max(500) }), body ?? {});
-      return this.connections.connectWithKey(ctx.workspaceId!, provider, apiKey);
+      const { apiKey, accountId } = parse(z.object({ apiKey: z.string().trim().min(8, "Paste the whole key.").max(2000), accountId: z.string().trim().max(100).optional() }), body ?? {});
+      return this.connections.connectWithKey(ctx.workspaceId!, provider, apiKey, accountId);
     }
     const { account } = parse(z.object({ account: z.string().max(200).default("") }), body ?? {});
     const doc = await this.integrations.findOneAndUpdate({ workspaceId: ctx.workspaceId, providerId: provider }, { $set: { connected: true, account } }, { upsert: true, new: true }).lean();
@@ -49,7 +49,7 @@ export class IntegrationsController {
   @Put(":provider/event-type")
   @Roles("owner", "admin")
   setEventType(@Ctx() ctx: RequestContext, @Param("provider") provider: string, @Body() body: unknown) {
-    const { id } = parse(z.object({ id: z.number().int().positive() }), body ?? {});
+    const { id } = parse(z.object({ id: z.union([z.number().int().positive(), z.string().min(1).max(100)]) }), body ?? {});
     return this.connections.setEventType(ctx.workspaceId!, provider, id);
   }
 

@@ -33,6 +33,9 @@ const EnvSchema = z.object({
   INTEGRATIONS_KEY: z.string().optional(),
   /** Cal.com's API (a test points it at a fake). */
   CALCOM_API_URL: z.string().url().default("https://api.cal.com/v2"),
+  GHL_API_URL: z.string().url().default("https://services.leadconnectorhq.com"),
+  /** Twenty Cloud; a self-hosted server is the address the owner gives (fetched through the SSRF guard). */
+  TWENTY_API_URL: z.string().url().default("https://api.twenty.com"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -8,7 +8,8 @@ import { businessOf } from "@outreach/core/variables";
 import { dataSchema, structuredResult } from "@outreach/core/agent-data";
 import { INLINE_KNOWLEDGE_CHARS, callOutcomes, type CallSetup } from "@outreach/core/call-instructions";
 import { AFTER_CALL_LABELS, integrationName, needsConnection } from "@outreach/core/connections";
-import { addDays, bookingCalendarOf, dateIn, describeSlots, whenLabel } from "@outreach/core/calendar";
+import { CRMS, addDays, bookingCalendarOf, dateIn, describeSlots, whenLabel } from "@outreach/core/calendar";
+import { callNote, personOf } from "@outreach/core/crm";
 import type { AgentDraft } from "@outreach/core/schemas";
 import { fill } from "@outreach/core/variables";
 import { Types } from "mongoose";
@@ -20,7 +21,7 @@ import { parse } from "../../common/zod";
 import type { M } from "../../db/models";
 import { contactOut } from "../contacts/contacts.service";
 import { ConnectionsService } from "../integrations/connections.service";
-import { CalComError } from "../integrations/calcom";
+import { ProviderError } from "../integrations/providers";
 import { LiveKitService } from "./livekit.service";
 
 /** What the agent gets for a call: everything to run it, nothing else of the workspace. */
@@ -34,6 +35,8 @@ export interface RuntimeConfig extends CallSetup {
   connected: string[]; // integrations the workspace has connected: a step needing another is skipped
   /** The calendar this call books into (connected, with an event type picked), or null. */
   calendar: { provider: string; name: string; eventType: string } | null;
+  /** Connected CRMs a workflow step can save the caller to (GoHighLevel, Twenty). */
+  crms: string[];
   maxCallMinutes: number;
 }
 
@@ -163,6 +166,7 @@ export class VoiceService {
       voice: { ...draft.agent, voiceId: draft.agent.voiceId },
       connected,
       calendar: provider && cal ? { provider, name: integrationName(provider), eventType: cal.eventType.name } : null,
+      crms: CRMS.filter((c) => connected.includes(c)),
       maxCallMinutes: call.test ? 10 : 15,
     };
   }
@@ -184,27 +188,75 @@ export class VoiceService {
         let draft = call.config as AgentDraft | undefined;
         if (!draft && call.agentVersionId) draft = (await this.versions.findById(call.agentVersionId).lean())?.config as AgentDraft | undefined;
         const missing = draft ? structuredResult(dataSchema(draft), (done?.saved ?? {}) as Record<string, string>).missingRequired : [];
-        const after = draft ? await this.afterCallLines(call.workspaceId, draft, Boolean(call.test)) : [];
-        await this.calls.updateOne({ _id: callId }, { $set: { live: false, outcome: e.outcome, summary: e.summary, endReason: e.endReason, durationSec: Math.round(e.durationSec), missing }, ...(after.length ? { $push: { transcript: { $each: after } } } : {}) });
+        const after = draft ? await this.afterCall(call.workspaceId, draft) : { lines: [], crm: [] };
+        await this.calls.updateOne({ _id: callId }, { $set: { live: false, outcome: e.outcome, summary: e.summary, endReason: e.endReason, durationSec: Math.round(e.durationSec), missing }, ...(after.lines.length ? { $push: { transcript: { $each: after.lines } } } : {}) });
         this.log.log(`call ${String(callId)} ended: ${e.outcome} (${e.endReason}, ${Math.round(e.durationSec)} s)`);
+        // CRM saves run after the call is filed, so the agent isn't kept waiting; each adds its line.
+        if (draft && after.crm.length) void this.runAfterCallCrm(callId, draft, after.crm, { outcome: e.outcome, summary: e.summary, saved: (done?.saved ?? {}) as Record<string, string> });
       }
     }
     return { ok: true };
   }
 
   /**
-   * What the agent's after-call actions did, as lines on the transcript. Test
-   * calls send nothing; a real send comes with the integrations (Phase 6).
+   * The agent's after-call actions: lines for the transcript, and the CRM saves
+   * to run (a connected GoHighLevel / Twenty "save the contact"). Test calls
+   * send to a connected CRM too (owner, 2026-11-28); other tools are not sent yet.
    */
-  private async afterCallLines(ws: Types.ObjectId, draft: AgentDraft, test: boolean) {
+  private async afterCall(ws: Types.ObjectId, draft: AgentDraft): Promise<{ lines: { who: string; text: string }[]; crm: { provider: string; keys: string[] }[] }> {
     const actions = draft.afterCall ?? [];
-    if (!actions.length) return [];
+    if (!actions.length) return { lines: [], crm: [] };
     const connected = new Set(await this.data.connected(ws));
-    return actions.map((a) => {
-      const what = `After the call: ${AFTER_CALL_LABELS[a.kind].toLowerCase()} in ${a.integration === "webhook" ? "your URL" : integrationName(a.integration)}`;
-      const how = needsConnection(a.integration) && !connected.has(a.integration) ? `skipped, ${integrationName(a.integration)} isn't connected` : test ? "test call, nothing was sent" : "for the team to do";
-      return { who: "action", text: `${what} (${how})` };
-    });
+    const lines: { who: string; text: string }[] = [];
+    const crm: { provider: string; keys: string[] }[] = [];
+    for (const a of actions) {
+      const name = a.integration === "webhook" ? "your URL" : integrationName(a.integration);
+      if (needsConnection(a.integration) && !connected.has(a.integration)) lines.push({ who: "action", text: `After the call: ${AFTER_CALL_LABELS[a.kind].toLowerCase()} in ${name} (skipped, ${name} isn't connected)` });
+      else if (a.kind === "save_contact" && (CRMS as readonly string[]).includes(a.integration)) crm.push({ provider: a.integration, keys: a.fields });
+      else lines.push({ who: "action", text: `After the call: ${AFTER_CALL_LABELS[a.kind].toLowerCase()} in ${name} (for the team to do)` });
+    }
+    return { lines, crm };
+  }
+
+  private async runAfterCallCrm(callId: Types.ObjectId, draft: AgentDraft, saves: { provider: string; keys: string[] }[], o: { outcome: string; summary: string; saved: Record<string, string> }) {
+    const call = await this.calls.findById(callId).lean();
+    if (!call) return;
+    const lines = [];
+    for (const s of saves) lines.push({ who: "action", text: `After the call: ${await this.saveToCrm(call, draft, s.provider, { ...o, keys: s.keys })}` });
+    await this.calls.updateOne({ _id: callId }, { $push: { transcript: { $each: lines } } });
+  }
+
+  /** Save the call's person and a note of the call to a connected CRM. Returns what happened, for the transcript. */
+  private async saveToCrm(call: { _id: Types.ObjectId; workspaceId: Types.ObjectId; contactId?: Types.ObjectId | null; fromNumber?: string | null; startedAt?: Date | null; test?: boolean | null }, draft: AgentDraft, provider: string, o: { outcome: string; summary: string; saved: Record<string, string>; keys?: string[] }): Promise<string> {
+    const name = integrationName(provider);
+    try {
+      const crm = await this.connections.crm(call.workspaceId, provider);
+      if (!crm) return `${name}: skipped, it isn't connected`;
+      const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { name: 1, phoneE164: 1, email: 1 }).lean() : null;
+      const person = personOf({ contact, saved: o.saved, fromNumber: call.fromNumber });
+      if (!person.name && !person.phone && !person.email) return `${name}: skipped, the call gave no name, number or email`;
+      const id = await crm.upsertContact(person);
+      const settings = await this.data.settings(call.workspaceId);
+      const tz = validZone(draft.timezone) || validZone(settings.timezone) || "UTC";
+      const note = callNote({ agent: draft.agent.name, when: whenLabel((call.startedAt ?? new Date()).toISOString(), tz), outcome: o.outcome, summary: o.summary, saved: o.saved, schema: dataSchema(draft), keys: o.keys });
+      await crm.addNote(id, note.title, note.body);
+      return `saved ${person.name || person.phone || person.email} to ${name}, with a note of the call${call.test ? " (test call, really saved)" : ""}`;
+    } catch (err) {
+      const why = err instanceof ProviderError ? err.message : "it didn't answer";
+      this.log.warn(`crm save failed for call ${String(call._id)} (${provider}): ${why}`);
+      return `${name}: couldn't save (${why})`;
+    }
+  }
+
+  /** A workflow step "save to the CRM" during the call, with the answers so far. */
+  async crmStep(callId: Types.ObjectId, body: unknown): Promise<{ text: string }> {
+    const { provider, saved } = parse(z.object({ provider: z.string().max(40), saved: z.record(z.string().max(64), z.string().max(500)).default({}) }), body);
+    const call = await this.calls.findById(callId).lean();
+    if (!call || !call.live) throw notFound("That call");
+    let draft = call.config as AgentDraft | undefined;
+    if (!draft && call.agentVersionId) draft = (await this.versions.findById(call.agentVersionId).lean())?.config as AgentDraft | undefined;
+    if (!draft) throw notFound("That agent");
+    return { text: await this.saveToCrm(call, draft, provider, { outcome: "in progress", summary: "", saved: { ...((call.saved ?? {}) as Record<string, string>), ...saved } }) };
   }
 
   /** The call's agent, its time zone, and the calendar it books into: for check_times / book_time. */
@@ -249,12 +301,12 @@ export class VoiceService {
     const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { phoneE164: 1, email: 1 }).lean() : null;
     const phone = [contact?.phoneE164, call.fromNumber].find((p): p is string => typeof p === "string" && /^\+\d{8,15}$/.test(p));
     try {
-      const booked = await cal.client.book({ eventTypeId: cal.eventType.id, start, name, timeZone, email: email || contact?.email || undefined, phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
+      const booked = await cal.client.book({ calendarId: cal.eventType.id, minutes: cal.eventType.minutes, start, name, timeZone, email: email || contact?.email || undefined, phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
       const when = whenLabel(booked.start || start, timeZone);
-      this.log.log(`call ${String(callId)} booked ${booked.uid} for ${when}`);
+      this.log.log(`call ${String(callId)} booked ${booked.id} for ${when}`);
       return { ok: true, when, text: `Booked: ${when}.` };
     } catch (err) {
-      const why = err instanceof CalComError ? err.message : "the calendar didn't answer";
+      const why = err instanceof ProviderError ? err.message : "the calendar didn't answer";
       this.log.warn(`booking failed for call ${String(callId)}: ${why}`);
       const email = /email/i.test(why);
       return { ok: false, text: email ? "This calendar needs an email address to book. Ask for their email, then call book_time again with it." : `It couldn't be booked (${why}). Call check_times again and offer another time.` };

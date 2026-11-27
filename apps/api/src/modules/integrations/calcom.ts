@@ -5,48 +5,30 @@
 // its version header. A booking needs only a name and a time zone; email and
 // phone are optional (CreateBookingAttendee).
 
-export class CalComError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-  }
-}
+import { type Bookable, type CalendarClient, ProviderError, providerFetch } from "./providers";
 
-export interface CalEventType {
+export { ProviderError as CalComError };
+
+export interface CalEventType extends Bookable {
   id: number;
-  name: string;
-  minutes: number;
   hidden: boolean;
 }
 
-const TIMEOUT_MS = 8000;
+type Envelope<T> = { status?: string; data?: T; error?: { message?: string } | string; message?: string };
+const said = (json: unknown) => {
+  const j = json as Envelope<unknown> | null;
+  if (!j || j.status !== "error") return j && !j.status && (j.error || j.message) ? String(typeof j.error === "string" ? j.error : j.error?.message || j.message) : undefined;
+  return String(typeof j.error === "string" ? j.error : j.error?.message || j.message || "Cal.com said no.");
+};
 
-export class CalCom {
+export class CalCom implements CalendarClient {
   constructor(
     private readonly apiKey: string,
     private readonly base = "https://api.cal.com/v2",
   ) {}
 
   private async request<T>(method: "GET" | "POST", path: string, version: string | null, body?: unknown): Promise<T> {
-    let res: Response;
-    try {
-      res = await fetch(`${this.base}${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json", ...(version ? { "cal-api-version": version } : {}) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch {
-      throw new CalComError("Cal.com didn't answer in time.", 504);
-    }
-    const json = (await res.json().catch(() => null)) as { status?: string; data?: unknown; error?: { message?: string } | string; message?: string } | null;
-    if (!res.ok || json?.status === "error") {
-      if (res.status === 401 || res.status === 403) throw new CalComError("Cal.com didn't accept that API key.", 401);
-      const raw = typeof json?.error === "string" ? json.error : json?.error?.message || json?.message;
-      throw new CalComError(raw ? String(raw).slice(0, 300) : `Cal.com said no (HTTP ${res.status}).`, res.status || 502);
-    }
+    const json = await providerFetch<Envelope<T>>("Cal.com", `${this.base}${path}`, { method, headers: { Authorization: `Bearer ${this.apiKey}`, ...(version ? { "cal-api-version": version } : {}) }, body }, said);
     return json?.data as T;
   }
 
@@ -60,9 +42,12 @@ export class CalCom {
     return (Array.isArray(d) ? d : []).map((e) => ({ id: e.id, name: e.title, minutes: e.lengthInMinutes, hidden: Boolean(e.hidden) }));
   }
 
-  /** Free start times (ISO, with the zone's offset) between two dates, inclusive. */
-  async slots(eventTypeId: number, start: string, end: string, timeZone: string): Promise<string[]> {
-    const q = new URLSearchParams({ eventTypeId: String(eventTypeId), start, end, timeZone });
+  async calendars(): Promise<Bookable[]> {
+    return (await this.eventTypes()).filter((t) => !t.hidden).map(({ id, name, minutes }) => ({ id, name, minutes }));
+  }
+
+  async slots(eventTypeId: string | number, from: string, to: string, timeZone: string): Promise<string[]> {
+    const q = new URLSearchParams({ eventTypeId: String(eventTypeId), start: from, end: to, timeZone });
     const d = await this.request<Record<string, ({ start: string } | string)[]>>("GET", `/slots?${q}`, "2024-09-04");
     return Object.values(d ?? {})
       .flat()
@@ -70,13 +55,13 @@ export class CalCom {
       .filter(Boolean);
   }
 
-  async book(o: { eventTypeId: number; start: string; name: string; timeZone: string; email?: string; phone?: string; metadata?: Record<string, string> }): Promise<{ uid: string; start: string }> {
+  async book(o: { calendarId: string | number; start: string; name: string; timeZone: string; email?: string; phone?: string; metadata?: Record<string, string> }): Promise<{ id: string; start: string }> {
     const d = await this.request<{ uid: string; start: string }>("POST", "/bookings", "2024-08-13", {
       start: new Date(o.start).toISOString(),
-      eventTypeId: o.eventTypeId,
+      eventTypeId: Number(o.calendarId),
       attendee: { name: o.name, timeZone: o.timeZone, ...(o.email ? { email: o.email } : {}), ...(o.phone ? { phoneNumber: o.phone } : {}) },
       ...(o.metadata ? { metadata: o.metadata } : {}),
     });
-    return { uid: d.uid, start: d.start };
+    return { id: d.uid, start: d.start };
   }
 }

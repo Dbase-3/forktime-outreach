@@ -33,3 +33,10 @@ export function dncSet(numbers: string[], country: CountryCode = "AU"): Set<stri
   }
   return out;
 }
+
+/** An E.164 number in parts, as CRMs like Twenty keep it: "+61400111222" → AU, "+61", "400111222". */
+export function phoneParts(e164: string): { country: string; callingCode: string; national: string } | null {
+  const parsed = parsePhoneNumberFromString(e164);
+  if (!parsed) return null;
+  return { country: parsed.country ?? "", callingCode: `+${parsed.countryCallingCode}`, national: String(parsed.nationalNumber) };
+}

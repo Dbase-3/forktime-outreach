@@ -96,3 +96,33 @@ export async function safeFetchText(raw: string, opts: { timeoutMs: number; maxB
   }
   throw new FetchProblem("That address redirects too many times.");
 }
+
+/**
+ * A JSON request to a server address someone typed in (a self-hosted CRM):
+ * HTTPS only, every resolved address checked in the connection's own lookup,
+ * no redirects, the answer capped at 1 MB.
+ */
+export function safeJsonRequest(raw: string, o: { method: string; headers: Record<string, string>; body?: string; timeoutMs: number }): Promise<{ status: number; text: string }> {
+  const url = new URL(raw);
+  if (url.protocol !== "https:") return Promise.reject(new FetchProblem("The server address must start with https://."));
+  const problem = publicUrlProblem(raw);
+  if (problem) return Promise.reject(new FetchProblem(problem));
+  const maxBytes = 1_000_000;
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, { method: o.method, lookup: guardedLookup, timeout: o.timeoutMs, headers: { ...o.headers, ...(o.body ? { "content-length": Buffer.byteLength(o.body) } : {}) } }, (res) => {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > maxBytes) return res.destroy(new FetchProblem("The server's answer was too large."));
+        chunks.push(chunk);
+      });
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString("utf8") }));
+      res.on("error", (err) => reject(err instanceof FetchProblem ? err : new FetchProblem("The server stopped answering.")));
+    });
+    req.on("timeout", () => req.destroy(new FetchProblem("The server took too long to answer.")));
+    req.on("error", (err) => reject(err instanceof FetchProblem ? err : new FetchProblem(err.message.includes("private network") ? "That address is on a private network." : "That server couldn't be reached.")));
+    if (o.body) req.write(o.body);
+    req.end();
+  });
+}

@@ -292,6 +292,23 @@ class PlatformCall {
     return Boolean(this.cfg.calendar && isLiveBooking(step, this.cfg.calendar.provider));
   }
 
+  /** A CRM step on a connected CRM (GoHighLevel, Twenty): it really saves, test calls included. */
+  isCrmStep(step) {
+    return step.kind === "action" && step.action === "crm" && Boolean(step.integration) && (this.cfg.crms || []).includes(step.integration);
+  }
+
+  /** Save in the background (the call doesn't wait); the transcript gets what happened. */
+  runCrmStep(step, detail) {
+    const name = integrationName(step.integration);
+    Promise.resolve(this.api.saveToCrm(step.integration, { ...this.saved }))
+      .then((r) => this.api.report({ type: "line", line: { who: "action", text: `${detail ? `${detail}: ` : ""}${(r && r.text) || `saved to ${name}`}`, at: Math.round(this.secondsIn()) } }))
+      .catch((err) => {
+        this.log.warn(`[Call] CRM save failed: ${err.message}`);
+        this.api.report({ type: "line", line: { who: "action", text: `${name}: couldn't save (${err.message.slice(0, 120)})`, at: Math.round(this.secondsIn()) } });
+      });
+    return { line: null, tag: "crm", tell: `Saved to ${name}. Don't mention it; carry on.` };
+  }
+
   /** The workflow is waiting at a Book step: it's done (booked or declined), so carry on. */
   finishBookingStep(prefix) {
     const { next } = this.position;
@@ -390,8 +407,8 @@ class PlatformCall {
       if (next.kind !== "action" || this.isBookingStep(next.step)) break;
       for (const s of this.position.say) this.done.add(s.id);
       this.done.add(next.step.id);
-      const result = runAction(next.step, next.detail, this.cfg.test, this.cfg.connected || []);
-      this.api.report({ type: "line", line: { who: "action", text: result.line, at: Math.round(this.secondsIn()) } });
+      const result = this.isCrmStep(next.step) ? this.runCrmStep(next.step, next.detail) : runAction(next.step, next.detail, this.cfg.test, this.cfg.connected || []);
+      if (result.line) this.api.report({ type: "line", line: { who: "action", text: result.line, at: Math.round(this.secondsIn()) } });
       if (result.tag) this.api.report({ type: "action", action: result.tag });
       parts.push(result.tell);
     }

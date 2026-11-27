@@ -13,7 +13,7 @@ export interface IntegrationInfo {
   does: string[]; // the connect drawer's list
   syncsContacts?: boolean; // can be a contacts source
   /** Connects for real with an API key the owner pastes (checked, stored encrypted). Others only remember a name for now. */
-  apiKey?: { label: string; help: string; placeholder: string };
+  apiKey?: { label: string; help: string; placeholder: string; account?: { label: string; help: string; placeholder: string; optional?: boolean } };
 }
 
 export const CATEGORIES: { id: IntegrationCategory; label: string }[] = [
@@ -28,11 +28,11 @@ const CRM_DOES = ["Pull contacts and their fields into Contacts, kept in sync", 
 
 export const INTEGRATIONS: IntegrationInfo[] = [
   { id: "hubspot", name: "HubSpot", domain: "hubspot.com", category: "crm", blurb: "Sync contacts and deals, log calls, update properties.", does: CRM_DOES, syncsContacts: true },
-  { id: "gohighlevel", name: "GoHighLevel", domain: "gohighlevel.com", category: "crm", blurb: "Sync contacts and pipelines, book on GHL calendars.", does: [...CRM_DOES, "Book on GHL calendars"], syncsContacts: true },
+  { id: "gohighlevel", name: "GoHighLevel", domain: "gohighlevel.com", category: "crm", blurb: "Save callers as contacts with a note of each call, book on GHL calendars.", does: ["Save each caller as a contact, with a note of the call and its answers", "Offer free times from one of your calendars and book during the call"], syncsContacts: true, apiKey: { label: "Private integration token", help: "In the sub-account: Settings → Private Integrations → Create new integration. Tick Contacts (view, edit), Calendars (view), Calendar events (view, edit) and Locations (view), then copy the token.", placeholder: "pit-…", account: { label: "Sub-account ID", help: "Settings → Business Profile shows it, or copy it from the address bar: …/location/<this part>/…", placeholder: "e.g. ve9EPM428h8vShlRW1KT" } } },
   { id: "salesforce", name: "Salesforce", domain: "salesforce.com", category: "crm", blurb: "Leads, contacts and opportunities, both ways.", does: CRM_DOES, syncsContacts: true },
   { id: "pipedrive", name: "Pipedrive", domain: "pipedrive.com", category: "crm", blurb: "People and deals, with call notes on each.", does: CRM_DOES, syncsContacts: true },
   { id: "zoho", name: "Zoho CRM", domain: "zoho.com", category: "crm", blurb: "Leads and contacts, with every call logged.", does: CRM_DOES, syncsContacts: true },
-  { id: "twenty", name: "Twenty", domain: "twenty.com", category: "crm", blurb: "Open-source CRM: people, companies and notes.", does: CRM_DOES, syncsContacts: true },
+  { id: "twenty", name: "Twenty", domain: "twenty.com", category: "crm", blurb: "Open-source CRM: save callers as people, with a note of each call.", does: ["Save each caller as a person, with a note of the call and its answers"], syncsContacts: true, apiKey: { label: "API key", help: "In Twenty, open Settings → APIs & Webhooks (or Developers → API) → Create key, and paste it here.", placeholder: "eyJhbGciOi…", account: { label: "Server address", help: "Leave as is for Twenty Cloud. Self-hosted: your Twenty server's address.", placeholder: "https://api.twenty.com", optional: true } } },
   { id: "close", name: "Close", domain: "close.com", category: "crm", blurb: "Leads and opportunities for sales teams.", does: CRM_DOES, syncsContacts: true },
   { id: "attio", name: "Attio", domain: "attio.com", category: "crm", blurb: "Records and lists, updated after every call.", does: CRM_DOES, syncsContacts: true },
   { id: "monday", name: "monday CRM", domain: "monday.com", category: "crm", blurb: "Boards of contacts and deals.", does: CRM_DOES, syncsContacts: true },

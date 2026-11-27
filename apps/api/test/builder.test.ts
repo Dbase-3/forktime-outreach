@@ -1,4 +1,6 @@
 import type { INestApplication } from "@nestjs/common";
+import { getModelToken } from "@nestjs/mongoose";
+import { Types, type Model } from "mongoose";
 import { BuilderService } from "../src/modules/builder/builder.service";
 import { startApp, withWorkspace } from "./helpers";
 
@@ -29,15 +31,15 @@ function scriptModel(calls: Call[], reply = "Done.") {
 }
 
 async function sampleAgent(email: string) {
-  const { agent, ws } = await withWorkspace(app, email, { sample: true });
+  const { agent, ws, id } = await withWorkspace(app, email, { sample: true });
   const flows = (await agent.get(`${ws}/agents`)).body as { id: string; name: string; status: string; numberId?: string }[];
   const flow = flows.find((f) => f.numberId)!;
-  return { agent, ws, flow: (await agent.get(`${ws}/agents/${flow.id}`)).body };
+  return { agent, ws, id, flow: (await agent.get(`${ws}/agents/${flow.id}`)).body };
 }
 
 describe("Change with AI", () => {
   it("returns the changed draft (not saved), the changes in plain words, and what isn't connected", async () => {
-    const { agent, ws, flow } = await sampleAgent("b1@example.com");
+    const { agent, ws, id, flow } = await sampleAgent("b1@example.com");
     const firstId = flow.steps[0].id;
     const heard = scriptModel([
       { tool: "add_step", input: { position: "after", ref: firstId, step: { kind: "ask", question: "What's your budget?", field: "budget", answerType: "number" } } },
@@ -59,7 +61,9 @@ describe("Change with AI", () => {
     const saved = (await agent.patch(`${ws}/agents/${flow.id}`).send({ version: flow.version, draft: res.draft }).expect(200)).body;
     const blocked = await agent.post(`${ws}/agents/${flow.id}/publish`).send({ version: saved.version }).expect(422);
     expect(blocked.body.error.details.issues).toContain("Connect GoHighLevel: After the call: save the contact uses it.");
-    await agent.put(`${ws}/integrations/gohighlevel`).send({ account: "northside.gohighlevel.com" }).expect(200);
+    // GoHighLevel connects with a token checked against GHL (test/ghl.test.ts); here, a stored connection.
+    const integrations: Model<unknown> = app.get(getModelToken("Integration"));
+    await integrations.create({ workspaceId: new Types.ObjectId(id), providerId: "gohighlevel", connected: true, hasKey: true, account: "Northside" });
     await agent.post(`${ws}/agents/${flow.id}/publish`).send({ version: saved.version }).expect(201);
   });
 

@@ -284,6 +284,7 @@ export const IntegrationSchema = new Schema(
     connected: { type: Boolean, default: true },
     account: String,
     secret: { type: String, select: false }, // the API key, sealed (common/secrets.ts); never sent anywhere
+    accountId: String, // the provider's account the key is for (GHL: the sub-account / location id)
     hasKey: { type: Boolean, default: false }, // a key is stored: a keyed integration counts as connected only then
     eventType: { type: Mixed, default: null }, // a calendar: { id, name, minutes } calls book into
     lastError: String,

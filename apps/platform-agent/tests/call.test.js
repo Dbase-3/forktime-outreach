@@ -133,3 +133,26 @@ describe("booking into a connected calendar", () => {
     expect(call.done.has("a1")).toBe(true);
   });
 });
+
+describe("a CRM step on a connected CRM", () => {
+  it("saves in the background with the answers so far, and the call carries on", async () => {
+    const crmSteps = [
+      { id: "q1", kind: "ask", question: "Your name?", field: "contactName", answerType: "text" },
+      { id: "c1", kind: "action", action: "crm", detail: "Save the lead", integration: "gohighlevel" },
+      { id: "q2", kind: "ask", question: "Best time?", field: "time", answerType: "text" },
+      { id: "e1", kind: "end", outcome: "done", text: "Bye!" },
+    ];
+    const reports = [];
+    const sent = [];
+    const f = { ...flow, steps: crmSteps };
+    const cfg = { flow: f, business: "Northside", direction: "outbound", values: { agent: "Mia", business: "Northside" }, schema: dataSchema(f), choices: {}, knowledge: { inline: [], searchable: false }, test: true, outcomes: ["done", "other"], voice: f.agent, greeting: f.greeting, maxCallMinutes: 10, connected: ["gohighlevel"], crms: ["gohighlevel"], calendar: null };
+    const api = { report: (e) => reports.push(e), saveToCrm: async (p, saved) => (sent.push({ p, saved }), { text: "saved Ann Lee to GoHighLevel" }) };
+    const call = new PlatformCall({ ctx: { room: {} }, api, cfg, vad: null, log: { warn() {}, log() {} } });
+    call.agent = { updateInstructions() {} };
+    expect(call.note("contactName", "Ann Lee")).toMatch(/Saved to GoHighLevel\. Don't mention it.*Then ask: "Best time\?"/);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sent).toEqual([{ p: "gohighlevel", saved: { contactName: "Ann Lee" } }]);
+    expect(reports).toContainEqual({ type: "action", action: "crm" });
+    expect(reports.find((r) => r.type === "line" && r.line.who === "action").line.text).toBe("Save the lead: saved Ann Lee to GoHighLevel");
+  });
+});

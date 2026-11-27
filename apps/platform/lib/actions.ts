@@ -163,19 +163,19 @@ export async function connectIntegration(provider: string, account: string): Pro
 }
 
 /** Connect with an API key (checked with the provider first; a refusal comes back as ApiError). */
-export async function connectWithKey(provider: string, apiKey: string): Promise<Integration> {
-  const i = await ws<Integration>(`/integrations/${provider}`, { method: "PUT", body: { apiKey } });
+export async function connectWithKey(provider: string, apiKey: string, accountId?: string): Promise<Integration> {
+  const i = await ws<Integration>(`/integrations/${provider}`, { method: "PUT", body: { apiKey, ...(accountId ? { accountId } : {}) } });
   patchState((s) => ({ ...s, integrations: [...s.integrations.filter((x) => x.id !== provider), i] }));
   return i;
 }
 
-export type EventTypeOption = { id: number; name: string; minutes: number };
+export type EventTypeOption = { id: string | number; name: string; minutes: number };
 
 export function eventTypesOf(provider: string): Promise<EventTypeOption[]> {
   return ws<EventTypeOption[]>(`/integrations/${provider}/event-types`);
 }
 
-export async function setEventType(provider: string, id: number): Promise<void> {
+export async function setEventType(provider: string, id: string | number): Promise<void> {
   const i = await ws<Integration>(`/integrations/${provider}/event-type`, { method: "PUT", body: { id } });
   patchState((s) => ({ ...s, integrations: [...s.integrations.filter((x) => x.id !== provider), i] }));
 }

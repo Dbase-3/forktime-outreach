@@ -16,6 +16,25 @@ HOST="${LISNA_HOST:-root@204.48.28.201}"
 API_URL="${LISNA_API_URL:-https://api.digicoinx.com}"
 command -v lk >/dev/null || { echo "LiveKit CLI (lk) not found: brew install livekit-cli"; exit 1; }
 
+# Never touch another product's agent (2026-11-27: Lisna deploys landed on Forktime's
+# production agent CA_ujSbWTQYGe4c for four hours, because its id was copied in by
+# mistake). Refuse ids that Forktime or outreach use, and any agent carrying
+# Forktime-only secrets.
+agent_id() { sed -n 's/^ *id *= *"\(CA_[A-Za-z0-9]*\)".*/\1/p' "$1" 2>/dev/null | head -1; }
+guard() {
+  local id="$1" other
+  [ -n "$id" ] || return 0
+  for f in "$ROOT/../forktime-core/packages/agent/livekit.toml" "$ROOT/apps/agent/livekit.toml"; do
+    other=$(agent_id "$f")
+    [ -n "$other" ] && [ "$id" = "$other" ] && { echo "REFUSED: $id is the agent in $f, not Lisna's."; exit 1; }
+  done
+  [ "$id" = "CA_ujSbWTQYGe4c" ] && { echo "REFUSED: $id is Forktime's production agent."; exit 1; }
+  if lk agent secrets --id "$id" 2>/dev/null | grep -qE '(JEV_|TELNYX_|KIOSK_)'; then
+    echo "REFUSED: agent $id has Forktime secrets: it isn't Lisna's."; exit 1
+  fi
+  return 0
+}
+
 pnpm --filter @outreach/core build >/dev/null
 STAGE=$(mktemp -d); SECRETS=$(mktemp)
 trap 'rm -rf "$STAGE" "$SECRETS"' EXIT
@@ -44,20 +63,30 @@ PROD_KEY=$(grep -E "^ANTHROPIC_API_KEY_PROD=" "$ROOT/apps/api/.env" 2>/dev/null 
 } > "$SECRETS"
 grep -q '^AGENT_RUNTIME_KEY=.\{64\}$' "$SECRETS" || { echo "Couldn't read the signing key from the API server."; exit 1; }
 
+LISNA_ID=$(agent_id "$PKG/livekit.toml")
+guard "$LISNA_ID"
+
 # --secrets-only: replace the running agent's secrets and restart it (no rebuild).
 if [ "${1:-}" = "--secrets-only" ]; then
+  [ -n "$LISNA_ID" ] || { echo "No Lisna agent id in livekit.toml yet."; exit 1; }
   # lk asks to confirm the overwrite, even non-interactively: answer y.
-  cd "$PKG" && expect -c "set timeout 120; spawn lk agent update-secrets --secrets-file $SECRETS --overwrite; expect -re {\[y/N\]|\(y/n\)|\?} { send \"y\r\" }; expect eof" >/dev/null
+  cd "$PKG" && expect -c "set timeout 120; spawn lk agent update-secrets --id $LISNA_ID --secrets-file $SECRETS --overwrite; expect -re {\[y/N\]|\(y/n\)|\?} { send \"y\r\" }; expect eof" >/dev/null
   exit 0
 fi
 
 cd "$STAGE"
-if grep -q '^\[agent\]' livekit.toml; then
-  lk agent deploy --secrets-file "$SECRETS"
+if [ -n "$LISNA_ID" ]; then
+  lk agent deploy --id "$LISNA_ID" --secrets-file "$SECRETS"
 else
-  echo "First deploy: creating platform-agent on LiveKit Cloud (us-east)."
-  # lk asks to confirm the project even with --silent: answer y to that one question.
-  # Afterwards it follows the logs: stop it with Ctrl-C once "Running", then add the id to livekit.toml.
-  expect -c "set timeout 900; spawn lk agent create --region us-east --secrets-file $SECRETS --silent; expect -re {\[y/N\]|\(y/n\)|confirm} { send \"y\r\" }; expect eof"
+  echo "First deploy: creating a NEW Lisna agent on LiveKit Cloud (us-east)."
+  BEFORE=$(lk agent list 2>/dev/null | grep -oE 'CA_[A-Za-z0-9]+' | sort -u)
+  LOG="${LISNA_CREATE_LOG:-/tmp/lisna-agent-create.log}"; echo "Progress: $LOG"
+  # The project confirmation is a selector ("y Yes • n Select another"): answer y. Plain [y/N] prompts too.
+  # It follows the new agent's logs after the build: stop once the worker says it's ready.
+  expect -c "set timeout 1500; log_file -noappend $LOG; spawn lk agent create --project ground-labs --region us-east --secrets-file $SECRETS --silent; expect { -re {y Yes} { send y; exp_continue } -re {\\[y/N\\]|\\(y/n\\)} { send \"y\\r\" ; exp_continue } -re {ready \\(platform-agent\\)} { send \"\\003\" ; exp_continue } eof }" >/dev/null || true
+  NEW_ID=$(agent_id livekit.toml)
+  # The id must be one that didn't exist before this run.
+  if [ -z "$NEW_ID" ] || echo "$BEFORE" | grep -qx "$NEW_ID"; then echo "No NEW agent id came back (got '${NEW_ID:-none}'): livekit.toml left unchanged."; exit 1; fi
   cp livekit.toml "$PKG/livekit.toml"
+  echo "Lisna agent created: $NEW_ID (saved in apps/platform-agent/livekit.toml)"
 fi

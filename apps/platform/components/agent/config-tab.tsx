@@ -50,6 +50,8 @@ export function ConfigTab({
         <input className="field" value={flow.description} onChange={(e) => onEdit((f) => ({ ...f, description: e.target.value }))} placeholder="What this agent is for" />
       </Field>
 
+      <SpeaksFor flow={flow} onEdit={onEdit} />
+
       {/* Who's talking and what they say first, before the rules (owner 2026-11-27). */}
       <div>
         <h3 className="eyebrow mb-3">Voice</h3>
@@ -126,6 +128,17 @@ export function ConfigTab({
         <NumberField flow={flow} onEdit={onEdit} />
       </div>
     </div>
+  );
+}
+
+/** The company the agent says it's from ({business}). Blank = the workspace's own name, shown as the placeholder. */
+function SpeaksFor({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => Flow) => void }) {
+  const app = useApp();
+  const own = app.settings.businessName || "your business";
+  return (
+    <Field label="Speaks for" hint={`The company it says it's from, as {business}. Leave blank for ${own}.`}>
+      <input className="field" value={flow.business ?? ""} maxLength={120} onChange={(e) => onEdit((f) => ({ ...f, business: e.target.value }))} placeholder={own} />
+    </Field>
   );
 }
 

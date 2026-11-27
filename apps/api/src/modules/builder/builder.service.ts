@@ -11,6 +11,7 @@ import { BUILDER_SYSTEM, builderContext, type BuilderWorkspace } from "@outreach
 import { EditError, addAfterCall, addStep, addTool, changeStep, deleteStep, missingIntegrations, removeAfterCall, removeData, setCheck, setData, type EditableAgent, type Edit, type StepInput, type Where } from "@outreach/core/agent-edits";
 import { AgentDraftSchema, BRIEF_MAX, OPS, type AgentDraft } from "@outreach/core/schemas";
 import { INTEGRATIONS } from "@outreach/core/integrations";
+import { greetingIsHonest } from "@outreach/core/disclosure";
 import { VOICES } from "@outreach/core/voices";
 import { Types } from "mongoose";
 import { z } from "zod";
@@ -107,13 +108,15 @@ export class BuilderService {
       }),
       betaZodTool({
         name: "set_text",
-        description: "Replace the agent's name, description, welcome message, instructions, or direction (inbound / outbound / both). For instructions, give the whole new text with only the asked-for part changed.",
-        inputSchema: z.object({ what: z.enum(["name", "description", "welcome", "instructions", "direction"]), value: z.string() }),
+        description: "Replace the agent's name, description, welcome message, instructions, direction (inbound / outbound / both), or company (who it says it's from; {business} says it; empty = the workspace's business). For instructions, give the whole new text with only the asked-for part changed.",
+        inputSchema: z.object({ what: z.enum(["name", "description", "welcome", "instructions", "direction", "company"]), value: z.string() }),
         run: async ({ what, value }) =>
           apply((a) => {
             const v = value.trim();
             if (what === "direction" && !["inbound", "outbound", "both"].includes(v)) throw new EditError("Direction is inbound, outbound or both.");
-            const key = { name: "name", description: "description", welcome: "greeting", instructions: "prompt", direction: "direction" }[what] as keyof EditableAgent;
+            // Every caller must hear both, in every welcome (product rule): a rewrite that drops one is sent back.
+            if (what === "welcome" && !greetingIsHonest(v)) throw new EditError("The welcome message must say it's an AI assistant and that the call is recorded. Keep both and try again.");
+            const key = { name: "name", description: "description", welcome: "greeting", instructions: "prompt", direction: "direction", company: "business" }[what] as keyof EditableAgent;
             return { agent: { ...a, [key]: v }, said: what === "instructions" ? "Updated the instructions" : what === "welcome" ? `Welcome message: “${v}”` : `${what[0].toUpperCase()}${what.slice(1)}: ${v}` };
           }),
       }),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { insertVar, unknownVars, variableGroups, varsIn } from "../src/variables";
+import { businessOf, insertVar, unknownVars, variableGroups, varsIn } from "../src/variables";
 
 const fields = [
   { key: "first_name", label: "First name" },
@@ -45,5 +45,13 @@ describe("filling variables (B30)", () => {
   it("reads a fallback as part of the variable, not a new one", async () => {
     const { varsIn } = await import("../src/variables");
     expect(varsIn("Hi {first_name|there} and {agent}")).toEqual(["first_name", "agent"]);
+  });
+});
+
+describe("the company an agent speaks for", () => {
+  it("is the agent's own when set, otherwise the workspace's", () => {
+    expect(businessOf({ business: " Fork Time " }, "Toyota Motors")).toBe("Fork Time");
+    expect(businessOf({ business: "" }, "Toyota Motors")).toBe("Toyota Motors");
+    expect(businessOf({}, "Toyota Motors")).toBe("Toyota Motors");
   });
 });

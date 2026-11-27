@@ -72,6 +72,18 @@ describe("Change with AI", () => {
     expect(res.draft.steps).toEqual(flow.steps);
   });
 
+  it("refuses a welcome message that drops “AI assistant” or “recorded”, so the model fixes it", async () => {
+    const { agent, ws, flow } = await sampleAgent("b5@example.com");
+    const heard = scriptModel([
+      { tool: "set_text", input: { what: "welcome", value: "Hi, this is Sara, an AI assistant from Fork Time. Quick question?" } },
+      { tool: "set_text", input: { what: "welcome", value: "Hi, this is Sara, an AI assistant from Fork Time. This call is recorded. Quick question?" } },
+    ]);
+    const res = (await agent.post(`${ws}/agents/${flow.id}/builder`).send({ message: "Make her Sara from Fork Time" }).expect(200)).body;
+    expect(heard[1]).toMatch(/^Not done: .*AI assistant.*recorded/);
+    expect(res.draft.greeting).toMatch(/This call is recorded/);
+    expect(res.changes).toHaveLength(1);
+  });
+
   it("keeps other workspaces' agents out", async () => {
     const { flow } = await sampleAgent("b3@example.com");
     const other = await withWorkspace(app, "b4@example.com");

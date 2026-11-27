@@ -74,6 +74,7 @@ export const AgentDraftSchema = z.object({
   direction: z.enum(["inbound", "outbound", "both"]),
   agent: AgentVoiceSchema,
   greeting: text(1000),
+  business: short(120).optional(),
   prompt: text(12000),
   brief: text(BRIEF_MAX).optional(),
   timezone: short(64),

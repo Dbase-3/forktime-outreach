@@ -62,6 +62,7 @@ export function builderContext(agent: EditableAgent, ws: BuilderWorkspace): stri
     `Direction: ${agent.direction}`,
     `Voice: ${v.name} (voice ${v.voiceId}), ${v.personality}, speed ${v.speed}, speaks ${v.language}`,
     `Welcome message: "${agent.greeting}"`,
+    `Speaks for ({business}): ${agent.business?.trim() || `${ws.business || "the workspace's business"} (the workspace's own)`}`,
     "Instructions:",
     "<<<",
     agent.prompt,

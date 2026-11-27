@@ -23,6 +23,8 @@ const draft = (over: Partial<AgentDraftT> = {}): AgentDraftT => ({
     { key: "Budget", label: "Budget", type: "number", description: "If said", required: false },
   ],
   checks: [{ label: "Booked", description: "A meeting was booked" }, { label: " ", description: "" }],
+  agentName: "",
+  business: "",
   ...over,
 });
 
@@ -54,6 +56,16 @@ describe("turning a written draft into an agent", () => {
   it("never lets a greeting skip 'AI assistant' and 'recorded'", () => {
     expect(applyDraft(draft({ greeting: "Hey {first_name}, it's {agent} from {business}!" })).greeting).toMatch(/AI assistant.*recorded/);
     expect(applyDraft(draft({ direction: "inbound", greeting: "Hello!" })).greeting).toMatch(/^Thanks for calling/);
+  });
+
+  it("carries the name the agent uses on calls when the owner gave one", () => {
+    expect(applyDraft(draft({ agentName: " Sara " })).agentName).toBe("Sara");
+    expect(applyDraft(draft()).agentName).toBeUndefined(); // none given: the voice keeps its name
+  });
+
+  it("carries the company the agent speaks for, blank when it's the workspace's own", () => {
+    expect(applyDraft(draft({ business: " Fork Time " })).business).toBe("Fork Time");
+    expect(applyDraft(draft()).business).toBe("");
   });
 
   it("every template's prompt and greeting are honest and filled", () => {

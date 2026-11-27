@@ -19,7 +19,7 @@ import { flush, useApp } from "@/lib/store";
 import { ConnectSheet } from "../integrations";
 
 /** The parts of an agent a change can touch: what Undo puts back. */
-const PARTS = ["name", "description", "direction", "agent", "greeting", "prompt", "steps", "dataFields", "askRequired", "checks", "tools", "knowledgeIds", "afterCall"] as const;
+const PARTS = ["name", "description", "direction", "agent", "greeting", "business", "prompt", "steps", "dataFields", "askRequired", "checks", "tools", "knowledgeIds", "afterCall"] as const;
 export type AgentParts = Pick<Flow, (typeof PARTS)[number]>;
 export const partsOf = (f: Flow): AgentParts => Object.fromEntries(PARTS.map((k) => [k, f[k]])) as AgentParts;
 

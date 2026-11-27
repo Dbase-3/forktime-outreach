@@ -49,6 +49,8 @@ export const AgentDraft = z.object({
     }),
   ),
   checks: z.array(z.object({ label: z.string(), description: z.string() })),
+  agentName: z.string().describe("the name the agent calls itself on calls, if the owner gave one (like Sara); otherwise empty"),
+  business: z.string().describe("the company the agent speaks for, only if the owner named one other than the Business; otherwise empty"),
 });
 
 export type AgentDraftT = z.infer<typeof AgentDraft>;
@@ -118,8 +120,8 @@ function askFields(steps: Step[]): Set<string> {
   return keys;
 }
 
-/** The parts of an agent a draft fills in. */
-export type DraftParts = Pick<Flow, "name" | "description" | "direction" | "greeting" | "prompt" | "steps" | "dataFields" | "checks">;
+/** The parts of an agent a draft fills in, plus the name it uses on calls when the owner gave one (it goes on the voice). */
+export type DraftParts = Pick<Flow, "name" | "description" | "direction" | "greeting" | "prompt" | "steps" | "dataFields" | "checks" | "business"> & { agentName?: string };
 
 export function applyDraft(draft: AgentDraftT): DraftParts {
   const steps = toSteps(draft.steps);
@@ -132,7 +134,10 @@ export function applyDraft(draft: AgentDraftT): DraftParts {
     return [{ key, label: f.label.trim() || key, type: f.type as FieldType, description: f.description.trim(), required: f.required }];
   });
   const checks: SuccessCheck[] = draft.checks.filter((c) => c.label.trim()).map((c) => ({ id: newId("c"), label: c.label.trim(), description: c.description.trim() }));
+  const agentName = (draft.agentName ?? "").trim().slice(0, 60);
   return {
+    ...(agentName ? { agentName } : {}),
+    business: (draft.business ?? "").trim().slice(0, 120),
     name: draft.name.trim() || "New agent",
     description: draft.summary.trim(),
     direction: draft.direction,
@@ -158,6 +163,10 @@ An agent has two parts, and they must not repeat each other:
    Keep it to the main path: 4 to 12 steps in total, one question at a time, and every path finishes with an end step.
 
 greeting: the first thing said. It MUST say the agent is an AI assistant and that the call is recorded. Use {agent} for the agent's name and {business} for the business. For calls we make, greet the person by {first_name} when it makes sense.
+
+agentName: if the owner names the agent (like "an agent named Sara"), put that name here; it becomes the name the voice uses, and {agent} says it. Otherwise leave it empty.
+
+business: if the owner says the agent represents a company or brand other than the Business named below (an agency building for a client, say), put that company's name here; {business} then says it on calls. Otherwise leave it empty. Either way, write {business} in the greeting, prompt and steps, never a company name.
 
 You may use contact fields in braces, like {first_name}, in any line, but only fields from the list you are given.
 

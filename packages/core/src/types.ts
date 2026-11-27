@@ -93,6 +93,8 @@ export interface Flow {
   status: "draft" | "live";
   agent: AgentVoice;
   greeting: string;
+  /** The company the agent says it's from, when it isn't the workspace's own (an agency building for a client). Blank = the workspace's business name. Fills {business}. */
+  business?: string;
   /** Who the agent is and how it behaves: persona, tone, rules, guardrails. The workflow holds the steps. */
   prompt: string;
   /** What the owner asked for when the agent was written for them (kept so the workflow can be rebuilt). */

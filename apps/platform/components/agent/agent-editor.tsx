@@ -22,7 +22,7 @@ import { ApiError, ws } from "@/lib/api";
 import { publishAgent, unpublishAgent } from "@/lib/actions";
 import { nowIso, update, useApp } from "@/lib/store";
 import { humanize } from "@outreach/core/format";
-import { variableGroups } from "@outreach/core/variables";
+import { businessOf, variableGroups } from "@outreach/core/variables";
 import type { Flow, Step } from "@outreach/core/types";
 import { FlowCanvas } from "../flow/flow-canvas";
 import { metaOf } from "../flow/meta";
@@ -143,7 +143,8 @@ export function AgentEditor({ id }: { id: string }) {
     if (!draft) return writer.lastError() ?? "Couldn't write the agent. Try describing it differently.";
     setSelectedId(null);
     setDrawn((n) => n + 1);
-    edit((f) => ({ ...f, ...draft, brief: brief.slice(0, BRIEF_MAX), name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
+    const { agentName, ...parts } = draft;
+    edit((f) => ({ ...f, ...parts, agent: agentName ? { ...f.agent, name: agentName } : f.agent, brief: brief.slice(0, BRIEF_MAX), name: /^(untitled|new) agent$/i.test(f.name.trim()) || !f.name.trim() ? draft.name : f.name, askRequired: {} }));
     showMain("workflow");
     return null;
   };
@@ -156,7 +157,7 @@ export function AgentEditor({ id }: { id: string }) {
   const rebuildWorkflow = async () => {
     const newSteps = await writer.rebuildWorkflow({
       brief: flow.brief ?? "",
-      business: app.settings.businessName,
+      business: businessOf(flow, app.settings.businessName),
       fields: draftFields(app),
       agent: { name: flow.agent.name, prompt: flow.prompt, greeting: flow.greeting, direction: flow.direction },
     });
@@ -335,7 +336,7 @@ export function AgentEditor({ id }: { id: string }) {
 
             {/* Preview (stays mounted so a call carries on while you look at the workflow) */}
             <div className={clsx("absolute inset-0 bg-background", mainTab !== "preview" && "invisible")}>
-              <PreviewPanel flow={flow} business={app.settings.businessName} contacts={sampleContacts.data ?? []} onActiveStep={setActiveId} />
+              <PreviewPanel flow={flow} business={businessOf(flow, app.settings.businessName)} contacts={sampleContacts.data ?? []} onActiveStep={setActiveId} />
             </div>
           </div>
         </section>

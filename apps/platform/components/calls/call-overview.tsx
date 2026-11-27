@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { ArrowDownLeft, ArrowUpRight, CircleSlash, Flag } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { businessOf } from "@outreach/core/variables";
 import { CALL_ACTIONS, END_REASONS, callerMoodLines, flowPath, moodLevel, moodStats } from "@outreach/core/call-review";
 import { duration, humanize } from "@outreach/core/format";
 import type { AppState, Call, Contact } from "@outreach/core/types";
@@ -98,7 +99,7 @@ function Section({ title, aside, children }: { title: string; aside?: ReactNode;
 function PathSection({ call, app, contact }: { call: Call; app: AppState; contact?: Contact }) {
   const flow = app.flows.find((f) => f.id === call.flowId);
   if (!flow) return null;
-  const values = { ...(contact?.fields ?? {}), ...call.saved, agent: flow.agent.name, business: app.settings.businessName };
+  const values = { ...(contact?.fields ?? {}), ...call.saved, agent: flow.agent.name, business: businessOf(flow, app.settings.businessName) };
   const path = flowPath(flow.steps, values);
   const questions = Object.fromEntries(flow.steps.flatMap((s) => (s.kind === "ask" ? [[s.field, s.question]] : [])));
   return (

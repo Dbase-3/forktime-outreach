@@ -4,6 +4,7 @@
 
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
+import { businessOf } from "@outreach/core/variables";
 import { dataSchema, structuredResult } from "@outreach/core/agent-data";
 import { INLINE_KNOWLEDGE_CHARS, callOutcomes, type CallSetup } from "@outreach/core/call-instructions";
 import { AFTER_CALL_LABELS, integrationName, needsConnection } from "@outreach/core/connections";
@@ -111,7 +112,7 @@ export class VoiceService {
     if (!draft && call.agentVersionId) draft = (await this.versions.findById(call.agentVersionId).lean())?.config as AgentDraft | undefined;
     if (!draft) throw notFound("That agent");
     const settings = await this.data.settings(ws);
-    const business = settings.businessName || "the business";
+    const business = businessOf(draft, settings.businessName) || "the business";
     const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: ws }).lean() : null;
     const person = contact ? contactOut(contact) : null;
     const values: Record<string, string> = {

@@ -48,6 +48,11 @@ export function variableGroups(fields: Pick<FieldDef, "key" | "label">[], answer
 // e.g. "Hi {first_name|there}". Keys are letters, numbers and underscores.
 const VAR = /\{(\w+)(?:\|([^{}]*))?\}/g;
 
+/** The company an agent speaks for, which {business} says: its own "Speaks for", else the workspace's business name. The one rule, used by calls, previews and call review. */
+export function businessOf(flow: { business?: string }, workspaceBusiness: string): string {
+  return flow.business?.trim() || workspaceBusiness.trim();
+}
+
 /** The variables a text uses, in order, once each. */
 export function varsIn(text: string): string[] {
   return [...new Set([...text.matchAll(VAR)].map((m) => m[1]))];

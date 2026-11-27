@@ -8,7 +8,7 @@ import { findStep, insertStep, newId, removeStep, toFieldKey, updateStep, type C
 import { AFTER_CALL_LABELS, integrationName } from "./connections";
 import type { ActionKind, AfterCallAction, AgentTool, AnswerType, Condition, DataField, Flow, Step, SuccessCheck } from "./types";
 
-export type EditableAgent = Pick<Flow, "name" | "description" | "direction" | "agent" | "greeting" | "prompt" | "steps" | "dataFields" | "askRequired" | "checks" | "tools" | "knowledgeIds" | "afterCall">;
+export type EditableAgent = Pick<Flow, "name" | "description" | "direction" | "agent" | "greeting" | "business" | "prompt" | "steps" | "dataFields" | "askRequired" | "checks" | "tools" | "knowledgeIds" | "afterCall">;
 
 export interface Edit<A = EditableAgent> {
   agent: A;

@@ -40,6 +40,13 @@ export class TestCallsController {
     return this.voice.startTest(ctx.workspaceId!, oid(id, "That agent"), { id: ctx.userId, email: ctx.email }, contactId);
   }
 
+  /** Ring a real phone from the Lisna line with the agent's draft (owner 2026-11-28). */
+  @Post("agents/:id/phone-call")
+  phone(@Ctx() ctx: RequestContext, @Param("id") id: string, @Body() body: unknown) {
+    const o = parse(z.object({ to: z.string().trim().min(5).max(30), contactId: z.string().max(64).nullable().default(null) }), body ?? {});
+    return this.voice.startPhone(ctx.workspaceId!, oid(id, "That agent"), { id: ctx.userId, email: ctx.email }, o);
+  }
+
   @Post("calls/:id/hang-up")
   @HttpCode(200)
   hangUp(@Ctx() ctx: RequestContext, @Param("id") id: string) {

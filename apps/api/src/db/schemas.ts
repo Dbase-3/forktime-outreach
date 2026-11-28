@@ -81,7 +81,7 @@ AgentVersionSchema.index({ agentId: 1, n: 1 }, { unique: true });
 export const NumberSchema = new Schema(
   {
     workspaceId: { type: ObjectId, required: true, index: true },
-    e164: { type: String, required: true, unique: true },
+    e164: { type: String, required: true },
     display: { type: String, required: true },
     country: { type: String, required: true },
     kind: { type: String, enum: ["local", "mobile", "tollfree"], required: true },
@@ -89,9 +89,14 @@ export const NumberSchema = new Schema(
     provider: { type: String, default: "fake" }, // "telnyx" in Phase 3
     providerId: String,
     status: { type: String, enum: ["active", "releasing"], default: "active" },
+    /** The Lisna line: one real number every workspace has a copy of (owner 2026-11-28). Outbound only for now. */
+    shared: { type: Boolean, default: false },
   },
   opts,
 );
+// A number belongs to one workspace, except the shared Lisna line, which every workspace has.
+NumberSchema.index({ e164: 1 }, { unique: true, partialFilterExpression: { shared: false }, name: "e164_unique_unless_shared" });
+NumberSchema.index({ workspaceId: 1, e164: 1 }, { unique: true });
 
 // ---- Contacts ----
 

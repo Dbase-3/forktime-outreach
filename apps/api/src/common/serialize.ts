@@ -38,7 +38,17 @@ export function knowledgeOut(k: Row<"Knowledge">, withContent = false): Versione
 }
 
 export function numberOut(n: Row<"PhoneNumber">): PhoneNumber {
-  return { id: String(n._id), e164: n.e164, display: n.display, country: n.country, kind: n.kind as PhoneNumber["kind"], area: n.area ?? undefined, addedAt: iso(n.createdAt) };
+  return {
+    id: String(n._id),
+    e164: n.e164,
+    display: n.display,
+    country: n.country,
+    kind: n.kind as PhoneNumber["kind"],
+    area: n.area ?? undefined,
+    addedAt: iso(n.createdAt),
+    ...(n.shared ? { shared: true, outboundOnly: true } : {}),
+    ...(n.provider === "fake" ? { sample: true } : {}),
+  };
 }
 
 export function fieldOut(f: Row<"FieldDef">): FieldDef {

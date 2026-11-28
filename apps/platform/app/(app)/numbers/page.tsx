@@ -1,35 +1,35 @@
 "use client";
 
 // Every number in the workspace and the agent using it (one agent per number).
-// Get another number here, or from an agent's Config. A number no agent uses
-// can be released.
+// For now that's the shared Lisna line (outbound only) plus any old sample
+// numbers; buying numbers comes later (owner 2026-11-28). A sample number no
+// agent uses can be removed; the Lisna line can't.
 
-import { Phone, Plus, Trash2 } from "lucide-react";
+import { Phone, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { relativeTime } from "@outreach/core/format";
 import { numberOwner } from "@outreach/core/numbers";
 import { releaseNumber } from "@/lib/actions";
 import { useApp } from "@/lib/store";
-import { GetNumber, describeNumber } from "@/components/numbers/number-picker";
+import { byUse, describeNumber } from "@/components/numbers/number-picker";
 import { Popover } from "@/components/popover";
-import { EmptyState, Modal, PageHeader } from "@/components/ui";
+import { EmptyState, PageHeader } from "@/components/ui";
 
 export default function NumbersPage() {
   const app = useApp();
-  const [getting, setGetting] = useState(false);
   const [releasing, setReleasing] = useState<string | null>(null);
-  const getButton = <button type="button" className="btn-primary" onClick={() => setGetting(true)}><Plus size={15} /> Get a number</button>;
-  const free = app.numbers.filter((n) => !numberOwner(app.flows, n.id)).length;
+  const numbers = [...app.numbers].sort(byUse);
+  const free = numbers.filter((n) => !numberOwner(app.flows, n.id)).length;
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Numbers" subtitle="Each number belongs to one agent: it calls from it and answers calls to it." actions={getButton} />
-      {app.numbers.length === 0 ? (
-        <EmptyState icon={<Phone size={20} />} title="No numbers yet" body="Get a number so your agents can make and answer calls." action={getButton} />
+      <PageHeader title="Numbers" subtitle="Each number belongs to one agent at a time. For now your agents call from the Lisna line; it can't take calls yet, and getting your own numbers comes later." />
+      {numbers.length === 0 ? (
+        <EmptyState icon={<Phone size={20} />} title="No numbers yet" body="The Lisna line appears here once phone calls are set up." />
       ) : (
         <>
-          <p className="mb-2 text-xs text-fg-3">{app.numbers.length} {app.numbers.length === 1 ? "number" : "numbers"} · {free} not in use</p>
+          <p className="mb-2 text-xs text-fg-3">{numbers.length} {numbers.length === 1 ? "number" : "numbers"} · {free} not in use</p>
           <div className="card overflow-hidden">
             <table className="w-full table-fixed text-sm">
               <thead className="bg-subtle/60 text-left">
@@ -41,7 +41,7 @@ export default function NumbersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {app.numbers.map((n) => {
+                {numbers.map((n) => {
                   const owner = numberOwner(app.flows, n.id);
                   return (
                     <tr key={n.id}>
@@ -54,7 +54,7 @@ export default function NumbersPage() {
                       </td>
                       <td className="hidden px-4 py-3 text-fg-3 sm:table-cell">{relativeTime(n.addedAt)}</td>
                       <td className="px-2 py-3 text-right">
-                        {!owner && (
+                        {!owner && !n.shared && (
                           <Popover
                             align="end"
                             className="w-64"
@@ -91,9 +91,6 @@ export default function NumbersPage() {
           </div>
         </>
       )}
-      <Modal open={getting} onClose={() => setGetting(false)} title="Get a number" description="Pick where people will see you calling from.">
-        <GetNumber taken={app.numbers.map((n) => n.e164)} onAdded={() => setGetting(false)} />
-      </Modal>
     </div>
   );
 }

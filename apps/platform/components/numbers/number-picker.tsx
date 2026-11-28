@@ -1,8 +1,10 @@
 "use client";
 
-// Choosing an agent's phone number, and getting another one. A number belongs
-// to one agent: picking one that's taken shows who has it and offers a new
-// number instead (owner 2026-11-26). "Decide later" never blocks anyone.
+// Choosing an agent's phone number. A number belongs to one agent: picking one
+// that's taken shows who has it (owner 2026-11-26). "Decide later" never blocks
+// anyone. For now every workspace has one real number, the shared Lisna line
+// (outbound only), and numbers can't be bought (owner 2026-11-28): the old
+// made-up sample numbers are listed apart, as samples that can't call.
 
 import clsx from "clsx";
 import { AlertTriangle, Check, Phone, Plus } from "lucide-react";
@@ -15,8 +17,13 @@ import type { Flow, PhoneNumber } from "@outreach/core/types";
 import { Segmented } from "../ui";
 
 export function describeNumber(n: PhoneNumber): string {
+  if (n.shared) return "Lisna line · makes calls, doesn't take them yet";
+  if (n.sample) return "Sample number · can't call";
   return `${KIND_LABEL[n.kind]} · ${countryOf(n.country).label}`;
 }
+
+/** Real numbers first (the Lisna line on top), samples last. */
+export const byUse = (a: PhoneNumber, b: PhoneNumber) => Number(Boolean(b.shared)) - Number(Boolean(a.shared)) || Number(Boolean(a.sample)) - Number(Boolean(b.sample));
 
 
 export function NumberPicker({
@@ -32,12 +39,15 @@ export function NumberPicker({
   value: string | undefined;
   onChange: (numberId: string | undefined) => void;
   exceptFlowId?: string;
-  onGetNumber: () => void;
+  /** Unused while numbers can't be bought (kept so callers don't change). */
+  onGetNumber?: () => void;
 }) {
   // The parent holds the choice; a taken number can be chosen (to see who has it) but not saved.
   const blockedBy = numberOwner(flows, value, exceptFlowId);
-  const free = numbers.filter((n) => !numberOwner(flows, n.id, exceptFlowId));
-  const taken = numbers.filter((n) => numberOwner(flows, n.id, exceptFlowId));
+  const real = numbers.filter((n) => !n.sample).sort(byUse);
+  const samples = numbers.filter((n) => n.sample);
+  const free = real.filter((n) => !numberOwner(flows, n.id, exceptFlowId));
+  const taken = real.filter((n) => numberOwner(flows, n.id, exceptFlowId));
   const current = numbers.find((n) => n.id === value);
 
   return (
@@ -47,10 +57,6 @@ export function NumberPicker({
         value={value ?? ""}
         aria-label="Phone number"
         onChange={(e) => {
-          if (e.target.value === NEW) {
-            onGetNumber();
-            return;
-          }
           onChange(e.target.value || undefined);
         }}
       >
@@ -65,7 +71,11 @@ export function NumberPicker({
             {taken.map((n) => <option key={n.id} value={n.id}>{n.display} · used by {numberOwner(flows, n.id, exceptFlowId)?.name}</option>)}
           </optgroup>
         )}
-        <option value={NEW}>+ Get another number…</option>
+        {samples.length > 0 && (
+          <optgroup label="Samples (can't call)">
+            {samples.map((n) => <option key={n.id} value={n.id}>{n.display}{numberOwner(flows, n.id, exceptFlowId) ? ` · used by ${numberOwner(flows, n.id, exceptFlowId)?.name}` : ""}</option>)}
+          </optgroup>
+        )}
       </select>
 
       {blockedBy ? (
@@ -73,17 +83,18 @@ export function NumberPicker({
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-medium">This number belongs to {blockedBy.name}</p>
-            <p className="mt-0.5 text-fg-2">A number can answer for one agent only. Get another number for this one, or pick a free one.</p>
-            <button type="button" className="btn-primary mt-2.5 h-8" onClick={onGetNumber}><Plus size={14} /> Get another number</button>
+            <p className="mt-0.5 text-fg-2">One agent at a time uses a number. To use it here, first set {blockedBy.name}&apos;s number to Decide later in its Config.</p>
+            <Link href={`/agents/${blockedBy.id}`} className="btn-secondary mt-2.5 h-8">Open {blockedBy.name}</Link>
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-fg-3">{current ? "" : "It needs a number before it goes live."}</span>
-          <button type="button" onClick={onGetNumber} className="flex items-center gap-1 font-medium text-fg-2 hover:text-fg">
-            <Plus size={13} /> Get another number
-          </button>
-        </div>
+        <p className="text-xs text-fg-3">
+          {current?.shared
+            ? "It calls from the Lisna line. Calls to this number aren't answered yet."
+            : current?.sample
+              ? "A sample number can't call. Pick the Lisna line to make real calls."
+              : "It needs a number before it goes live. Pick the Lisna line to make real calls."}
+        </p>
       )}
     </div>
   );

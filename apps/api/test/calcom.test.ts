@@ -89,7 +89,7 @@ async function bookingCall(connect: boolean) {
   const a = (await agents.findById(flowId).lean())!;
   const draft = { ...a.draft, timezone: "Australia/Sydney", steps: [{ id: "bk", kind: "action", action: "book", detail: "Intro call", integration: "calcom" }, { id: "e1", kind: "end", outcome: "booked", text: "See you then." }] };
   const calls: Model<unknown> = app.get(getModelToken("Call"));
-  const call = (await calls.create({ workspaceId: new Types.ObjectId(id), agentId: new Types.ObjectId(flowId), direction: "outbound", startedAt: new Date(), live: true, test: true, fromNumber: "+61400111222", config: draft })) as unknown as { _id: Types.ObjectId };
+  const call = (await calls.create({ workspaceId: new Types.ObjectId(id), agentId: new Types.ObjectId(flowId), direction: "inbound", startedAt: new Date(), live: true, test: true, fromNumber: "+61400111222", config: draft })) as unknown as { _id: Types.ObjectId };
   return { agent, ws, callId: String(call._id) };
 }
 

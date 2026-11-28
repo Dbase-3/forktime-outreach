@@ -8,6 +8,7 @@ import { agentOut, campaignOut, fieldOut, integrationOut, knowledgeOut, numberOu
 import type { M, Row } from "../../db/models";
 import type { Role } from "../../db/schemas";
 import { Mailer } from "../auth/mailer";
+import { SharedLine } from "../numbers/shared-line.service";
 import { SampleService } from "./sample.service";
 
 type Settings = Row<"Workspace">["settings"];
@@ -30,6 +31,7 @@ export class WorkspacesService {
     @InjectModel("Call") private readonly calls: M<"Call">,
     private readonly sample: SampleService,
     private readonly mailer: Mailer,
+    private readonly line: SharedLine,
   ) {}
 
   async create(userId: Types.ObjectId, input: { name: string; timezone: string; sample: boolean }) {
@@ -62,6 +64,7 @@ export class WorkspacesService {
   /** Everything the screens need up front. Contacts and calls are paged separately. */
   async bootstrap(ws: Types.ObjectId, role: Role) {
     const live = { workspaceId: ws, deletedAt: null };
+    await this.line.ensure(ws); // every workspace has the Lisna line
     const [workspace, agents, numbers, knowledge, fields, sources, campaigns, integrations, contactCount, callCount] = await Promise.all([
       this.get(ws, role),
       this.agents.find(live).sort({ updatedAt: -1 }).lean(),

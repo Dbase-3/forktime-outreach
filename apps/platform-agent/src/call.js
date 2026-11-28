@@ -12,6 +12,7 @@ const { callInstructions, noteValue, BOOK_NOW } = require("@outreach/core/call-i
 const { ACTION_LABELS } = require("@outreach/core/action-labels");
 const { integrationName, needsConnection } = require("@outreach/core/connections");
 const { isLiveBooking, hasLiveBookingStep } = require("@outreach/core/calendar");
+const { waitForPickup } = require("./phone");
 
 const { VOICE, TIMING, VOICE_IDS, LANGUAGE_CODES, env, ttsOptions } = require("./config");
 const { wrapUp } = require("./wrapup");
@@ -111,9 +112,14 @@ class PlatformCall {
     return callInstructions(this.cfg, this.position, this.ahead);
   }
 
-  /** The person is in the room: start listening and say the welcome. */
-  async start(participant) {
+  /** The person is in the room: start listening and say the welcome. A phone first has to pick up. */
+  async start(participant, opts = {}) {
     this.participant = participant;
+    if (opts.phone) {
+      const pickup = await waitForPickup(this.ctx.room, participant.identity, TIMING.ringMs);
+      this.log.log(`[Call] phone ${pickup}`);
+      if (pickup !== "answered") return this.finalize("no_answer");
+    }
     this.ctx.room.on("participantDisconnected", (p) => {
       if (p.identity === participant.identity) this.finalize("caller_hung_up");
     });

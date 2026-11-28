@@ -36,6 +36,15 @@ const EnvSchema = z.object({
   GHL_API_URL: z.string().url().default("https://services.leadconnectorhq.com"),
   /** Twenty Cloud; a self-hosted server is the address the owner gives (fetched through the SSRF guard). */
   TWENTY_API_URL: z.string().url().default("https://api.twenty.com"),
+  /**
+   * The one real phone number (owner 2026-11-28): shared by every workspace, outbound only, a demo line.
+   * Unset: no phone calls. E.164.
+   */
+  LISNA_LINE: z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  /** The LiveKit outbound SIP trunk that carries LISNA_LINE (it must list the number). */
+  LISNA_OUTBOUND_TRUNK: z.string().optional(),
+  /** Phone calls ringing or talking at once across the whole platform. */
+  PHONE_CALLS_MAX: z.coerce.number().int().min(1).max(50).default(3),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

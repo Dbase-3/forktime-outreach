@@ -40,3 +40,8 @@ export function phoneParts(e164: string): { country: string; callingCode: string
   if (!parsed) return null;
   return { country: parsed.country ?? "", callingCode: `+${parsed.countryCallingCode}`, national: String(parsed.nationalNumber) };
 }
+
+/** "+14375633151" → "+1 437 563 3151", for showing a number. The number itself if it can't be read. */
+export function displayNumber(e164: string): string {
+  return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
+}

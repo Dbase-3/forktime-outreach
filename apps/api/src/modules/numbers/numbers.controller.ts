@@ -1,8 +1,11 @@
-// Phone numbers. Iteration 1 uses a fake provider: the numbers offered come
-// from fictional ranges (@outreach/core numbers.ts) and "buying" one just
-// records it. Phase 3 swaps in Telnyx behind the same endpoints.
+// Phone numbers. Every workspace has the shared Lisna line (SharedLine, owner
+// 2026-11-28; outbound only). Buying numbers comes later: in production the
+// search and add routes say so. Elsewhere (tests, local) they still hand out
+// numbers from fictional ranges (@outreach/core numbers.ts) that can't call.
 
-import { Body, Controller, Delete, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Param, Post } from "@nestjs/common";
+import { ENV, type Env } from "../../config/env";
+import { SharedLine } from "./shared-line.service";
 import { InjectModel } from "@nestjs/mongoose";
 import { COUNTRIES, availableNumbers } from "@outreach/core/numbers";
 import { z } from "zod";
@@ -21,10 +24,17 @@ export class NumbersController {
   constructor(
     @InjectModel("PhoneNumber") private readonly numbers: M<"PhoneNumber">,
     @InjectModel("Agent") private readonly agents: M<"Agent">,
+    @Inject(ENV) private readonly env: Env,
+    private readonly line: SharedLine,
   ) {}
+
+  private noBuying() {
+    if (this.env.NODE_ENV === "production") throw unprocessable("New numbers aren't available yet. Agents use the Lisna line for now.");
+  }
 
   @Get()
   async list(@Ctx() ctx: RequestContext) {
+    await this.line.ensure(ctx.workspaceId!);
     return (await this.numbers.find({ workspaceId: ctx.workspaceId }).sort({ createdAt: 1 }).lean()).map(numberOut);
   }
 
@@ -37,6 +47,7 @@ export class NumbersController {
 
   @Post("search")
   async search(@Body() body: unknown) {
+    this.noBuying();
     const q = parse(Search, body);
     return this.offers(q.country, q.kind, q.area, 5);
   }
@@ -44,6 +55,7 @@ export class NumbersController {
   @Post()
   @Roles("owner", "admin")
   async add(@Ctx() ctx: RequestContext, @Body() body: unknown) {
+    this.noBuying();
     const q = parse(Search.extend({ e164: z.string().max(20) }), body);
     const offer = (await this.offers(q.country, q.kind, q.area, 40)).find((o) => o.e164 === q.e164);
     if (!offer) throw unprocessable("That number isn't available any more. Search again.");
@@ -55,6 +67,7 @@ export class NumbersController {
   @Roles("owner", "admin")
   async release(@Ctx() ctx: RequestContext, @Param("id") id: string) {
     const _id = oid(id, "That number");
+    if (await this.numbers.exists({ _id, workspaceId: ctx.workspaceId, shared: true })) throw unprocessable("The Lisna line can't be removed.");
     const user = await this.agents.findOne({ workspaceId: ctx.workspaceId, numberId: _id, deletedAt: null }).lean();
     if (user) throw conflict(`${(user.draft as { name: string }).name} uses this number. Give it another number first.`);
     const res = await this.numbers.deleteOne({ _id, workspaceId: ctx.workspaceId });

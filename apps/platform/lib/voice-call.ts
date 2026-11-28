@@ -1,7 +1,9 @@
 "use client";
 
 // A real voice call with an agent, from the browser: the API files a test call
-// and sends the agent into a LiveKit room; we join it with the microphone.
+// and sends the agent into a LiveKit room; we join it with the microphone. Or a
+// phone call (owner 2026-11-28): the API rings a real phone from the Lisna line
+// and we join the room to listen in only (no microphone), with live captions.
 // The orb follows the agent's own state, captions come from LiveKit's live
 // transcription, and the call record (saved answers, the step it's on) is read
 // from the API while the call runs.
@@ -13,10 +15,10 @@ import type { Call } from "@outreach/core/types";
 import { ApiError, currentWorkspace, ws } from "./api";
 import { flush } from "./store";
 
-export type VoicePhase = "idle" | "connecting" | "waiting" | "listening" | "thinking" | "speaking" | "ended";
+export type VoicePhase = "idle" | "connecting" | "ringing" | "waiting" | "listening" | "thinking" | "speaking" | "ended";
 export type Caption = { who: "agent" | "you"; text: string; final: boolean };
 
-type Started = { callId: string; url: string; token: string };
+type Started = { callId: string; url: string; token: string; to?: string };
 
 const AGENT_STATE: Record<string, VoicePhase> = { initializing: "waiting", idle: "listening", listening: "listening", thinking: "thinking", speaking: "speaking" };
 
@@ -49,16 +51,24 @@ export function useVoiceCall(agentId: string) {
     setPhase(next);
   }, []);
 
+  const [phoneTo, setPhoneTo] = useState<string | null>(null); // set while it's a phone call
   const start = useCallback(
-    async (contactId: string | null) => {
+    async (contactId: string | null, phone?: string) => {
       setError(null);
       setCaptions([]);
       segments.current.clear();
       setMuted(false);
+      setPhoneTo(null);
       setPhase("connecting");
       try {
         await flush(); // the call runs the draft as saved: send any edits first
-        const s = await ws<Started>(`/agents/${agentId}/test-call`, { body: { contactId } });
+        const s = phone
+          ? await ws<Started>(`/agents/${agentId}/phone-call`, { body: { to: phone, contactId } })
+          : await ws<Started>(`/agents/${agentId}/test-call`, { body: { contactId } });
+        if (phone) {
+          setPhoneTo(s.to ?? phone);
+          setPhase("ringing");
+        }
         setCallId(s.callId);
         const r = new Room({ adaptiveStream: true, dynacast: true, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
         room.current = r;
@@ -77,7 +87,8 @@ export function useVoiceCall(agentId: string) {
         });
         r.on(RoomEvent.Disconnected, () => setPhase((cur) => (cur === "idle" ? cur : "ended")));
         r.registerTextStreamHandler("lk.transcription", async (reader, from) => {
-          const who: Caption["who"] = from.identity === r.localParticipant.identity ? "you" : "agent";
+          // In a phone call "you" is the person on the phone: the browser only listens.
+          const who: Caption["who"] = from.identity === r.localParticipant.identity || (phone && from.identity === "phone") ? "you" : "agent";
           const id = reader.info.attributes?.["lk.segment_id"] ?? reader.info.id;
           let text = "";
           for await (const chunk of reader) {
@@ -95,7 +106,7 @@ export function useVoiceCall(agentId: string) {
           }
         });
         await r.connect(s.url, s.token);
-        await r.localParticipant.setMicrophoneEnabled(true);
+        if (!phone) await r.localParticipant.setMicrophoneEnabled(true);
         if (r.state === ConnectionState.Connected) setPhase((cur) => (cur === "connecting" ? "waiting" : cur));
       } catch (err) {
         await leave("idle");
@@ -133,5 +144,5 @@ export function useVoiceCall(agentId: string) {
 
   useEffect(() => () => void room.current?.disconnect(), []);
 
-  return { phase, callId, call: record.data ?? null, error, muted, captions, start, end, toggleMute, reset, audioRef: audio };
+  return { phase, callId, call: record.data ?? null, error, muted, captions, start, end, toggleMute, reset, audioRef: audio, phoneTo };
 }

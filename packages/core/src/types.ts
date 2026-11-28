@@ -304,6 +304,12 @@ export interface PhoneNumber {
   kind: "local" | "mobile" | "tollfree";
   area?: string;
   addedAt: string;
+  /** The Lisna line, shared by every workspace (outbound only for now). */
+  shared?: boolean;
+  /** Can place calls but not take them yet. */
+  outboundOnly?: boolean;
+  /** A made-up sample number: shown, but it can't call. */
+  sample?: boolean;
 }
 
 export interface AppState {

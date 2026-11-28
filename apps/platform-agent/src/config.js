@@ -49,6 +49,8 @@ const VOICE = {
 const TIMING = {
   /** The person is already in the room (a test call, or an answered phone): the greeting starts after this beat. */
   greetingDelayMs: 600,
+  /** A phone call that isn't picked up in this long is "no answer" (the API rings for 35 s; this covers the setup). */
+  ringMs: 45000,
   /** After the last words, how long before the line is closed, so they aren't cut off. */
   hangupDelayMs: 1200,
   /** After being told to wrap up at the time limit, how long before the line is cut. */

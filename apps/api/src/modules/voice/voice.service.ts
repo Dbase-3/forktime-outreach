@@ -2,7 +2,7 @@
 // sends the agent in; the agent fetches what it needs (signed) and reports
 // back as the call goes: lines, saved answers, the path, actions, the end.
 
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { businessOf } from "@outreach/core/variables";
 import { dataSchema, structuredResult } from "@outreach/core/agent-data";
@@ -15,7 +15,10 @@ import { fill } from "@outreach/core/variables";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { KnowledgeIndex } from "../../common/knowledge-index";
-import { conflict, notFound } from "../../common/errors";
+import { ApiError, conflict, notFound, unprocessable } from "../../common/errors";
+import { countryOfZone, dncSet, toE164 } from "@outreach/core/phone";
+import { ENV, type Env } from "../../config/env";
+import { SharedLine } from "../numbers/shared-line.service";
 import { WorkspaceData } from "../../common/workspace-data";
 import { parse } from "../../common/zod";
 import type { M } from "../../db/models";
@@ -59,6 +62,9 @@ export const EventsBody = z.object({ events: z.array(Event).min(1).max(200) });
 
 const roomOf = (callId: string) => `pf-${callId}`;
 
+/** The other side's number on a phone call: the number dialled when we call out, the caller's when they call in. */
+export const theirNumber = (call: { direction?: string | null; fromNumber?: string | null; toNumber?: string | null }) => (call.direction === "outbound" ? call.toNumber : call.fromNumber) ?? null;
+
 @Injectable()
 export class VoiceService {
   private readonly log = new Logger("Voice");
@@ -68,12 +74,56 @@ export class VoiceService {
     @InjectModel("Agent") private readonly agents: M<"Agent">,
     @InjectModel("AgentVersion") private readonly versions: M<"AgentVersion">,
     @InjectModel("Contact") private readonly contacts: M<"Contact">,
+    @InjectModel("PhoneNumber") private readonly numbers: M<"PhoneNumber">,
     @InjectModel("Knowledge") private readonly knowledge: M<"Knowledge">,
     private readonly data: WorkspaceData,
     private readonly index: KnowledgeIndex,
     private readonly livekit: LiveKitService,
     private readonly connections: ConnectionsService,
+    private readonly line: SharedLine,
+    @Inject(ENV) private readonly env: Env,
   ) {}
+
+  /**
+   * The owner has the agent's draft ring a real phone from the Lisna line (owner 2026-11-28: outbound
+   * only, a demo line). A test call like the browser one (draft, `test`), but over the phone; the
+   * owner can listen in from the browser. One at a time per workspace; PHONE_CALLS_MAX across Lisna.
+   */
+  async startPhone(ws: Types.ObjectId, agentId: Types.ObjectId, user: { id: Types.ObjectId; email: string }, o: { to: string; contactId: string | null }) {
+    this.livekit.ready();
+    if (!this.line.ready) throw new ApiError(503, "phone_off", "Phone calls aren't set up on this server yet.");
+    const agent = await this.agents.findOne({ _id: agentId, workspaceId: ws, deletedAt: null }).lean();
+    if (!agent) throw notFound("That agent");
+    const from = agent.numberId ? await this.numbers.findOne({ _id: agent.numberId, workspaceId: ws }).lean() : null;
+    if (!from?.shared) throw unprocessable("Give this agent the Lisna line first: Config → Number.");
+    const settings = await this.data.settings(ws);
+    const to = toE164(o.to, countryOfZone(settings.timezone));
+    if (!to) throw unprocessable("That isn't a phone number we can call. Include the country code, like +1 or +61.");
+    if (to === from.e164) throw unprocessable("That's the Lisna line itself.");
+    if (dncSet(settings.doNotCall ?? [], countryOfZone(settings.timezone)).has(to)) throw unprocessable("That number is on your do-not-call list.");
+    const recent = { live: true, toNumber: { $exists: true }, startedAt: { $gte: new Date(Date.now() - 15 * 60_000) } };
+    if (await this.calls.exists({ ...recent, workspaceId: ws })) throw conflict("A phone call is going already. End it first.");
+    if ((await this.calls.countDocuments(recent)) >= this.env.PHONE_CALLS_MAX) throw conflict("The Lisna line is busy. Try again in a minute.");
+    // The contact picked in Preview, else whoever in Contacts has this number (their details fill the variables).
+    const contact =
+      (o.contactId && Types.ObjectId.isValid(o.contactId) ? await this.contacts.findOne({ _id: new Types.ObjectId(o.contactId), workspaceId: ws, deletedAt: null }, { _id: 1 }).lean() : null) ??
+      (await this.contacts.findOne({ workspaceId: ws, phoneE164: to, deletedAt: null }, { _id: 1 }).lean());
+    const draft = agent.draft as AgentDraft;
+    const call = await this.calls.create({ workspaceId: ws, agentId, contactId: contact?._id ?? null, direction: "outbound", fromNumber: from.e164, toNumber: to, startedAt: new Date(), live: true, test: true, config: draft });
+    const callId = String(call._id);
+    try {
+      await this.livekit.startRoom(roomOf(callId), callId, { phone: true });
+      await this.livekit.dial(roomOf(callId), { to, from: from.e164, trunk: this.env.LISNA_OUTBOUND_TRUNK!, name: draft.name });
+      const pass = await this.livekit.listenerPass(roomOf(callId), `listen-${String(user.id)}`, user.email);
+      this.log.log(`call ${callId}: ringing ${to.slice(0, -4)}•••• from the Lisna line`);
+      return { callId, room: roomOf(callId), to, ...pass };
+    } catch (err) {
+      await this.calls.updateOne({ _id: call._id }, { $set: { live: false, endReason: "failed", outcome: "failed" } });
+      await this.livekit.closeRoom(roomOf(callId)).catch(() => undefined);
+      this.log.warn(`call ${callId}: couldn't place the phone call: ${err instanceof Error ? err.message : err}`);
+      throw new ApiError(502, "phone_failed", "The phone call couldn't be placed. Try again in a minute.");
+    }
+  }
 
   /** The owner talks to the agent's current draft from the browser. */
   async startTest(ws: Types.ObjectId, agentId: Types.ObjectId, user: { id: Types.ObjectId; email: string }, contactId: string | null) {
@@ -131,7 +181,7 @@ export class VoiceService {
       today: todayIn(draft.timezone || settings.timezone),
       first_name: person?.name.split(" ")[0] ?? "",
       name: person?.name ?? "",
-      phone: person?.phone ?? call.fromNumber ?? "",
+      phone: theirNumber(call) || person?.phone || "", // the number this call is really on comes first
     };
 
     const docs = await this.knowledge
@@ -227,13 +277,13 @@ export class VoiceService {
   }
 
   /** Save the call's person and a note of the call to a connected CRM. Returns what happened, for the transcript. */
-  private async saveToCrm(call: { _id: Types.ObjectId; workspaceId: Types.ObjectId; contactId?: Types.ObjectId | null; fromNumber?: string | null; startedAt?: Date | null; test?: boolean | null }, draft: AgentDraft, provider: string, o: { outcome: string; summary: string; saved: Record<string, string>; keys?: string[] }): Promise<string> {
+  private async saveToCrm(call: { _id: Types.ObjectId; workspaceId: Types.ObjectId; contactId?: Types.ObjectId | null; direction?: string | null; fromNumber?: string | null; toNumber?: string | null; startedAt?: Date | null; test?: boolean | null }, draft: AgentDraft, provider: string, o: { outcome: string; summary: string; saved: Record<string, string>; keys?: string[] }): Promise<string> {
     const name = integrationName(provider);
     try {
       const crm = await this.connections.crm(call.workspaceId, provider);
       if (!crm) return `${name}: skipped, it isn't connected`;
       const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { name: 1, phoneE164: 1, email: 1 }).lean() : null;
-      const person = personOf({ contact, saved: o.saved, fromNumber: call.fromNumber });
+      const person = personOf({ contact, saved: o.saved, fromNumber: theirNumber(call) });
       if (!person.name && !person.phone && !person.email) return `${name}: skipped, the call gave no name, number or email`;
       const id = await crm.upsertContact(person);
       const settings = await this.data.settings(call.workspaceId);
@@ -254,7 +304,7 @@ export class VoiceService {
     const { call, timeZone, cal } = await this.bookingContext(callId);
     if (!cal) return { text: "The calendar isn't connected. Say the team will help with their booking." };
     const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { name: 1, phoneE164: 1, email: 1 }).lean() : null;
-    const person = personOf({ contact, saved: (call.saved ?? {}) as Record<string, string>, fromNumber: call.fromNumber });
+    const person = personOf({ contact, saved: (call.saved ?? {}) as Record<string, string>, fromNumber: theirNumber(call) });
     const who = { phone: person.phone, email: email || person.email };
     if (!who.phone && !who.email) return { text: "There's no phone number on this call to look them up by. Ask for the email address they booked with, then call find_booking with it." };
     try {
@@ -346,7 +396,7 @@ export class VoiceService {
     if (!cal) return { ok: false, text: "The calendar isn't connected. Say the team will confirm a time with them." };
     // The caller's own answers first, then the call's contact, then the calling number (same rule as CRM saves).
     const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { name: 1, phoneE164: 1, email: 1 }).lean() : null;
-    const person = personOf({ contact, saved: (call.saved ?? {}) as Record<string, string>, fromNumber: call.fromNumber });
+    const person = personOf({ contact, saved: (call.saved ?? {}) as Record<string, string>, fromNumber: theirNumber(call) });
     try {
       const booked = await cal.client.book({ calendarId: cal.eventType.id, minutes: cal.eventType.minutes, start, name, timeZone, email: email || person.email || undefined, phone: person.phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
       const when = whenLabel(booked.start || start, timeZone);

@@ -52,13 +52,16 @@ const agent = defineAgent({
       return;
     }
     console.log(`[Platform] call ${callId}: ${cfg.flow.name}${cfg.test ? " (test)" : ""}`);
-    const participant = await ctx.waitForParticipant();
+    // A phone call: the phone's participant, whoever else joins (the owner may listen in from the browser).
+    const { phoneIdentityFrom } = require("./phone");
+    const phone = phoneIdentityFrom(ctx.job.metadata) || phoneIdentityFrom(ctx.room.metadata);
+    const participant = await ctx.waitForParticipant(phone || undefined);
     const call = new PlatformCall({ ctx, api, cfg, vad: ctx.proc.userData.vad });
     ctx.addShutdownCallback(async () => {
       await call.finalize("failed").catch(() => undefined);
     });
     try {
-      await call.start(participant);
+      await call.start(participant, { phone: Boolean(phone) });
     } catch (err) {
       console.error("[Platform] call failed:", (err && err.stack) || err);
       await call.finalize("failed").catch(() => undefined);

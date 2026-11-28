@@ -156,3 +156,48 @@ describe("a CRM step on a connected CRM", () => {
     expect(reports.find((r) => r.type === "line" && r.line.who === "action").line.text).toBe("Save the lead: saved Ann Lee to GoHighLevel");
   });
 });
+
+describe("phone calls", () => {
+  const { phoneIdentityFrom, waitForPickup } = require("../src/phone");
+  const { EventEmitter } = require("node:events");
+  const room = () => {
+    const r = new EventEmitter();
+    r.remoteParticipants = new Map();
+    return r;
+  };
+
+  it("reads the phone's identity from the room metadata, and nothing else", () => {
+    expect(phoneIdentityFrom(JSON.stringify({ kind: "platform", callId: "a".repeat(24), phone: "phone" }))).toBe("phone");
+    expect(phoneIdentityFrom(JSON.stringify({ kind: "platform", callId: "a".repeat(24) }))).toBeNull();
+    expect(phoneIdentityFrom("not json")).toBeNull();
+  });
+
+  it("waits for the pickup, ignoring anyone else in the room", async () => {
+    const r = room();
+    r.remoteParticipants.set("listen-1", { identity: "listen-1", attributes: {} });
+    const phone = { identity: "phone", attributes: { "sip.callStatus": "ringing" } };
+    r.remoteParticipants.set("phone", phone);
+    const waiting = waitForPickup(r, "phone", 5000);
+    phone.attributes["sip.callStatus"] = "active";
+    r.emit("participantAttributesChanged");
+    await expect(waiting).resolves.toBe("answered");
+  });
+
+  it("no answer when the phone hangs up or leaves before picking up, or rings out", async () => {
+    const r = room();
+    const phone = { identity: "phone", attributes: { "sip.callStatus": "ringing" } };
+    r.remoteParticipants.set("phone", phone);
+    const hung = waitForPickup(r, "phone", 5000);
+    phone.attributes["sip.callStatus"] = "hangup";
+    r.emit("participantAttributesChanged");
+    await expect(hung).resolves.toBe("not_answered");
+
+    const left = waitForPickup(r, "phone", 5000);
+    r.emit("participantDisconnected", { identity: "listen-1" }); // someone else leaving changes nothing
+    r.emit("participantDisconnected", phone);
+    await expect(left).resolves.toBe("not_answered");
+
+    phone.attributes["sip.callStatus"] = "ringing";
+    await expect(waitForPickup(r, "phone", 20)).resolves.toBe("not_answered");
+  });
+});

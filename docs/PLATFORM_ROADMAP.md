@@ -355,6 +355,7 @@ Each phase ends with a working, deployed slice and its tests. Phases 1–2 can o
 - Next: a general "call an API" action with field mapping and a Test button; after-call actions really sent (with Phase 6 connections); builder speed (≈35 s with Opus).
 
 ### Phase 3: telephony
+*(first slice 2026-11-28, owner: one shared demo number, outbound only.)* Every workspace has the Lisna line (+14375633151, on the existing `getfork-outbound` trunk); one agent per workspace uses it; Preview can ring a real phone and listen in; the agent waits for the pickup and files no-answer. Buying numbers, inbound, recordings, voicemail detection and cost tracking are still to do (see CLAUDE.md "Phone calls: the Lisna line").
 - **Provisioning:** Telnyx search, buy and release, with spend caps (copy forktime-core). Regulatory bundles for AU/UK. US texting registration (10DLC) before any US SMS.
 - **LiveKit:** a dedicated project. Inbound trunk plus a dispatch rule per number → `platform-agent`. Outbound trunk per country. Caller ID = the agent's number.
 - **Inbound routing:** number → agent → version. Unknown callers are handled.

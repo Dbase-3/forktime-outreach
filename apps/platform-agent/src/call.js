@@ -115,6 +115,7 @@ class PlatformCall {
   /** The person is in the room: start listening and say the welcome. A phone first has to pick up. */
   async start(participant, opts = {}) {
     this.participant = participant;
+    this.isPhone = Boolean(opts.phone);
     if (opts.phone) {
       const pickup = await waitForPickup(this.ctx.room, participant.identity, TIMING.ringMs);
       this.log.log(`[Call] phone ${pickup}`);
@@ -504,11 +505,22 @@ class PlatformCall {
     this.after(TIMING.timeLimitGraceMs, () => this.finalize("agent_ended"));
   }
 
-  /** Close the call once, whatever ended it: file it, then leave. */
-  async finalize(endReason) {
-    if (this.ended) return;
+  /**
+   * Close the call once, whatever ended it: hang up, file it, then leave. A second
+   * caller (the shutdown callback when the room goes) gets the same promise, so the
+   * job waits for the call to be filed before it exits.
+   */
+  finalize(endReason) {
+    if (!this.finalizing) this.finalizing = this.closeCall(endReason);
+    return this.finalizing;
+  }
+
+  async closeCall(endReason) {
     this.ended = true;
     for (const t of this.timers) clearTimeout(t);
+    // A phone call: hang the phone up now (owner 2026-11-28: the page said "call ended" but the phone
+    // stayed connected to an empty room). Deleting the room ends it for everyone; filing goes on.
+    if (this.isPhone && typeof this.ctx.deleteRoom === "function") await this.ctx.deleteRoom().catch((err) => this.log.warn(`[Call] hang-up: ${err.message}`));
     if (this.phoneFragments.length) this.onItem({ role: "user", textContent: this.phoneFragments.join(" ") });
     const lines = this.lines;
     const missingListen = this.cfg.schema.filter((f) => f.from === "listen" && !this.saved[f.key]);

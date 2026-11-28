@@ -224,7 +224,7 @@ export class VoiceService {
   /** The agent's reports, in order. Unknown or finished calls refuse them. */
   async applyEvents(callId: Types.ObjectId, body: unknown) {
     const { events } = parse(EventsBody, body);
-    const call = await this.calls.findById(callId, { live: 1, workspaceId: 1, config: 1, agentVersionId: 1 }).lean();
+    const call = await this.calls.findById(callId, { live: 1, workspaceId: 1, config: 1, agentVersionId: 1, toNumber: 1 }).lean();
     if (!call) throw notFound("That call");
     if (!call.live) throw conflict("That call has ended.");
     for (const e of events) {
@@ -241,6 +241,8 @@ export class VoiceService {
         const after = draft ? await this.afterCall(call.workspaceId, draft) : { lines: [], crm: [] };
         await this.calls.updateOne({ _id: callId }, { $set: { live: false, outcome: e.outcome, summary: e.summary, endReason: e.endReason, durationSec: Math.round(e.durationSec), missing }, ...(after.lines.length ? { $push: { transcript: { $each: after.lines } } } : {}) });
         this.log.log(`call ${String(callId)} ended: ${e.outcome} (${e.endReason}, ${Math.round(e.durationSec)} s)`);
+        // A phone call: make sure the line is hung up (the agent does it first; this is the backstop).
+        if (call.toNumber) void this.livekit.closeRoom(roomOf(String(callId))).catch(() => undefined);
         // CRM saves run after the call is filed, so the agent isn't kept waiting; each adds its line.
         if (draft && after.crm.length) void this.runAfterCallCrm(callId, draft, after.crm, { outcome: e.outcome, summary: e.summary, saved: (done?.saved ?? {}) as Record<string, string> });
       }

@@ -181,7 +181,7 @@ greeting: the first thing said. It MUST say the agent is an AI assistant and tha
 
 agentName: if the owner names the agent (like "an agent named Sara"), put that name here; it becomes the name the voice uses, and {agent} says it. Otherwise leave it empty.
 
-business: if the owner says the agent represents a company or brand other than the Business named below (an agency building for a client, say), put that company's name here; {business} then says it on calls. Otherwise leave it empty. Either way, write {business} in the greeting, prompt and steps, never a company name.
+business: if the owner names a company or brand the agent represents, other than the Business named below (an agency building for a client, say), put that company's name here; {business} then says it on calls. Only an actual name: a description like "our digital marketing agency" or "my clinic" is not a name, so leave it empty then. Otherwise leave it empty. Either way, write {business} in the greeting, prompt and steps, never a company name.
 
 You may use contact fields in braces, like {first_name}, in any line, but only fields from the list you are given.
 

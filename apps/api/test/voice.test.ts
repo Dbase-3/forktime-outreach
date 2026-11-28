@@ -24,9 +24,12 @@ function signed(method: "GET" | "POST", path: string, body?: object, key = KEY) 
 }
 
 /** A live test call on the sample workspace's first agent, as startTest files it (without LiveKit). */
-async function liveCall() {
+/** A live test call on a sample agent: the first one, or (withKnowledge) the one with documents attached. */
+async function liveCall(o: { withKnowledge?: boolean } = {}) {
   const { agent, ws, id } = await withWorkspace(app, `v${Math.random()}@example.com`, { sample: true, name: "Northside Motors" });
-  const flows = (await agent.get(`${ws}/agents`)).body as { id: string }[];
+  const all = (await agent.get(`${ws}/agents`)).body as { id: string; knowledgeIds?: string[] }[];
+  // The sample's agents are saved together, so their order isn't fixed: pick the one the test needs.
+  const flows = o.withKnowledge ? [all.find((f) => f.knowledgeIds?.length) ?? all[0]] : all;
   const calls: Model<unknown> = app.get(getModelToken("Call"));
   const agents: Model<{ draft: unknown }> = app.get(getModelToken("Agent"));
   const a = await agents.findById(flows[0].id).lean();
@@ -111,7 +114,7 @@ describe("the agent's door (/runtime)", () => {
   });
 
   it("searches the knowledge the agent may use", async () => {
-    const { callId } = await liveCall();
+    const { callId } = await liveCall({ withKnowledge: true });
     const res = (await signed("POST", `/runtime/calls/${callId}/search`, { query: "warranty" }).req.expect(200)).body;
     expect(res.passages[0].docName).toMatch(/Warranty/i);
   });

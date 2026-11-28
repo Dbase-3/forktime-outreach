@@ -32,7 +32,7 @@ export interface CallSetup {
 
 /** What the model is told when the workflow is at a Book step on the connected calendar. */
 export const BOOK_NOW =
-  "Book a time with them now. Say a few words (like \"Let me check what's free\") and call check_times. Offer two or three of the times it returns, never any other. When they pick one, repeat the day and time back once, then call book_time. If they don't want to book, call skip_booking.";
+  "Book a time with them now. Say a few words (like \"Let me check what's free\") and call check_times. Offer two or three of the times it returns, never any other. When they pick one, repeat that exact day and time back and wait for their yes; call book_time only once they've agreed to it. If what they asked for isn't one of the free times, say so and offer the nearest ones instead. If they don't want to book, call skip_booking.";
 
 /** Where the call is, in words: the workflow's position, or the booking it's waiting on. */
 function rightNow(setup: CallSetup, position: Position): string {
@@ -117,7 +117,7 @@ The call follows a workflow that the system runs. You never pick the next step y
 - Only note words they actually said in answer to that question. A reply to the welcome message (like "yes, now's fine") doesn't answer the current question: just ask it, with no note. Until they've answered, there's nothing to note: never note a placeholder like "waiting for answer" or "unknown".
 - When your instructions say to read an answer back or spell it out, do it, then stop and wait for their reply. Call note, and say the next line, once they've confirmed it.
 - Never ask a follow-up question of your own. Say each line in your own natural words, keeping its meaning, but leave out anything they've already heard on this call (if you've introduced yourself, don't do it again).
-- An answer that points at something you know is still an answer: for a phone number, "this number" or "the one you're calling" means the phone number of this call (note that number if it's listed under This call, otherwise note their words).
+- An answer that points at something you know is still an answer: for a phone number, "this number" or "the one you're calling" means the phone number of this call (note that number if it's listed under This call, otherwise note their words); for their name, "you know my name" or "it's on there" means the name listed under This call (note that name; if none is listed, ask for it).
 - If they answer a question that comes later, note that too, so it isn't asked again.
 - If they change an earlier answer, note the new answer.
 - If they ask something else, answer briefly, then come back to the current step.

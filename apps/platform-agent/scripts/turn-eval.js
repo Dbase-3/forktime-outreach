@@ -38,7 +38,7 @@ const dentist = {
 };
 
 function setupFor(flow, values, opts = {}) {
-  return { flow, business: opts.business ?? "Toyota Motors", direction: "inbound", values: { agent: "Ava", business: opts.business ?? "Toyota Motors", today: opts.today ?? TODAY, ...values }, schema: dataSchema(flow), knowledge: { inline: [], searchable: false }, test: false, calendar: flow.steps.some((s) => s.integration === "calcom") ? { provider: "calcom", name: "Cal.com" } : null };
+  return { flow, business: opts.business ?? "Toyota Motors", direction: "inbound", values: { agent: "Ava", business: opts.business ?? "Toyota Motors", today: opts.today ?? TODAY, ...(opts.values ?? {}), ...values }, schema: dataSchema(flow), knowledge: { inline: [], searchable: false }, test: false, calendar: flow.steps.some((s) => s.integration === "calcom") ? { provider: "calcom", name: "Cal.com" } : null };
 }
 function instructionsFor(flow, saved, opts) {
   const done = new Set(flow.steps.filter((s) => s.kind === "ask" && saved[s.field]).map((s) => s.id));
@@ -49,7 +49,10 @@ function instructionsFor(flow, saved, opts) {
 const tools = (flow) => [
   { name: "note", description: "Save something they actually said: the answer to the current question, a later question answered early, a changed answer, or something to listen for. Never save a question you are asking. The result says what to say next, unless you've already said it (see Right now).", input_schema: { type: "object", properties: { field: { type: "string", enum: dataSchema(flow).map((f) => f.key) }, value: { type: "string" } }, required: ["field", "value"] } },
   { name: "end_call", description: "End the call when it can't go on.", input_schema: { type: "object", properties: { goodbye: { type: "string" }, outcome: { type: "string" }, summary: { type: "string" } }, required: ["goodbye", "outcome", "summary"] } },
-  ...(flow.steps.some((s) => s.integration) ? [{ name: "check_times", description: "Get free times.", input_schema: { type: "object", properties: { from: { type: "string" } } } }] : []),
+  ...(flow.steps.some((s) => s.integration) ? [
+    { name: "check_times", description: "Get free times.", input_schema: { type: "object", properties: { from: { type: "string" } } } },
+    { name: "book_time", description: "Book the time they picked. Only after they've agreed to a day and time from check_times.", input_schema: { type: "object", properties: { start: { type: "string" }, name: { type: "string" } }, required: ["start", "name"] } },
+  ] : []),
 ];
 
 // Each case: the conversation so far (last line = caller), and a judge of the reply.
@@ -62,8 +65,31 @@ const plumber = {
   steps: [ask("p1", "issue", "What's going on with the plumbing?"), ask("p2", "callback_number", "What's the best number to call you back on?"), ask("p3", "address", "And the address for the job?"), { id: "p5", kind: "end", outcome: "callback_requested", text: "Thanks, a plumber will call you back shortly." }],
   dataFields: [], askRequired: {},
 };
+const seoAgent = {
+  name: "Sunny Comet", timezone: "Asia/Karachi", agent: { personality: "friendly", language: "English" },
+  greeting: "Hi {first_name}, this is {agent}, an AI assistant calling from {business}. This call is recorded. Do you have a quick minute?",
+  prompt: "You are {agent}, an AI assistant calling restaurant owners for {business}, a digital marketing agency. Keep it short and friendly.",
+  steps: [ask("q1", "interest", "Which are you most interested in: SEO, online ads, or directory listings?"), ask("q2", "contact_name", "Can I take your name?"), ask("q3", "contact_phone", "And what's the best phone number to reach you on?"), { id: "q4", kind: "action", action: "book", detail: "Book a 30-minute call", integration: "calcom" }, { id: "q5", kind: "end", outcome: "meeting_booked", text: "Thanks, speak then!" }],
+  dataFields: [], askRequired: {},
+};
+const SLOTS = "Free times in Karachi time:\nMonday 30 November: 9 am [2026-11-30T04:00:00Z], 10:30 am [2026-11-30T05:30:00Z], 4 pm [2026-11-30T11:00:00Z]\nTuesday 1 December: 10:30 am [2026-12-01T05:30:00Z], 2 pm [2026-12-01T09:00:00Z]";
 const ONLY = process.env.ONLY;
 const CASES = [
+  { name: "name: you know my name (owner's call)", flow: seoAgent, saved: { interest: "SEO" }, opts: { business: "Digital Growth Co", values: { name: "Aadeel Khaan", first_name: "Aadeel", phone: "+14045090399" } },
+    convo: [["a", "Hi Aadeel, this is Ava, an AI assistant calling from Digital Growth Co. This call is recorded. Do you have a quick minute?"], ["u", "Yes."], ["a", "Which are you most interested in: SEO, online ads, or directory listings?"], ["u", "SEO."], ["a", "Great choice. Can I take your name?"], ["u", "You already know my name."]],
+    pass: (r) => { const n = notes(r).find((x) => x.field === "contact_name"); return n ? (/aadeel/i.test(n.value) ? "ok" : `FAIL noted "${n.value}"`) : `FAIL no name noted: "${text(r).slice(0, 70)}"`; } },
+  { name: "name: it's on your list (new)", flow: seoAgent, saved: { interest: "Online ads" }, opts: { business: "Digital Growth Co", values: { name: "Maria Lopez", first_name: "Maria", phone: "+15125550198" } },
+    convo: [["a", "Hi Maria, this is Ava, an AI assistant calling from Digital Growth Co. This call is recorded. Do you have a quick minute?"], ["u", "Sure."], ["a", "Which are you most interested in: SEO, online ads, or directory listings?"], ["u", "Online ads I guess."], ["a", "Nice. Can I take your name?"], ["u", "You called me, you've got it already."]],
+    pass: (r) => { const n = notes(r).find((x) => x.field === "contact_name"); return n ? (/maria/i.test(n.value) ? "ok" : `FAIL noted "${n.value}"`) : `FAIL no name noted: "${text(r).slice(0, 70)}"`; } },
+  { name: "book: unclear pick isn't booked (owner's call)", flow: seoAgent, saved: { interest: "SEO", contact_name: "Aadeel Khaan", contact_phone: "+923131083726" }, opts: { business: "Digital Growth Co" },
+    convo: [["a", "Got it. Let me check what's free."], ["tool", { id: "t1", name: "check_times", input: {} }], ["result", { id: "t1", text: SLOTS }], ["a", "I've got Monday at 9 am, 10:30 am or 4 pm. Which suits?"], ["u", "Let's do Monday at 4:30 AM."], ["a", "4:30 am is early, and it's not free. I've got 4 pm on Monday, would that work?"], ["u", "PM. Sorry, PM."]],
+    pass: (r) => r.content.some((b) => b.type === "tool_use" && b.name === "book_time") ? `FAIL booked: "${text(r).slice(0, 70)}"` : "ok" },
+  { name: "book: clear yes is booked (new)", flow: seoAgent, saved: { interest: "SEO", contact_name: "Maria Lopez", contact_phone: "+15125550198" }, opts: { business: "Digital Growth Co" },
+    convo: [["a", "Can I take your name?"], ["u", "Maria Lopez."], ["a", "Thanks Maria. And the best number to reach you on?"], ["u", "512 555 0198."], ["a", "Got it. Let me check what's free."], ["tool", { id: "t1", name: "check_times", input: {} }], ["result", { id: "t1", text: SLOTS }], ["a", "I've got Tuesday at 10:30 am or 2 pm. Which suits?"], ["u", "2 pm Tuesday."], ["a", "So that's Tuesday the 1st of December at 2 pm. Shall I book it?"], ["u", "Yes please."]],
+    pass: (r) => { const b = r.content.find((x) => x.type === "tool_use" && x.name === "book_time"); return b ? (b.input.start === "2026-12-01T09:00:00Z" ? "ok" : `FAIL booked ${b.input.start}`) : `FAIL not booked: "${text(r).slice(0, 70)}"`; } },
+  { name: "book: picks a free time (new)", flow: seoAgent, saved: { interest: "SEO", contact_name: "Maria Lopez", contact_phone: "+15125550198" }, opts: { business: "Digital Growth Co" },
+    convo: [["a", "Can I take your name?"], ["u", "Maria Lopez."], ["a", "Thanks Maria. And the best number to reach you on?"], ["u", "512 555 0198."], ["a", "Got it. Let me check what's free."], ["tool", { id: "t1", name: "check_times", input: {} }], ["result", { id: "t1", text: SLOTS }], ["a", "I've got Monday at 9 am or 10:30 am, or Tuesday at 2 pm. Which suits?"], ["u", "Monday at 10:30."]],
+    pass: (r) => r.content.some((b) => b.type === "tool_use" && b.name === "book_time") ? `FAIL booked without a yes: "${text(r).slice(0, 70)}"` : /10:30/.test(text(r)) ? "ok (repeated, waiting)" : `? "${text(r).slice(0, 70)}"` },
   { name: "readback forced: confirmed (new, plumber)", flow: plumber, saved: { issue: "Leaking pipe" }, opts: { business: "Ace Plumbing", today: "Monday 30 November 2026", now: "2026-11-30T15:00:00Z" },
     convo: [["a", "Hi, this is Ava, the AI assistant at Ace Plumbing. This call is recorded. How can I help?"], ["u", "My kitchen sink pipe is leaking."], ["a", "Sorry to hear that. What's the best number to call you back on?"], ["u", "It's 212 555 0147."], ["a", "Thanks. Let me read that back: two one two, five five five, zero one four seven. Is that right?"], ["u", "Yes, that's right."]],
     pass: (r) => notes(r).some((n) => n.field === "callback_number") ? (/address/i.test(text(r)) || !text(r).trim() ? "ok (noted, moved on)" : `ok (noted) "${text(r).slice(0, 60)}"`) : `FAIL didn't note after yes: "${text(r).slice(0, 80)}"` },
@@ -101,7 +127,7 @@ const CASES = [
   let fails = 0, total = 0;
   for (const c of CASES.filter((c) => !ONLY || c.name.includes(ONLY))) {
     const system = instructionsFor(c.flow, c.saved, c.opts);
-    const messages = c.convo.map(([w, t]) => ({ role: w === "a" ? "assistant" : "user", content: t }));
+    const messages = c.convo.map(([w, t]) => ({ role: w === "a" || w === "tool" ? "assistant" : w === "result" ? "user" : "user", content: w === "tool" ? [{ type: "tool_use", id: t.id, name: t.name, input: t.input }] : w === "result" ? [{ type: "tool_result", tool_use_id: t.id, content: t.text }] : t }));
     const out = [];
     for (let i = 0; i < RUNS; i++) {
       const r = await client.messages.create({ model: MODEL, max_tokens: 300, system, tools: tools(c.flow), messages });

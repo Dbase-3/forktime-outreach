@@ -33,9 +33,9 @@ export function CallSheet({ callId, onClose }: { callId: string | null; onClose:
     queryKey: callKey(app.workspace.id, openId),
     queryFn: () => ws<CallDetail>(`/calls/${openId}`),
     enabled: Boolean(openId),
-    refetchInterval: (q) => (q.state.data?.call.live ? 3000 : false),
+    refetchInterval: (q) => (q.state.data?.call?.live ? 3000 : false),
   });
-  const call = detail.data && detail.data.call.id === openId ? detail.data.call : null;
+  const call = detail.data?.call?.id === openId ? detail.data.call : null;
   const contact = call ? detail.data?.contact ?? undefined : undefined;
   const flow = call ? app.flows.find((f) => f.id === call.flowId) : undefined;
   const latest = call;

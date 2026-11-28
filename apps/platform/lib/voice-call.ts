@@ -32,7 +32,9 @@ export function useVoiceCall(agentId: string) {
 
   const wsId = currentWorkspace();
   const record = useQuery({
-    queryKey: ["call", wsId, callId],
+    // Its own key: the call drawer caches { call, contact } under ["call", …], this keeps the bare Call (sharing
+    // one key crashed the drawer for a just-made test call, 2026-11-28).
+    queryKey: ["test-call", wsId, callId],
     queryFn: () => ws<{ call: Call }>(`/calls/${callId}`).then((r) => r.call),
     enabled: Boolean(callId),
     // Fast while talking; after hanging up, until the agent has filed it.

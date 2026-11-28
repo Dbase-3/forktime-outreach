@@ -26,6 +26,10 @@ const ask = z.object({
 });
 // What an action can run on: the tools that really connect, a webhook, or nothing ("").
 const LINKS = ["", "webhook", ...AVAILABLE_INTEGRATIONS.map((i) => i.id)] as [string, ...string[]];
+// What runs once the call is over, however it ended (owner 2026-11-28: a CRM save as the last
+// step never ran when the caller hung up before reaching it).
+const AFTER_LINKS = ["webhook", ...AVAILABLE_INTEGRATIONS.map((i) => i.id)] as [string, ...string[]];
+const afterCall = z.object({ kind: z.enum(["save_contact", "send_webhook"]), integration: z.enum(AFTER_LINKS).describe("the CRM to save to, or webhook"), detail: z.string().describe("in plain words; for a webhook, the URL") });
 const action = z.object({ kind: z.literal("action"), action: z.enum(["book", "transfer", "text", "crm", "webhook"]), detail: z.string(), integration: z.enum(LINKS).describe("the tool it runs on, from the list you're given; empty for none") });
 const end = z.object({ kind: z.literal("end"), outcome: z.string().describe("snake_case result, e.g. meeting_booked"), text: z.string() });
 const condition = z.object({ field: z.string(), op: z.enum(OP_KEYS), value: z.string().describe("empty for is_yes, is_no, is_set, is_empty") });
@@ -55,6 +59,7 @@ export const AgentDraft = z.object({
     }),
   ),
   checks: z.array(z.object({ label: z.string(), description: z.string() })),
+  afterCall: z.array(afterCall),
   agentName: z.string().describe("the name the agent calls itself on calls, if the owner gave one (like Sara); otherwise empty"),
   business: z.string().describe("the company the agent speaks for, only if the owner named one other than the Business; otherwise empty"),
 });
@@ -127,7 +132,7 @@ function askFields(steps: Step[]): Set<string> {
 }
 
 /** The parts of an agent a draft fills in, plus the name it uses on calls when the owner gave one (it goes on the voice). */
-export type DraftParts = Pick<Flow, "name" | "description" | "direction" | "greeting" | "prompt" | "steps" | "dataFields" | "checks" | "business"> & { agentName?: string };
+export type DraftParts = Pick<Flow, "name" | "description" | "direction" | "greeting" | "prompt" | "steps" | "dataFields" | "checks" | "business" | "afterCall"> & { agentName?: string };
 
 export function applyDraft(draft: AgentDraftT): DraftParts {
   const steps = toSteps(draft.steps);
@@ -152,6 +157,7 @@ export function applyDraft(draft: AgentDraftT): DraftParts {
     steps,
     dataFields,
     checks,
+    afterCall: (draft.afterCall ?? []).map((a) => ({ id: newId("ac"), kind: a.kind, integration: a.integration, fields: [], detail: a.detail.trim() })),
   };
 }
 
@@ -165,6 +171,7 @@ An agent has two parts, and they must not repeat each other:
    - ask: a question; the answer is saved under field (snake_case). answerType is text, yesno, number, date or choice (give 2 to 5 choices for choice, otherwise an empty list).
    - branch: a decision on a field saved earlier by an ask, or on a contact field. Use is_yes / is_no for yesno answers, is / any_of for choices, less_than / more_than for numbers, before / after for dates. value is empty for is_yes, is_no, is_set, is_empty. Each side is a list of steps; a side may be empty (the call carries on after the branch).
    - action: book (calendar), transfer (to a person), text (send an SMS), crm (save or flag in the CRM), webhook. detail says what, in a few words. integration is the tool it runs on, from the Tools list you're given: link every book step to a calendar and every crm step to a CRM there (the one the owner names, or the only one that fits); leave it empty when nothing fits, and for transfer and text.
+   - Saving the person to a CRM once the call is over ("save them to GoHighLevel", "log it in Twenty") is an afterCall save_contact, never a crm step at the end of the workflow: a call that ends early would never reach that step. Use a crm step only for something to do at that exact point of the call.
    - Booking on a calendar: the book step itself finds free times, offers them, agrees one with the caller and books it. So don't put an ask for the day or time before it, and never a say after it claiming it's booked (the call confirms the real booking).
    - A date answer holds a day only, never a time of day.
    - end: the call ends with this line; outcome is a snake_case result such as meeting_booked or not_interested.
@@ -177,6 +184,8 @@ agentName: if the owner names the agent (like "an agent named Sara"), put that n
 business: if the owner says the agent represents a company or brand other than the Business named below (an agency building for a client, say), put that company's name here; {business} then says it on calls. Otherwise leave it empty. Either way, write {business} in the greeting, prompt and steps, never a company name.
 
 You may use contact fields in braces, like {first_name}, in any line, but only fields from the list you are given.
+
+afterCall: what runs once the call is over, however it ended: save_contact to a CRM from the Tools list, or send_webhook to their URL. Often empty.
 
 dataFields: extra facts to pull from the conversation that no ask step already saves (often none). checks: 1 to 3 ways to judge whether a call did its job.
 

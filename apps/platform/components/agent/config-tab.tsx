@@ -15,6 +15,7 @@ import { numberOwner } from "@outreach/core/numbers";
 import { useApp } from "@/lib/store";
 import { VoicePanel } from "../flow/voice-panel";
 import { NumberPicker } from "../numbers/number-picker";
+import { setAgentNumber } from "@/lib/actions";
 import { VarText } from "../var-text";
 import { Popover } from "../popover";
 import { Confirm } from "../confirm";
@@ -165,7 +166,9 @@ function NumberField({ flow, onEdit }: { flow: Flow; onEdit: (fn: (f: Flow) => F
           }
           setLiveNote(false);
           setPending(null);
-          onEdit((f) => ({ ...f, numberId: id }));
+          setNumberProblem(null);
+          // The number is saved on its own route (the draft save leaves it out), so it really changes on the server.
+          void setAgentNumber(flow.id, id ?? null).catch((err) => setNumberProblem(err instanceof Error ? err.message : "Couldn't change the number."));
         }}
       />
       {liveNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">A live agent needs a number. Switch it to draft first, or pick another number.</p>}

@@ -88,24 +88,28 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
           void start("build");
         }}
       >
-        <div className="relative">
-          <textarea
-            ref={box}
-            className="field min-h-[7.5rem] resize-none py-2.5 leading-relaxed"
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter builds (Shift+Enter for a new line), like a chat box.
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void start("build");
-              }
-            }}
-            maxLength={BRIEF_MAX}
-            autoFocus
-            aria-label="What this agent should do"
-            placeholder={hint}
-          />
+        {/* The same coloured ring and wash as "Describe your agent" in the editor. */}
+        <div className="ai-ring">
+          <div className="ai-card flex gap-2.5 rounded-2xl p-3 transition-shadow focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.12)]">
+            <Sparkles size={16} className="ai-twinkle mt-1 shrink-0 text-accent" aria-hidden />
+            <textarea
+              ref={box}
+              className="min-h-[7rem] flex-1 resize-none bg-transparent text-[16px] leading-relaxed text-fg outline-none placeholder:text-fg-4 sm:text-sm"
+              value={brief}
+              onChange={(e) => setBrief(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter builds (Shift+Enter for a new line), like a chat box.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void start("build");
+                }
+              }}
+              maxLength={BRIEF_MAX}
+              autoFocus
+              aria-label="What this agent should do"
+              placeholder={hint}
+            />
+          </div>
         </div>
         <div>
           <div className="mb-2 text-xs text-fg-3">Or start from one of these:</div>

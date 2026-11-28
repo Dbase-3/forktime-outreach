@@ -226,7 +226,7 @@ export function Modal({ open, onClose, title, description, children, footer }: {
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in dark:bg-black/60" />
         <Dialog.Content
           onCloseAutoFocus={focus.onClose}
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-lift outline-none data-[state=open]:animate-sheet-up sm:bottom-auto sm:top-[10vh] sm:mx-auto sm:max-h-[80vh] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-xl sm:data-[state=open]:animate-pop-in"
+          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-lift outline-none data-[state=open]:animate-sheet-up sm:top-0 sm:m-auto sm:h-fit sm:max-h-[80vh] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-xl sm:data-[state=open]:animate-pop-in"
         >
           <div className="flex items-start gap-3 px-5 pb-3 pt-5">
             <div className="min-w-0 flex-1">

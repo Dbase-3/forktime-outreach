@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import { callNote, personOf } from "../src/crm";
 
 describe("who the call was with", () => {
-  it("the call's contact comes first", () => {
-    expect(personOf({ contact: { name: "Ann Lee", phoneE164: "+61400111222", email: "ann@x.com" }, saved: { contactName: "Someone" }, fromNumber: "+15550001111" })).toEqual({ name: "Ann Lee", phone: "+61400111222", email: "ann@x.com" });
+  it("what they said on the call wins over the contact; the contact fills in the rest", () => {
+    const contact = { name: "Aadeel Khaan", phoneE164: "+14045090399", email: "ceo@monsterhub.io" };
+    expect(personOf({ contact, saved: { full_name: "Kevin Peterson", email: "kevin@gmail.com", phone_number: "+92 313-1083726" } })).toEqual({ name: "Kevin Peterson", phone: "+923131083726", email: "kevin@gmail.com" });
+    expect(personOf({ contact, saved: { full_name: "Kevin Peterson" }, fromNumber: "+15550001111" })).toEqual({ name: "Kevin Peterson", phone: "+14045090399", email: "ceo@monsterhub.io" });
+  });
+
+  it("with nothing said, the call's contact", () => {
+    expect(personOf({ contact: { name: "Ann Lee", phoneE164: "+61400111222", email: "ann@x.com" }, saved: { other: "x" }, fromNumber: "+15550001111" })).toEqual({ name: "Ann Lee", phone: "+61400111222", email: "ann@x.com" });
   });
 
   it("otherwise what they said: a name answer, a phone answer in E.164, an email answer", () => {

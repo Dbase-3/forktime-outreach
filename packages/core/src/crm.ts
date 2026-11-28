@@ -20,8 +20,11 @@ const asEmail = (v: string | undefined | null) => {
 };
 
 /**
- * Who the call was with: the contact it was made for, else what they said on
- * the call (a saved name, phone or email answer), else the number that called.
+ * Who the call was with: what they said on the call (a saved name, phone or
+ * email answer) first, then the contact the call was made for, then the number
+ * that called. What the person on the line says wins (owner 2026-11-28: a test
+ * call run "as" a synced contact saved that contact to GoHighLevel and Twenty
+ * although the caller gave their own name, email and number).
  */
 export function personOf(o: { contact?: { name?: string; phoneE164?: string | null; email?: string | null } | null; saved: Record<string, string>; fromNumber?: string | null }): CallPerson {
   const saved = Object.entries(o.saved);
@@ -30,9 +33,9 @@ export function personOf(o: { contact?: { name?: string; phoneE164?: string | nu
   const last = saved.find(([k]) => /^last_?name$/i.test(k))?.[1];
   const savedName = pick(/^(contact_?|full_?|caller_?|customer_?)?name$/i, (v) => v.trim() || undefined) ?? ([first, last].filter(Boolean).join(" ") || undefined);
   return {
-    name: o.contact?.name?.trim() || savedName,
-    phone: asE164(o.contact?.phoneE164) ?? pick(/phone|mobile|number/i, asE164) ?? asE164(o.fromNumber),
-    email: asEmail(o.contact?.email) ?? pick(/e-?mail/i, asEmail),
+    name: savedName || o.contact?.name?.trim() || undefined,
+    phone: pick(/phone|mobile|number/i, asE164) ?? asE164(o.contact?.phoneE164) ?? asE164(o.fromNumber),
+    email: pick(/e-?mail/i, asEmail) ?? asEmail(o.contact?.email),
   };
 }
 

@@ -13,6 +13,8 @@ import { voiceById } from "@outreach/core/voices";
 import type { Direction } from "@outreach/core/types";
 import { Avatar, Badge, EmptyState, PageHeader, Sheet } from "@/components/ui";
 import { CreateAgentModal } from "@/components/agent/create-agent-modal";
+import { createAgent } from "@/lib/actions";
+import { randomAgentName } from "@outreach/core/numbers";
 import { AgentMenu } from "@/components/agent/agent-menu";
 
 const DIRECTION: Record<Direction, { label: string; icon: typeof ArrowUpRight }> = {
@@ -34,11 +36,21 @@ export default function AgentsPage() {
     if (new URLSearchParams(window.location.search).get("new") === "1") setPicking(true);
   }, []);
 
-  // Scratch or a template: name it and pick its number first (CreateAgentModal), then open it.
-  const [creating, setCreating] = useState<{ template: FlowTemplate | null } | null>(null);
-  const create = (template: FlowTemplate | null) => {
+  // Scratch: "What should this agent do?" (CreateAgentModal). A template opens straight away, named after
+  // it; name and number are set later in Config (owner 2026-11-28: don't ask them up front).
+  const [describing, setDescribing] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const create = async (template: FlowTemplate | null) => {
     setPicking(false);
-    setCreating({ template });
+    setProblem(null);
+    if (!template) return setDescribing(true);
+    try {
+      const taken = flows.map((f) => f.name);
+      const flow = await createAgent({ templateId: template.id, name: taken.includes(template.name) ? randomAgentName(taken) : template.name });
+      router.push(`/agents/${flow.id}`);
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Couldn't create the agent.");
+    }
   };
   const q = query.trim().toLowerCase();
   const shown = flows.filter((f) => !q || `${f.name} ${f.description} ${f.agent.name}`.toLowerCase().includes(q));
@@ -51,6 +63,7 @@ export default function AgentsPage() {
   return (
     <div>
       <PageHeader title="Agents" subtitle="Each agent has a voice, a workflow, what it knows and what it collects." actions={newButton} />
+      {problem && <p className="mb-4 text-sm text-rose-700 dark:text-rose-400" role="alert">{problem}</p>}
 
       <div className="mb-5 rounded-xl border border-line bg-surface p-4">
         <div className="mb-3 flex items-center justify-between">
@@ -59,7 +72,7 @@ export default function AgentsPage() {
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           {TEMPLATES.slice(0, 3).map((t) => (
-            <button key={t.id} type="button" onClick={() => create(t)} className="rounded-lg border border-line p-3 text-left transition-colors hover:border-line-strong hover:bg-subtle">
+            <button key={t.id} type="button" onClick={() => void create(t)} className="rounded-lg border border-line p-3 text-left transition-colors hover:border-line-strong hover:bg-subtle">
               <span className="block text-sm font-medium">{t.name}</span>
               <span className="mt-0.5 line-clamp-2 block text-xs text-fg-3">{t.blurb}</span>
             </button>
@@ -123,7 +136,7 @@ export default function AgentsPage() {
       )}
 
       <Sheet open={picking} onClose={() => setPicking(false)} title="New agent" size="lg">
-        <button type="button" onClick={() => create(null)} className="mb-5 flex w-full items-center gap-3 rounded-xl border border-dashed border-line-strong p-3.5 text-left transition-colors hover:bg-subtle">
+        <button type="button" onClick={() => void create(null)} className="mb-5 flex w-full items-center gap-3 rounded-xl border border-dashed border-line-strong p-3.5 text-left transition-colors hover:bg-subtle">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-fg-2"><FilePlus2 size={16} /></span>
           <span>
             <span className="block text-sm font-medium">Start from scratch</span>
@@ -135,7 +148,7 @@ export default function AgentsPage() {
           {TEMPLATES.map((t) => {
             const DirIcon = DIRECTION[t.direction].icon;
             return (
-              <button key={t.id} type="button" onClick={() => create(t)} className={clsx("flex flex-col items-start rounded-xl border border-line p-3.5 text-left transition-colors hover:border-line-strong hover:bg-subtle")}>
+              <button key={t.id} type="button" onClick={() => void create(t)} className={clsx("flex flex-col items-start rounded-xl border border-line p-3.5 text-left transition-colors hover:border-line-strong hover:bg-subtle")}>
                 <span className="flex w-full items-center justify-between gap-2">
                   <span className="text-sm font-medium">{t.name}</span>
                   <DirIcon size={13} className="text-fg-4" />
@@ -147,7 +160,7 @@ export default function AgentsPage() {
           })}
         </div>
       </Sheet>
-      <CreateAgentModal open={creating !== null} template={creating?.template ?? null} onClose={() => setCreating(null)} />
+      <CreateAgentModal open={describing} onClose={() => setDescribing(false)} />
     </div>
   );
 }

@@ -64,6 +64,7 @@ export function AgentEditor({ id }: { id: string }) {
   // Undo after Write with AI puts back only what the AI wrote, so edits made meanwhile stay (B28).
   const [undo, setUndo] = useState<Partial<Flow> | null>(null);
   const [drawn, setDrawn] = useState(0); // bumps when AI (or undo) replaces the workflow, so the canvas refits
+  const [startWith, setStartWith] = useState<string | null>(null); // a description to write the agent from on open
   const [focusBrief, setFocusBrief] = useState(false); // "Start from scratch": the cursor waits in "Change with AI"
   const writer = useAgentWriter();
   // Contacts to try the preview as (a few from the server).
@@ -87,7 +88,16 @@ export function AgentEditor({ id }: { id: string }) {
   useEffect(() => {
     if (window.matchMedia("(min-width: 768px)").matches) setView("canvas");
     // A freshly written agent opens on its workflow, so the owner sees what was built.
-    if (new URLSearchParams(window.location.search).get("blank") === "1") setFocusBrief(true);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("blank") === "1") setFocusBrief(true);
+    // From "What should this agent do?": write it from that description now, and drop it from the address
+    // (so a reload or a shared link doesn't write it again).
+    const described = params.get("describe")?.trim();
+    if (described) {
+      setStartWith(described);
+      params.delete("describe");
+      window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
+    }
   }, []);
 
   const showMain = (tab: MainTab) => {
@@ -294,7 +304,7 @@ export function AgentEditor({ id }: { id: string }) {
               />
             )}
           </div>
-          <ChangeWithAi flow={flow} onApply={applyParts} onWriteWhole={writeAgent} writing={writer.busy === "agent"} focus={focusBrief} />
+          <ChangeWithAi flow={flow} onApply={applyParts} onWriteWhole={writeAgent} writing={writer.busy === "agent"} focus={focusBrief} startWith={startWith} />
         </aside>
 
         <SplitDivider container={panes} pct={split} onChange={setSplit} />

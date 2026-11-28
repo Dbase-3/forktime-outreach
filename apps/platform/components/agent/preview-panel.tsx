@@ -20,9 +20,10 @@ type Mode = "voice" | "chat";
 
 export function PreviewPanel({ flow, business, contacts, onActiveStep }: { flow: Flow; business: string; contacts: Contact[]; onActiveStep: (id: string | null) => void }) {
   const [mode, setMode] = useState<Mode>("voice");
-  const [picked, setPicked] = useState("");
-  // The contacts arrive after the first render: until one is picked, use the first.
-  const contactId = picked || contacts[0]?.id || "";
+  const [picked, setPicked] = useState<string | null>(null); // "" = someone new, not a contact
+  // Until they pick: an agent that answers calls hears from someone new (owner 2026-11-28: a test call run as
+  // the first synced contact saved that contact to the CRMs); one that makes calls rings the first contact.
+  const contactId = picked ?? (flow.direction === "outbound" ? contacts[0]?.id ?? "" : "");
   const contact = contacts.find((c) => c.id === contactId);
   const begin = useMemo(() => () => startPractice(flow, { agentName: flow.agent.name, business, contactFields: callValues(flow, contact) }), [flow, business, contact]);
   const [state, setState] = useState<PracticeState>(begin);
@@ -63,6 +64,7 @@ export function PreviewPanel({ flow, business, contacts, onActiveStep }: { flow:
         <label className="flex items-center gap-2">
           <span className="shrink-0 text-xs text-fg-3">{flow.direction === "inbound" ? "Caller" : "Calling"}</span>
           <select className="field h-8 min-w-0 flex-1 py-0 text-sm" value={contactId} onChange={(e) => setPicked(e.target.value)} aria-label="Preview as contact">
+            <option value="">Someone new (not a contact)</option>
             {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
           </select>
         </label>

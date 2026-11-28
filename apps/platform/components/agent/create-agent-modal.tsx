@@ -1,103 +1,168 @@
 "use client";
 
-// Before a new agent opens (owner 2026-11-26): name it (a random starter name,
-// only to tell agents apart; what it says on calls is set in Config) and pick
-// its phone number. A number already used by another agent can't be taken;
-// "Get another number" adds one without leaving the dialog.
+// "Start from scratch" (owner 2026-11-28): one box, "What should this agent
+// do?", with example requests typing themselves into the empty box and a few to
+// click, so people see what agents can do. Build = create it and let AI write
+// it at once (the editor picks the description up); Skip = a blank agent. No
+// name or number here: it gets a random starter name and no number, both set
+// later in Config. Nothing here is required.
 
-import { ArrowLeft } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { numberOwner, randomAgentName } from "@outreach/core/numbers";
-import { useApp } from "@/lib/store";
-import type { FlowTemplate } from "@outreach/core/templates";
+import { randomAgentName } from "@outreach/core/numbers";
+import { BRIEF_MAX } from "@outreach/core/schemas";
 import { createAgent } from "@/lib/actions";
-import { Field, Modal } from "../ui";
-import { GetNumber, NumberPicker } from "../numbers/number-picker";
+import { useApp } from "@/lib/store";
+import { Modal } from "../ui";
 
-export function CreateAgentModal({ open, template, onClose }: { open: boolean; template: FlowTemplate | null; onClose: () => void }) {
+/** What an agent can do, as people would ask for it. Shown typing in the empty box and as one-click starts. */
+export const EXAMPLE_BRIEFS = [
+  { label: "Book appointments", text: "Answer calls for my dental clinic, book check-ups in my Cal.com calendar and save new patients to GoHighLevel." },
+  { label: "Qualify leads", text: "Call new leads from my list, ask their budget and when they want to buy, and book a demo with the ones who are ready." },
+  { label: "Answer questions", text: "Answer questions about our opening hours, prices and services from our website, and take a message when we're closed." },
+  { label: "Confirm bookings", text: "Call customers the day before their appointment to confirm it, and move it to a new time if they can't make it." },
+  { label: "Save to my CRM", text: "Take enquiries for our real estate agency: get their name, phone, email and what they're looking for, and save them to Twenty." },
+];
+
+const EXAMPLE_TEXTS = EXAMPLE_BRIEFS.map((e) => e.text); // stable, so the typing doesn't restart each render
+
+/** The minimum Write with AI accepts. */
+const MIN_BRIEF = 8;
+
+export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const app = useApp();
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [numberId, setNumberId] = useState<string | undefined>(undefined);
-  const [view, setView] = useState<"details" | "number">("details");
-  const nameBox = useRef<HTMLInputElement>(null);
+  const [brief, setBrief] = useState("");
+  const [busy, setBusy] = useState<null | "build" | "skip">(null);
+  const [error, setError] = useState<string | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const hint = useTypingHint(open && !brief, EXAMPLE_TEXTS);
 
-  // Fresh each time it opens: a starter name, and the first free number picked for them.
   useEffect(() => {
     if (!open) return;
-    const taken = app.flows.map((f) => f.name);
-    setName(template && !taken.includes(template.name) ? template.name : randomAgentName(taken));
-    setNumberId(app.numbers.find((n) => !numberOwner(app.flows, n.id))?.id);
-    setView("details");
-    // Only when it opens; later edits to the workspace shouldn't reset what they typed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, template]);
+    setBrief("");
+    setError(null);
+    setBusy(null);
+  }, [open]);
 
-  const blocked = Boolean(numberOwner(app.flows, numberId));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const create = async () => {
-    if (!name.trim() || blocked || busy) return;
-    setBusy(true);
+  const start = async (how: "build" | "skip") => {
+    if (busy) return;
+    const text = how === "build" ? brief.trim().slice(0, BRIEF_MAX) : "";
+    if (how === "build" && text.length < MIN_BRIEF) return;
+    setBusy(how);
     setError(null);
     try {
-      const flow = await createAgent({ templateId: template?.id ?? null, name: name.trim(), numberId });
+      const flow = await createAgent({ templateId: null, name: randomAgentName(app.flows.map((f) => f.name)) });
       onClose();
-      router.push(template ? `/agents/${flow.id}` : `/agents/${flow.id}?blank=1`);
+      // The editor writes the agent from `describe` straight away (and drops it from the address).
+      router.push(text ? `/agents/${flow.id}?describe=${encodeURIComponent(text)}` : `/agents/${flow.id}?blank=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create the agent.");
-    } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
-
-  if (view === "number") {
-    return (
-      <Modal open={open} onClose={onClose} title="Get another number" description="Pick where people will see you calling from.">
-        <button type="button" className="mb-3 flex items-center gap-1 text-sm text-fg-3 hover:text-fg" onClick={() => setView("details")}><ArrowLeft size={14} /> Back</button>
-        <GetNumber
-          taken={app.numbers.map((n) => n.e164)}
-          onAdded={(n) => {
-            setNumberId(n.id);
-            setView("details");
-          }}
-        />
-      </Modal>
-    );
-  }
+  const ready = brief.trim().length >= MIN_BRIEF;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={template ? `New agent from “${template.name}”` : "New agent"}
-      description="Name it and give it a number. You can change both later."
+      title="What should this agent do?"
+      description="Describe it in a sentence or two and AI builds it. Or skip and build it yourself."
       footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={() => void create()} disabled={!name.trim() || blocked || busy}>{busy ? "Creating…" : "Create agent"}</button>
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" className="btn-ghost" onClick={() => void start("skip")} disabled={busy !== null}>
+            {busy === "skip" ? "Creating…" : "Skip, start blank"}
+          </button>
+          <button type="button" className="btn-primary" onClick={() => void start("build")} disabled={!ready || busy !== null}>
+            <Sparkles size={15} aria-hidden /> {busy === "build" ? "Creating…" : "Build agent"}
+          </button>
         </div>
       }
     >
       <form
-        className="space-y-5"
+        className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          void create();
+          void start("build");
         }}
       >
-        <Field label="Agent name" hint="Only for you, to tell your agents apart. What it calls itself on calls is set in Config.">
-          <input ref={nameBox} className="field" value={name} onChange={(e) => setName(e.target.value)} onFocus={(e) => e.target.select()} autoFocus maxLength={60} />
-        </Field>
+        <div className="relative">
+          <textarea
+            ref={box}
+            className="field min-h-[7.5rem] resize-none py-2.5 leading-relaxed"
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter builds (Shift+Enter for a new line), like a chat box.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void start("build");
+              }
+            }}
+            maxLength={BRIEF_MAX}
+            autoFocus
+            aria-label="What this agent should do"
+            placeholder={hint}
+          />
+        </div>
         <div>
-          <span className="label">Phone number</span>
-          <p className="-mt-0.5 mb-2 text-xs text-fg-3">It makes and answers calls on this number. Each number belongs to one agent.</p>
-          <NumberPicker numbers={app.numbers} flows={app.flows} value={numberId} onChange={setNumberId} onGetNumber={() => setView("number")} />
+          <div className="mb-2 text-xs text-fg-3">Or start from one of these:</div>
+          <div className="flex flex-wrap gap-1.5">
+            {EXAMPLE_BRIEFS.map((e) => (
+              <button
+                key={e.label}
+                type="button"
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                onClick={() => {
+                  setBrief(e.text);
+                  box.current?.focus();
+                }}
+              >
+                {e.label}
+              </button>
+            ))}
+          </div>
         </div>
         {error && <p className="text-sm text-rose-700 dark:text-rose-400" role="alert">{error}</p>}
-        <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
       </form>
     </Modal>
   );
+}
+
+/**
+ * Example requests typed into the empty box one letter at a time, held, then
+ * the next. With reduced motion they just change every few seconds. Only runs
+ * while `on` (open and empty).
+ */
+function useTypingHint(on: boolean, examples: string[]): string {
+  const [shown, setShown] = useState(`e.g. ${examples[0]}`);
+  useEffect(() => {
+    if (!on) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let i = 0;
+    let n = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const full = `e.g. ${examples[i]}`;
+      if (still) {
+        setShown(full);
+        i = (i + 1) % examples.length;
+        timer = setTimeout(tick, 4000);
+        return;
+      }
+      n += 1;
+      setShown(full.slice(0, n));
+      if (n < full.length) timer = setTimeout(tick, 28);
+      else {
+        i = (i + 1) % examples.length;
+        n = 0;
+        timer = setTimeout(tick, 2600); // hold the whole line, then type the next
+      }
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [on, examples]);
+  return shown;
 }

@@ -344,10 +344,11 @@ export class VoiceService {
     if (Number.isNaN(Date.parse(start))) return { ok: false, text: "That isn't one of the times. Use the exact value in brackets from check_times." };
     const { call, timeZone, cal } = await this.bookingContext(callId);
     if (!cal) return { ok: false, text: "The calendar isn't connected. Say the team will confirm a time with them." };
-    const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { phoneE164: 1, email: 1 }).lean() : null;
-    const phone = [contact?.phoneE164, call.fromNumber].find((p): p is string => typeof p === "string" && /^\+\d{8,15}$/.test(p));
+    // The caller's own answers first, then the call's contact, then the calling number (same rule as CRM saves).
+    const contact = call.contactId ? await this.contacts.findOne({ _id: call.contactId, workspaceId: call.workspaceId }, { name: 1, phoneE164: 1, email: 1 }).lean() : null;
+    const person = personOf({ contact, saved: (call.saved ?? {}) as Record<string, string>, fromNumber: call.fromNumber });
     try {
-      const booked = await cal.client.book({ calendarId: cal.eventType.id, minutes: cal.eventType.minutes, start, name, timeZone, email: email || contact?.email || undefined, phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
+      const booked = await cal.client.book({ calendarId: cal.eventType.id, minutes: cal.eventType.minutes, start, name, timeZone, email: email || person.email || undefined, phone: person.phone, metadata: { lisnaCallId: String(callId), ...(call.test ? { test: "yes" } : {}) } });
       const when = whenLabel(booked.start || start, timeZone);
       await this.calls.updateOne({ _id: callId }, { $addToSet: { bookingRefs: booked.id } });
       this.log.log(`call ${String(callId)} booked ${booked.id} for ${when}`);

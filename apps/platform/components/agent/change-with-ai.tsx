@@ -33,12 +33,15 @@ export function ChangeWithAi({
   onWriteWhole,
   writing,
   focus,
+  startWith,
 }: {
   flow: Flow;
   onApply: (parts: Partial<AgentParts>) => void;
   onWriteWhole: (brief: string) => Promise<string | null>;
   writing: boolean;
   focus?: boolean;
+  /** A description given before the editor opened: sent once, as if typed here. */
+  startWith?: string | null;
 }) {
   const app = useApp();
   const [text, setText] = useState("");
@@ -76,10 +79,21 @@ export function ChangeWithAi({
   const needs = missingIntegrations(flow, connected);
   const needNames = [...new Map(needs.map((m) => [m.integration, m])).values()];
 
-  async function send() {
-    const message = text.trim();
+  // A description from "What should this agent do?": send it once, while the agent is still blank.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!startWith || started.current || !blank) return;
+    started.current = true;
+    setShown(true);
+    void send(startWith);
+    // Only when a description arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startWith]);
+
+  async function send(given?: string) {
+    const message = (given ?? text).trim();
     if (message.length < 2 || working) return;
-    setText("");
+    if (given === undefined) setText("");
     setOpen(true);
     setTurns((t) => [...t, { who: "you", text: message }]);
     if (blank) {

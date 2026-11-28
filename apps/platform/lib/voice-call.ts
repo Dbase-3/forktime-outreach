@@ -3,7 +3,8 @@
 // A real voice call with an agent, from the browser: the API files a test call
 // and sends the agent into a LiveKit room; we join it with the microphone. Or a
 // phone call (owner 2026-11-28): the API rings a real phone from the Lisna line
-// and we join the room to listen in only (no microphone), with live captions.
+// and the browser only follows along: status and captions, no microphone and no
+// sound (the conversation is on the phone alone; playing it here too echoed).
 // The orb follows the agent's own state, captions come from LiveKit's live
 // transcription, and the call record (saved answers, the step it's on) is read
 // from the API while the call runs.
@@ -105,7 +106,8 @@ export function useVoiceCall(agentId: string) {
             });
           }
         });
-        await r.connect(s.url, s.token);
+        // A phone call: no audio tracks at all (captions arrive as text streams, not tracks).
+        await r.connect(s.url, s.token, { autoSubscribe: !phone });
         if (!phone) await r.localParticipant.setMicrophoneEnabled(true);
         if (r.state === ConnectionState.Connected) setPhase((cur) => (cur === "connecting" ? "waiting" : cur));
       } catch (err) {

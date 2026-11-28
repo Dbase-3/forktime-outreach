@@ -111,7 +111,7 @@ export function LiveVoice({ flow, contactId, onActiveStep, onSaved }: { flow: Fl
           )}
         </div>
 
-        {v.phoneTo && inCall && <p className="mt-3 font-mono text-xs text-fg-3">Calling {v.phoneTo} from the Lisna line · you&apos;re listening in</p>}
+        {v.phoneTo && inCall && <p className="mt-3 font-mono text-xs text-fg-3">Calling {v.phoneTo} from the Lisna line · the call is on the phone only; captions show here</p>}
 
         {!inCall && (
           <div className="mt-6 w-full border-t border-line pt-4 text-left">
@@ -132,7 +132,7 @@ export function LiveVoice({ flow, contactId, onActiveStep, onSaved }: { flow: Fl
             ) : (
               <p className="text-xs text-fg-3">To ring a real phone, give {flow.agent.name} the Lisna line in Config → Number.</p>
             )}
-            {line && <p className="mt-1.5 text-xs text-fg-3">{flow.agent.name} calls from {line.display}; you listen in here. Include the country code.</p>}
+            {line && <p className="mt-1.5 text-xs text-fg-3">{flow.agent.name} calls from {line.display}. The conversation happens on that phone only; this page shows its progress and captions. Include the country code.</p>}
           </div>
         )}
 
